@@ -16,3 +16,5 @@ audience: humans_and_agents
 
 - [Brief](brief.md)
   Читать, когда нужно понять scope и verify для чтения zellij sessions.
+- [Design](design.md)
+  Читать, когда нужно понять выбранный adapter contract и error mapping.

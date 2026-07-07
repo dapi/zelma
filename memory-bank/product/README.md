@@ -54,3 +54,4 @@ Product-документы не определяют предметную мод
 - [Metrics](metrics.md) — product metrics, baselines, targets, measurement ownership и instrumentation constraints.
 - [Marketing](marketing.md) — positioning, messaging, channels, competitive alternatives и launch constraints.
 - [Roadmap](roadmap.md) — product themes, bets, horizons и зависимости без превращения в feature backlog.
+- [Execution Order](execution-order.md) — практический порядок запуска feature issues и параллельных delivery waves.
