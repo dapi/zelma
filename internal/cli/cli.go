@@ -51,9 +51,14 @@ func newSetupCommand(stdout io.Writer) *cobra.Command {
 	return &cobra.Command{
 		Use:   "setup",
 		Short: "Prepare a repository for zelma.",
+		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			result, err := setup.ConfigureGitignore("")
 			if err != nil {
+				var gitignoreErr *setup.GitignoreError
+				if errors.As(err, &gitignoreErr) {
+					return fmt.Errorf("%s: failed to configure .gitignore: %w", cmd.CommandPath(), err)
+				}
 				return errors.New(repo.Diagnostic(cmd.CommandPath(), err))
 			}
 			if result.Changed {

@@ -2,6 +2,7 @@ package setup
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -15,6 +16,20 @@ type Result struct {
 	Changed       bool
 }
 
+type GitignoreError struct {
+	Op   string
+	Path string
+	Err  error
+}
+
+func (e *GitignoreError) Error() string {
+	return fmt.Sprintf("%s %s: %v", e.Op, e.Path, e.Err)
+}
+
+func (e *GitignoreError) Unwrap() error {
+	return e.Err
+}
+
 func ConfigureGitignore(start string) (Result, error) {
 	root, err := repo.ResolveRoot(start)
 	if err != nil {
@@ -24,7 +39,7 @@ func ConfigureGitignore(start string) (Result, error) {
 	gitignorePath := filepath.Join(root.Path, ".gitignore")
 	content, err := os.ReadFile(gitignorePath)
 	if err != nil && !os.IsNotExist(err) {
-		return Result{}, err
+		return Result{}, &GitignoreError{Op: "read", Path: gitignorePath, Err: err}
 	}
 
 	result := Result{
@@ -36,7 +51,7 @@ func ConfigureGitignore(start string) (Result, error) {
 
 	next := appendZelmaIgnoreEntry(content)
 	if err := os.WriteFile(gitignorePath, next, 0o644); err != nil {
-		return Result{}, err
+		return Result{}, &GitignoreError{Op: "write", Path: gitignorePath, Err: err}
 	}
 	result.Changed = true
 	return result, nil

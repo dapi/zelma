@@ -175,6 +175,54 @@ func TestSetupPreservesExistingGitignoreRules(t *testing.T) {
 	assertFileContent(t, gitignorePath, "dist/\n.env\n.zelma\n")
 }
 
+func TestSetupRejectsUnexpectedArgs(t *testing.T) {
+	root := newTestGitRepo(t)
+	t.Chdir(root)
+
+	var stdout, stderr bytes.Buffer
+
+	code := Run(context.Background(), []string{"setup", "/other/repo"}, &stdout, &stderr)
+
+	if code != 1 {
+		t.Fatalf("Run() code = %d, want 1", code)
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("stdout = %q, want empty", stdout.String())
+	}
+	if !strings.Contains(stderr.String(), `unknown command "/other/repo" for "zelma setup"`) {
+		t.Fatalf("stderr = %q, want unexpected-arg diagnostic", stderr.String())
+	}
+	if _, err := os.Stat(filepath.Join(root, ".gitignore")); !os.IsNotExist(err) {
+		t.Fatalf(".gitignore stat error = %v, want not exist", err)
+	}
+}
+
+func TestSetupReportsGitignoreIOErrorsSeparately(t *testing.T) {
+	root := newTestGitRepo(t)
+	gitignorePath := filepath.Join(root, ".gitignore")
+	if err := os.Mkdir(gitignorePath, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(root)
+
+	var stdout, stderr bytes.Buffer
+
+	code := Run(context.Background(), []string{"setup"}, &stdout, &stderr)
+
+	if code != 1 {
+		t.Fatalf("Run() code = %d, want 1", code)
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("stdout = %q, want empty", stdout.String())
+	}
+	if !strings.Contains(stderr.String(), "zelma setup: failed to configure .gitignore") {
+		t.Fatalf("stderr = %q, want setup gitignore diagnostic", stderr.String())
+	}
+	if strings.Contains(stderr.String(), "failed to resolve repo root") {
+		t.Fatalf("stderr = %q, must not report repo-root failure", stderr.String())
+	}
+}
+
 func newTestGitRepo(t *testing.T) string {
 	t.Helper()
 
