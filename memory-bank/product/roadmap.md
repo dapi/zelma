@@ -20,6 +20,9 @@ canonical_for:
 
 Этот документ описывает направление и sequencing продуктовых тем. Он не должен становиться списком всех feature packages: delivery-единицы живут в [`../features/README.md`](../features/README.md), а инициативы — в [`../prd/README.md`](../prd/README.md).
 
+Практический порядок запуска GitHub issues и параллельных волн реализации
+зафиксирован в [`execution-order.md`](execution-order.md).
+
 ## Horizons
 
 | Horizon | Theme | Intended outcome | Candidate PRD / Feature | Dependency | Status |
