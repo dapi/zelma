@@ -256,10 +256,9 @@ from `list-panes --json --all`:
 - candidate path: `pane_cwd` exists and is inside or equal to the current repo
   root.
 
-Open issue: `CodexSessionRef` extraction still needs a separate design pass.
-Possible evidence sources include Codex process command line, Codex session logs,
-environment variables and CLI/session metadata. Do not mark a record `active`
-until `CodexSessionRef` rules are defined.
+`CodexSessionRef` extraction rules live in
+[`codex-runtime-identification.md`](codex-runtime-identification.md). Do not
+mark a record `active` until those rules produce a resolved UUID.
 
 ## Go Libraries
 

@@ -42,4 +42,4 @@ Knowledge-файлы опциональны. Если они создаются 
 
 ## Instantiated Epics
 
-В шаблонном репозитории этот каталог может быть пустым. Это нормально.
+- [EP-001: Go CLI Foundation](EP-001/README.md) — foundational epic for Go CLI scaffold, command tree, agent-first help and output/error contract.
