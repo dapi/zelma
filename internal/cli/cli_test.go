@@ -177,11 +177,15 @@ func TestSetupPreservesExistingGitignoreRules(t *testing.T) {
 
 func TestSetupRejectsUnexpectedArgs(t *testing.T) {
 	root := newTestGitRepo(t)
+	gitignorePath := filepath.Join(root, ".gitignore")
+	if err := os.WriteFile(gitignorePath, []byte("dist/\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	t.Chdir(root)
 
 	var stdout, stderr bytes.Buffer
 
-	code := Run(context.Background(), []string{"setup", "/other/repo"}, &stdout, &stderr)
+	code := Run(context.Background(), []string{"setup", "../other-repo"}, &stdout, &stderr)
 
 	if code != 1 {
 		t.Fatalf("Run() code = %d, want 1", code)
@@ -189,12 +193,10 @@ func TestSetupRejectsUnexpectedArgs(t *testing.T) {
 	if stdout.Len() != 0 {
 		t.Fatalf("stdout = %q, want empty", stdout.String())
 	}
-	if !strings.Contains(stderr.String(), `unknown command "/other/repo" for "zelma setup"`) {
+	if !strings.Contains(stderr.String(), `unknown command "../other-repo" for "zelma setup"`) {
 		t.Fatalf("stderr = %q, want unexpected-arg diagnostic", stderr.String())
 	}
-	if _, err := os.Stat(filepath.Join(root, ".gitignore")); !os.IsNotExist(err) {
-		t.Fatalf(".gitignore stat error = %v, want not exist", err)
-	}
+	assertFileContent(t, gitignorePath, "dist/\n")
 }
 
 func TestSetupReportsGitignoreIOErrorsSeparately(t *testing.T) {
