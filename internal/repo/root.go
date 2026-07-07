@@ -9,6 +9,8 @@ import (
 
 var ErrUnsupported = errors.New("unsupported repo")
 
+var stat = os.Stat
+
 type Root struct {
 	Path string
 }
@@ -33,7 +35,11 @@ func ResolveRoot(start string) (Root, error) {
 	original := dir
 
 	for {
-		if isGitWorktreeRoot(dir) {
+		ok, err := isGitWorktreeRoot(dir)
+		if err != nil {
+			return Root{}, err
+		}
+		if ok {
 			return Root{Path: dir}, nil
 		}
 
@@ -72,7 +78,7 @@ func normalizeStart(start string) (string, error) {
 		return "", fmt.Errorf("resolve repo root: inspect %q: %w", abs, err)
 	}
 
-	info, err := os.Stat(resolved)
+	info, err := stat(resolved)
 	if err != nil {
 		return "", fmt.Errorf("resolve repo root: stat %q: %w", resolved, err)
 	}
@@ -83,10 +89,14 @@ func normalizeStart(start string) (string, error) {
 	return filepath.Clean(resolved), nil
 }
 
-func isGitWorktreeRoot(dir string) bool {
-	info, err := os.Stat(filepath.Join(dir, ".git"))
+func isGitWorktreeRoot(dir string) (bool, error) {
+	gitPath := filepath.Join(dir, ".git")
+	info, err := stat(gitPath)
 	if err != nil {
-		return false
+		if errors.Is(err, os.ErrNotExist) {
+			return false, nil
+		}
+		return false, fmt.Errorf("resolve repo root: stat %q: %w", gitPath, err)
 	}
-	return info.IsDir() || info.Mode().IsRegular()
+	return info.IsDir() || info.Mode().IsRegular(), nil
 }

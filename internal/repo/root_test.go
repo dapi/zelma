@@ -2,6 +2,7 @@ package repo
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -81,6 +82,46 @@ func TestResolveRootOutsideRepoReturnsUnsupported(t *testing.T) {
 		if !strings.Contains(diagnostic, want) {
 			t.Fatalf("Diagnostic() = %q, want substring %q", diagnostic, want)
 		}
+	}
+}
+
+func TestResolveRootReportsGitStatFailureSeparately(t *testing.T) {
+	root := t.TempDir()
+	nested := filepath.Join(root, "nested")
+	if err := os.MkdirAll(nested, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	statErr := fmt.Errorf("permission denied")
+	gitPath := filepath.Join(cleanEval(t, root), ".git")
+	originalStat := stat
+	stat = func(path string) (os.FileInfo, error) {
+		if path == gitPath {
+			return nil, statErr
+		}
+		return originalStat(path)
+	}
+	t.Cleanup(func() {
+		stat = originalStat
+	})
+
+	_, err := ResolveRoot(nested)
+	if err == nil {
+		t.Fatal("ResolveRoot() error = nil, want stat failure")
+	}
+	if errors.Is(err, ErrUnsupported) {
+		t.Fatalf("ResolveRoot() error = %v, must not be ErrUnsupported", err)
+	}
+	if !errors.Is(err, statErr) {
+		t.Fatalf("ResolveRoot() error = %v, want wrapped statErr", err)
+	}
+
+	diagnostic := Diagnostic("zelma", err)
+	if strings.Contains(diagnostic, "run zelma from inside a Git repository") {
+		t.Fatalf("Diagnostic() = %q, must not include unsupported-repo hint", diagnostic)
+	}
+	if !strings.Contains(diagnostic, "failed to resolve repo root") {
+		t.Fatalf("Diagnostic() = %q, want probing failure diagnostic", diagnostic)
 	}
 }
 
