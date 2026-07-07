@@ -3,6 +3,8 @@ package cli
 import (
 	"bytes"
 	"context"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -87,7 +89,7 @@ func TestHelpRoutes(t *testing.T) {
 		{
 			name:       "setup",
 			args:       []string{"setup", "--help"},
-			wantOutput: []string{"Usage:", "zelma setup"},
+			wantOutput: []string{"COMMAND MAP", "STATUS", "OUTPUT CONVENTIONS", "RECOVERY HINTS", "zelma setup", "implemented"},
 		},
 		{
 			name:       "sessions list",
@@ -179,7 +181,7 @@ func assertBefore(t *testing.T, output, first, second string) {
 
 const rootHelpSnapshot = `COMMAND MAP
   zelma help              Show this command map.
-  zelma setup             Prepare this repository for zelma. Status: stub.
+  zelma setup             Add .zelma to this repository .gitignore. Status: implemented.
   zelma sessions help     Show the sessions command map.
   zelma sessions list     List known zelma sessions. Status: stub.
   zelma sessions create   Create a zelma session. Status: stub.
@@ -187,17 +189,19 @@ const rootHelpSnapshot = `COMMAND MAP
 
 OUTPUT CONVENTIONS
   help output: stdout, exit 0, plain text.
+  setup changed: stdout, exit 0, "changed: added .zelma to <path>".
+  setup unchanged: stdout, exit 0, "already configured: <path> contains .zelma".
   stub commands: stderr, exit 1, "<command> is not implemented yet".
   machine-readable session data: not implemented in this feature.
 
 RECOVERY HINTS
   unknown command: run "zelma help".
   session task: run "zelma sessions help" before choosing list/create/detect.
-  setup task: run "zelma setup --help" to inspect the current stub contract.
+  setup task: run "zelma setup" from inside a git repository.
 
 HUMAN NOTES
   zelma manages Codex sessions in zellij panes. Runtime session behavior is not
-  implemented yet; this build only exposes the command tree and help contracts.
+  implemented yet; setup only configures repository-local ignore rules.
 
 Usage:
   zelma [command]
@@ -234,11 +238,6 @@ func TestStubDiagnostics(t *testing.T) {
 		wantStderr string
 	}{
 		{
-			name:       "setup",
-			args:       []string{"setup"},
-			wantStderr: "zelma setup is not implemented yet\n",
-		},
-		{
 			name:       "sessions list",
 			args:       []string{"sessions", "list"},
 			wantStderr: "zelma sessions list is not implemented yet\n",
@@ -272,4 +271,161 @@ func TestStubDiagnostics(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestSetupCreatesGitignoreWithZelmaEntry(t *testing.T) {
+	root := newTestGitRepo(t)
+	t.Chdir(root)
+
+	var stdout, stderr bytes.Buffer
+
+	code := Run(context.Background(), []string{"setup"}, &stdout, &stderr)
+
+	if code != 0 {
+		t.Fatalf("Run() code = %d, want 0; stderr = %q", code, stderr.String())
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("stderr = %q, want empty", stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "changed: added .zelma to ") {
+		t.Fatalf("stdout = %q, want changed summary", stdout.String())
+	}
+	assertFileContent(t, filepath.Join(root, ".gitignore"), ".zelma\n")
+}
+
+func TestSetupIsIdempotentWhenGitignoreAlreadyContainsZelma(t *testing.T) {
+	root := newTestGitRepo(t)
+	gitignorePath := filepath.Join(root, ".gitignore")
+	if err := os.WriteFile(gitignorePath, []byte(".zelma\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(root)
+
+	var firstStdout, firstStderr bytes.Buffer
+	firstCode := Run(context.Background(), []string{"setup"}, &firstStdout, &firstStderr)
+	if firstCode != 0 {
+		t.Fatalf("first Run() code = %d, want 0; stderr = %q", firstCode, firstStderr.String())
+	}
+
+	before := readFile(t, gitignorePath)
+
+	var secondStdout, secondStderr bytes.Buffer
+	secondCode := Run(context.Background(), []string{"setup"}, &secondStdout, &secondStderr)
+
+	if secondCode != 0 {
+		t.Fatalf("second Run() code = %d, want 0; stderr = %q", secondCode, secondStderr.String())
+	}
+	if secondStderr.Len() != 0 {
+		t.Fatalf("second stderr = %q, want empty", secondStderr.String())
+	}
+	if !strings.Contains(secondStdout.String(), "already configured: ") {
+		t.Fatalf("second stdout = %q, want already configured summary", secondStdout.String())
+	}
+	after := readFile(t, gitignorePath)
+	if after != before {
+		t.Fatalf(".gitignore changed on repeated setup: before %q after %q", before, after)
+	}
+}
+
+func TestSetupPreservesExistingGitignoreRules(t *testing.T) {
+	root := newTestGitRepo(t)
+	gitignorePath := filepath.Join(root, ".gitignore")
+	if err := os.WriteFile(gitignorePath, []byte("dist/\n.env\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(filepath.Join(root, "nested"))
+
+	var stdout, stderr bytes.Buffer
+
+	code := Run(context.Background(), []string{"setup"}, &stdout, &stderr)
+
+	if code != 0 {
+		t.Fatalf("Run() code = %d, want 0; stderr = %q", code, stderr.String())
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("stderr = %q, want empty", stderr.String())
+	}
+	assertFileContent(t, gitignorePath, "dist/\n.env\n.zelma\n")
+}
+
+func TestSetupRejectsUnexpectedArgs(t *testing.T) {
+	root := newTestGitRepo(t)
+	gitignorePath := filepath.Join(root, ".gitignore")
+	if err := os.WriteFile(gitignorePath, []byte("dist/\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(root)
+
+	var stdout, stderr bytes.Buffer
+
+	code := Run(context.Background(), []string{"setup", "../other-repo"}, &stdout, &stderr)
+
+	if code != 1 {
+		t.Fatalf("Run() code = %d, want 1", code)
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("stdout = %q, want empty", stdout.String())
+	}
+	if !strings.Contains(stderr.String(), `unknown command "../other-repo" for "zelma setup"`) {
+		t.Fatalf("stderr = %q, want unexpected-arg diagnostic", stderr.String())
+	}
+	assertFileContent(t, gitignorePath, "dist/\n")
+}
+
+func TestSetupReportsGitignoreIOErrorsSeparately(t *testing.T) {
+	root := newTestGitRepo(t)
+	gitignorePath := filepath.Join(root, ".gitignore")
+	if err := os.Mkdir(gitignorePath, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(root)
+
+	var stdout, stderr bytes.Buffer
+
+	code := Run(context.Background(), []string{"setup"}, &stdout, &stderr)
+
+	if code != 1 {
+		t.Fatalf("Run() code = %d, want 1", code)
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("stdout = %q, want empty", stdout.String())
+	}
+	if !strings.Contains(stderr.String(), "zelma setup: failed to configure .gitignore") {
+		t.Fatalf("stderr = %q, want setup gitignore diagnostic", stderr.String())
+	}
+	if strings.Contains(stderr.String(), "failed to resolve repo root") {
+		t.Fatalf("stderr = %q, must not report repo-root failure", stderr.String())
+	}
+}
+
+func newTestGitRepo(t *testing.T) string {
+	t.Helper()
+
+	root := t.TempDir()
+	if err := os.Mkdir(filepath.Join(root, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(filepath.Join(root, "nested"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	return root
+}
+
+func assertFileContent(t *testing.T, path, want string) {
+	t.Helper()
+
+	got := readFile(t, path)
+	if got != want {
+		t.Fatalf("%s = %q, want %q", path, got, want)
+	}
+}
+
+func readFile(t *testing.T, path string) string {
+	t.Helper()
+
+	content, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(content)
 }

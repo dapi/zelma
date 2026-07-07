@@ -2,9 +2,12 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 
+	"github.com/dapi/zelma/internal/repo"
+	"github.com/dapi/zelma/internal/setup"
 	"github.com/spf13/cobra"
 )
 
@@ -33,7 +36,7 @@ func NewRootCommand(stdout, stderr io.Writer) *cobra.Command {
 	root.SetHelpFunc(renderHelp)
 	root.CompletionOptions.DisableDefaultCmd = true
 
-	root.AddCommand(newStubCommand("setup", "Prepare a repository for zelma."))
+	root.AddCommand(newSetupCommand(stdout))
 
 	sessions := &cobra.Command{
 		Use:   "sessions",
@@ -56,6 +59,8 @@ func renderHelp(cmd *cobra.Command, args []string) {
 	switch cmd.CommandPath() {
 	case "zelma":
 		fmt.Fprint(cmd.OutOrStdout(), rootHelp)
+	case "zelma setup":
+		fmt.Fprint(cmd.OutOrStdout(), setupHelp)
 	case "zelma sessions":
 		fmt.Fprint(cmd.OutOrStdout(), sessionsHelp)
 	case "zelma help":
@@ -71,7 +76,7 @@ func renderHelp(cmd *cobra.Command, args []string) {
 
 func isStubCommand(cmd *cobra.Command) bool {
 	switch cmd.CommandPath() {
-	case "zelma setup", "zelma sessions list", "zelma sessions create", "zelma sessions detect":
+	case "zelma sessions list", "zelma sessions create", "zelma sessions detect":
 		return true
 	default:
 		return false
@@ -80,7 +85,7 @@ func isStubCommand(cmd *cobra.Command) bool {
 
 const rootHelp = `COMMAND MAP
   zelma help              Show this command map.
-  zelma setup             Prepare this repository for zelma. Status: stub.
+  zelma setup             Add .zelma to this repository .gitignore. Status: implemented.
   zelma sessions help     Show the sessions command map.
   zelma sessions list     List known zelma sessions. Status: stub.
   zelma sessions create   Create a zelma session. Status: stub.
@@ -88,20 +93,45 @@ const rootHelp = `COMMAND MAP
 
 OUTPUT CONVENTIONS
   help output: stdout, exit 0, plain text.
+  setup changed: stdout, exit 0, "changed: added .zelma to <path>".
+  setup unchanged: stdout, exit 0, "already configured: <path> contains .zelma".
   stub commands: stderr, exit 1, "<command> is not implemented yet".
   machine-readable session data: not implemented in this feature.
 
 RECOVERY HINTS
   unknown command: run "zelma help".
   session task: run "zelma sessions help" before choosing list/create/detect.
-  setup task: run "zelma setup --help" to inspect the current stub contract.
+  setup task: run "zelma setup" from inside a git repository.
 
 HUMAN NOTES
   zelma manages Codex sessions in zellij panes. Runtime session behavior is not
-  implemented yet; this build only exposes the command tree and help contracts.
+  implemented yet; setup only configures repository-local ignore rules.
 
 Usage:
   zelma [command]
+`
+
+const setupHelp = `COMMAND MAP
+  zelma setup             Add .zelma to this repository .gitignore.
+  zelma help              Return to the top-level command map.
+
+STATUS
+  implemented: repository-local .gitignore configuration.
+
+OUTPUT CONVENTIONS
+  changed: stdout, exit 0, "changed: added .zelma to <path>".
+  already configured: stdout, exit 0, "already configured: <path> contains .zelma".
+  repository error: stderr, exit 1, prefixed with "zelma setup:".
+
+RECOVERY HINTS
+  not in a git repo: run from a repository worktree.
+  gitignore write failure: inspect filesystem permissions and retry.
+
+HUMAN NOTES
+  setup does not create .zelma/sessions.json and does not contact zellij.
+
+Usage:
+  zelma setup
 `
 
 const sessionsHelp = `COMMAND MAP
@@ -147,6 +177,30 @@ Status:
 Description:
   %s
 `
+
+func newSetupCommand(stdout io.Writer) *cobra.Command {
+	return &cobra.Command{
+		Use:   "setup",
+		Short: "Prepare a repository for zelma.",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			result, err := setup.ConfigureGitignore("")
+			if err != nil {
+				var gitignoreErr *setup.GitignoreError
+				if errors.As(err, &gitignoreErr) {
+					return fmt.Errorf("%s: failed to configure .gitignore: %w", cmd.CommandPath(), err)
+				}
+				return errors.New(repo.Diagnostic(cmd.CommandPath(), err))
+			}
+			if result.Changed {
+				fmt.Fprintf(stdout, "changed: added .zelma to %s\n", result.GitignorePath)
+				return nil
+			}
+			fmt.Fprintf(stdout, "already configured: %s contains .zelma\n", result.GitignorePath)
+			return nil
+		},
+	}
+}
 
 func newStubCommand(use, short string) *cobra.Command {
 	return &cobra.Command{

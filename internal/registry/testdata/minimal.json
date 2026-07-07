@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "sessions": [
+    {
+      "zellij_session": "zelma-main",
+      "zellij_pane": "1",
+      "codex_session": "codex-2026-07-07T10-00-00Z-a1b2",
+      "opened_path": "/workspace/zelma",
+      "state": "active"
+    }
+  ]
+}
