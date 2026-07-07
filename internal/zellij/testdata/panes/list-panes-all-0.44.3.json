@@ -1,0 +1,61 @@
+[
+  {
+    "id": 0,
+    "is_plugin": true,
+    "is_focused": false,
+    "is_fullscreen": false,
+    "is_floating": false,
+    "is_suppressed": false,
+    "title": "compact-bar",
+    "exited": false,
+    "exit_status": null,
+    "pane_rows": 1,
+    "pane_columns": 120,
+    "cursor_coordinates_in_pane": null,
+    "terminal_command": null,
+    "plugin_url": "compact-bar",
+    "tab_id": 1,
+    "tab_position": 0,
+    "tab_name": "work"
+  },
+  {
+    "id": 0,
+    "is_plugin": false,
+    "is_focused": true,
+    "is_fullscreen": false,
+    "is_floating": false,
+    "is_suppressed": false,
+    "title": "codex",
+    "exited": false,
+    "exit_status": null,
+    "pane_rows": 40,
+    "pane_columns": 120,
+    "cursor_coordinates_in_pane": [
+      2,
+      10
+    ],
+    "terminal_command": null,
+    "plugin_url": null,
+    "tab_id": 1,
+    "tab_position": 0,
+    "tab_name": "work",
+    "pane_command": "/usr/local/bin/codex --cd /workspace/zelma",
+    "pane_cwd": "/workspace/zelma"
+  },
+  {
+    "id": 2,
+    "is_plugin": false,
+    "is_focused": false,
+    "is_fullscreen": false,
+    "is_floating": false,
+    "is_suppressed": false,
+    "title": "finished-shell",
+    "exited": true,
+    "exit_status": 0,
+    "terminal_command": "bash",
+    "plugin_url": null,
+    "tab_id": 2,
+    "tab_position": 1,
+    "tab_name": "logs"
+  }
+]

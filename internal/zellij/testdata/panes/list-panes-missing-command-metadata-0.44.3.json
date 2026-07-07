@@ -1,0 +1,17 @@
+[
+  {
+    "id": 4,
+    "is_plugin": false,
+    "is_focused": false,
+    "is_floating": false,
+    "is_suppressed": false,
+    "title": "plain-shell",
+    "exited": false,
+    "exit_status": null,
+    "terminal_command": null,
+    "plugin_url": null,
+    "tab_id": 3,
+    "tab_position": 2,
+    "tab_name": "shell"
+  }
+]
