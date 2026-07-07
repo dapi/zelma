@@ -2,9 +2,12 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 
+	"github.com/dapi/zelma/internal/repo"
+	"github.com/dapi/zelma/internal/setup"
 	"github.com/spf13/cobra"
 )
 
@@ -28,7 +31,7 @@ func NewRootCommand(stdout, stderr io.Writer) *cobra.Command {
 	root.SetOut(stdout)
 	root.SetErr(stderr)
 
-	root.AddCommand(newStubCommand("setup", "Prepare a repository for zelma."))
+	root.AddCommand(newSetupCommand(stdout))
 
 	sessions := &cobra.Command{
 		Use:   "sessions",
@@ -42,6 +45,30 @@ func NewRootCommand(stdout, stderr io.Writer) *cobra.Command {
 	root.AddCommand(sessions)
 
 	return root
+}
+
+func newSetupCommand(stdout io.Writer) *cobra.Command {
+	return &cobra.Command{
+		Use:   "setup",
+		Short: "Prepare a repository for zelma.",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			result, err := setup.ConfigureGitignore("")
+			if err != nil {
+				var gitignoreErr *setup.GitignoreError
+				if errors.As(err, &gitignoreErr) {
+					return fmt.Errorf("%s: failed to configure .gitignore: %w", cmd.CommandPath(), err)
+				}
+				return errors.New(repo.Diagnostic(cmd.CommandPath(), err))
+			}
+			if result.Changed {
+				fmt.Fprintf(stdout, "changed: added .zelma to %s\n", result.GitignorePath)
+				return nil
+			}
+			fmt.Fprintf(stdout, "already configured: %s contains .zelma\n", result.GitignorePath)
+			return nil
+		},
+	}
 }
 
 func newStubCommand(use, short string) *cobra.Command {
