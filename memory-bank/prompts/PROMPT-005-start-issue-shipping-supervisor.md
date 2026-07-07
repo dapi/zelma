@@ -147,9 +147,12 @@ Success is allowed only when all conditions are true:
      - For `feature_pack_only`, feature-doc changes may be sufficient if they satisfy the issue acceptance.
    - Before sending `/review`, switch the task pane review model to `GPT-5.5 Extra high`.
    - Send `/review` to the same pane only after the delivery-mode check passes and review model is confirmed.
+   - After sending `/review`, take the first pane snapshot after about 3 seconds, not after the normal long polling interval.
+   - While the `/review` quiz/menu is open, poll every 3 seconds and answer the preset/base/model prompts immediately so the review can start without waiting for a minute-long observer interval.
    - Select review against base branch / PR-style review.
    - Select `BASE_BRANCH` as the base.
    - Wait for review output.
+   - Once the review has actually started, return to the normal observer polling interval.
    - After review output is captured, switch implementation/fix work back to `GPT-5.5 medium`.
 
 5. Review/fix loop:
@@ -250,9 +253,11 @@ Return a concise final report:
 | Scope gate for absent CI | Prompt stops with blocker instead of calling absent checks green. | passed |
 | Implementation issue routing | Prompt selects `PROMPT-003` before PR review when issue acceptance requires runtime/code behavior. | drafted |
 | Review model policy | Prompt requires `GPT-5.5 Extra high` for `/review` and medium for implementation/fixes. | drafted |
+| Review quiz polling | Prompt polls `/review` quiz/menu after 3 seconds and answers prompts quickly before returning to normal polling. | drafted |
 
 ## Change Notes
 
+- 2026-07-07: Added fast 3-second polling for `/review` preset/base/model quiz prompts.
 - 2026-07-07: Added model policy: implementation/fixes on `GPT-5.5 medium`, `/review` gates on `GPT-5.5 Extra high`.
 - 2026-07-07: Added delivery-mode preflight so implementation issues run through `PROMPT-003` before PR review/fix cycles.
 - 2026-07-07: Created reusable generic supervisor prompt from live FT-001 delivery workflow; repository-specific values were converted to variables.
