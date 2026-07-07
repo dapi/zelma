@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/gofrs/flock"
 	"github.com/google/renameio/v2"
@@ -21,6 +22,49 @@ const (
 )
 
 var ErrRegistryLocked = errors.New("sessions registry is locked by another writer")
+
+type ErrorCode string
+
+const (
+	ErrorCodeInvalidJSON        ErrorCode = "registry_invalid_json"
+	ErrorCodeTrailingData       ErrorCode = "registry_trailing_data"
+	ErrorCodeUnknownField       ErrorCode = "registry_unknown_field"
+	ErrorCodeMissingField       ErrorCode = "registry_missing_required_field"
+	ErrorCodeUnsupportedVersion ErrorCode = "registry_unsupported_version"
+	ErrorCodeInvalidField       ErrorCode = "registry_invalid_field"
+	ErrorCodeDuplicateSession   ErrorCode = "registry_duplicate_session"
+	ErrorCodeConflictingSession ErrorCode = "registry_conflicting_session"
+	ErrorCodeReadFailed         ErrorCode = "registry_read_failed"
+)
+
+type Diagnostic struct {
+	Code         ErrorCode `json:"code"`
+	Path         string    `json:"path,omitempty"`
+	Message      string    `json:"message"`
+	RecoveryHint string    `json:"recovery_hint"`
+}
+
+type DiagnosticError struct {
+	Diagnostic Diagnostic
+	Err        error
+}
+
+func (err *DiagnosticError) Error() string {
+	if err == nil {
+		return ""
+	}
+	if err.Diagnostic.Path == "" {
+		return fmt.Sprintf("validate sessions registry: %s: %s; recovery: %s", err.Diagnostic.Code, err.Diagnostic.Message, err.Diagnostic.RecoveryHint)
+	}
+	return fmt.Sprintf("validate sessions registry %s: %s: %s; recovery: %s", err.Diagnostic.Path, err.Diagnostic.Code, err.Diagnostic.Message, err.Diagnostic.RecoveryHint)
+}
+
+func (err *DiagnosticError) Unwrap() error {
+	if err == nil {
+		return nil
+	}
+	return err.Err
+}
 
 type State string
 
@@ -113,16 +157,37 @@ func Parse(data []byte) (Registry, error) {
 	return Decode(bytes.NewReader(data))
 }
 
+func DiagnoseFile(path string) error {
+	_, err := ReadFile(path)
+	return err
+}
+
+func ReadFile(path string) (Registry, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return Registry{}, diagnostic(ErrorCodeReadFailed, path, fmt.Sprintf("read registry file: %v", err), "inspect the registry path and filesystem permissions, then retry", err)
+	}
+	registry, err := Parse(data)
+	if err != nil {
+		return Registry{}, withPath(err, path)
+	}
+	return registry, nil
+}
+
 func Decode(r io.Reader) (Registry, error) {
 	decoder := json.NewDecoder(r)
 	decoder.DisallowUnknownFields()
 
 	var raw registryJSON
 	if err := decoder.Decode(&raw); err != nil {
-		return Registry{}, fmt.Errorf("parse sessions registry: %w", err)
+		code := ErrorCodeInvalidJSON
+		if strings.HasPrefix(err.Error(), "json: unknown field ") {
+			code = ErrorCodeUnknownField
+		}
+		return Registry{}, diagnostic(code, "", fmt.Sprintf("parse registry JSON: %v", err), "restore a valid schema v1 JSON object before running mutating commands", err)
 	}
 	if decoder.Decode(&struct{}{}) != io.EOF {
-		return Registry{}, errors.New("parse sessions registry: trailing data")
+		return Registry{}, diagnostic(ErrorCodeTrailingData, "", "registry JSON contains trailing data after the top-level object", "remove trailing bytes and keep exactly one schema v1 JSON object", nil)
 	}
 
 	registry, err := raw.registry()
@@ -137,7 +202,7 @@ func Decode(r io.Reader) (Registry, error) {
 
 func Validate(registry Registry) error {
 	if registry.Version != SchemaVersion {
-		return fmt.Errorf("validate sessions registry: unsupported schema version %d", registry.Version)
+		return diagnostic(ErrorCodeUnsupportedVersion, "version", fmt.Sprintf("unsupported schema version %d", registry.Version), "use schema version 1 or run a future migration command when one exists", nil)
 	}
 
 	activePanes := map[string]int{}
@@ -151,7 +216,10 @@ func Validate(registry Registry) error {
 
 		key := session.ZellijSession + "\x00" + session.ZellijPane
 		if first, ok := activePanes[key]; ok {
-			return fmt.Errorf("validate sessions registry: sessions[%d] duplicates active zellij pane from sessions[%d]", i, first)
+			if conflicts(registry.Sessions[first], session) {
+				return diagnostic(ErrorCodeConflictingSession, fmt.Sprintf("sessions[%d]", i), fmt.Sprintf("conflicts with active zellij pane from sessions[%d]", first), "inspect both records and manually keep one authoritative active session before retrying", nil)
+			}
+			return diagnostic(ErrorCodeDuplicateSession, fmt.Sprintf("sessions[%d]", i), fmt.Sprintf("duplicates active zellij pane from sessions[%d]", first), "remove the duplicate active record manually before retrying", nil)
 		}
 		activePanes[key] = i
 	}
@@ -161,27 +229,27 @@ func Validate(registry Registry) error {
 
 func validateSession(index int, session Session) error {
 	if session.ZellijSession == "" {
-		return fmt.Errorf("validate sessions registry: sessions[%d].zellij_session is required", index)
+		return diagnostic(ErrorCodeInvalidField, fmt.Sprintf("sessions[%d].zellij_session", index), "zellij_session is required", "restore the zellij session reference or remove the invalid record", nil)
 	}
 	if session.ZellijPane == "" {
-		return fmt.Errorf("validate sessions registry: sessions[%d].zellij_pane is required", index)
+		return diagnostic(ErrorCodeInvalidField, fmt.Sprintf("sessions[%d].zellij_pane", index), "zellij_pane is required", "restore the zellij pane reference or remove the invalid record", nil)
 	}
 	if !validState(session.State) {
-		return fmt.Errorf("validate sessions registry: sessions[%d].state %q is unsupported", index, session.State)
+		return diagnostic(ErrorCodeInvalidField, fmt.Sprintf("sessions[%d].state", index), fmt.Sprintf("state %q is unsupported", session.State), "set state to candidate, active, stale, closed or archived", nil)
 	}
 
 	identityRequired := session.State != StateCandidate
 	if identityRequired && session.CodexSession == "" {
-		return fmt.Errorf("validate sessions registry: sessions[%d].codex_session is required for %s state", index, session.State)
+		return diagnostic(ErrorCodeInvalidField, fmt.Sprintf("sessions[%d].codex_session", index), fmt.Sprintf("codex_session is required for %s state", session.State), "restore the Codex session reference or mark the record candidate only if identity is unresolved", nil)
 	}
 	if identityRequired && session.OpenedPath == "" {
-		return fmt.Errorf("validate sessions registry: sessions[%d].opened_path is required for %s state", index, session.State)
+		return diagnostic(ErrorCodeInvalidField, fmt.Sprintf("sessions[%d].opened_path", index), fmt.Sprintf("opened_path is required for %s state", session.State), "restore a normalized absolute opened_path or mark the record candidate only if identity is unresolved", nil)
 	}
 	if session.OpenedPath != "" && !filepath.IsAbs(session.OpenedPath) {
-		return fmt.Errorf("validate sessions registry: sessions[%d].opened_path must be absolute", index)
+		return diagnostic(ErrorCodeInvalidField, fmt.Sprintf("sessions[%d].opened_path", index), "opened_path must be absolute", "replace opened_path with a normalized absolute path", nil)
 	}
 	if session.OpenedPath != "" && filepath.Clean(session.OpenedPath) != session.OpenedPath {
-		return fmt.Errorf("validate sessions registry: sessions[%d].opened_path must be normalized", index)
+		return diagnostic(ErrorCodeInvalidField, fmt.Sprintf("sessions[%d].opened_path", index), "opened_path must be normalized", "replace opened_path with filepath.Clean(opened_path)", nil)
 	}
 	return nil
 }
@@ -202,10 +270,10 @@ type registryJSON struct {
 
 func (raw registryJSON) registry() (Registry, error) {
 	if raw.Version == nil {
-		return Registry{}, errors.New("validate sessions registry: version is required")
+		return Registry{}, diagnostic(ErrorCodeMissingField, "version", "version is required", "add version: 1 to the registry root object", nil)
 	}
 	if raw.Sessions == nil {
-		return Registry{}, errors.New("validate sessions registry: sessions is required")
+		return Registry{}, diagnostic(ErrorCodeMissingField, "sessions", "sessions is required", "add a sessions array to the registry root object", nil)
 	}
 
 	sessions := make([]Session, 0, len(*raw.Sessions))
@@ -233,19 +301,19 @@ type sessionJSON struct {
 
 func (raw sessionJSON) session(index int) (Session, error) {
 	if raw.ZellijSession == nil {
-		return Session{}, fmt.Errorf("validate sessions registry: sessions[%d].zellij_session is required", index)
+		return Session{}, diagnostic(ErrorCodeMissingField, fmt.Sprintf("sessions[%d].zellij_session", index), "zellij_session is required", "add zellij_session or remove the invalid record", nil)
 	}
 	if raw.ZellijPane == nil {
-		return Session{}, fmt.Errorf("validate sessions registry: sessions[%d].zellij_pane is required", index)
+		return Session{}, diagnostic(ErrorCodeMissingField, fmt.Sprintf("sessions[%d].zellij_pane", index), "zellij_pane is required", "add zellij_pane or remove the invalid record", nil)
 	}
 	if raw.CodexSession == nil {
-		return Session{}, fmt.Errorf("validate sessions registry: sessions[%d].codex_session is required", index)
+		return Session{}, diagnostic(ErrorCodeMissingField, fmt.Sprintf("sessions[%d].codex_session", index), "codex_session is required", "add codex_session; use an empty string only for unresolved candidate records", nil)
 	}
 	if raw.OpenedPath == nil {
-		return Session{}, fmt.Errorf("validate sessions registry: sessions[%d].opened_path is required", index)
+		return Session{}, diagnostic(ErrorCodeMissingField, fmt.Sprintf("sessions[%d].opened_path", index), "opened_path is required", "add opened_path; use an empty string only for unresolved candidate records", nil)
 	}
 	if raw.State == nil {
-		return Session{}, fmt.Errorf("validate sessions registry: sessions[%d].state is required", index)
+		return Session{}, diagnostic(ErrorCodeMissingField, fmt.Sprintf("sessions[%d].state", index), "state is required", "add one of candidate, active, stale, closed or archived", nil)
 	}
 
 	return Session{
@@ -255,4 +323,34 @@ func (raw sessionJSON) session(index int) (Session, error) {
 		OpenedPath:    *raw.OpenedPath,
 		State:         *raw.State,
 	}, nil
+}
+
+func conflicts(first, second Session) bool {
+	return first.CodexSession != second.CodexSession || first.OpenedPath != second.OpenedPath || first.State != second.State
+}
+
+func diagnostic(code ErrorCode, path, message, hint string, err error) error {
+	return &DiagnosticError{
+		Diagnostic: Diagnostic{
+			Code:         code,
+			Path:         path,
+			Message:      message,
+			RecoveryHint: hint,
+		},
+		Err: err,
+	}
+}
+
+func withPath(err error, path string) error {
+	var diagnosticErr *DiagnosticError
+	if !errors.As(err, &diagnosticErr) {
+		return err
+	}
+	if diagnosticErr.Diagnostic.Path != "" {
+		return err
+	}
+
+	copy := *diagnosticErr
+	copy.Diagnostic.Path = path
+	return &copy
 }

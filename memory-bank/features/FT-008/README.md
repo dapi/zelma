@@ -16,3 +16,5 @@ audience: humans_and_agents
 
 - [Brief](brief.md)
   Читать, когда нужно понять validation и recovery границы.
+- [Design](design.md)
+  Читать, когда нужен selected contract error codes и non-destructive recovery.
