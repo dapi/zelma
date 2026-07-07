@@ -9,9 +9,19 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/gofrs/flock"
+	"github.com/google/renameio/v2"
 )
 
 const SchemaVersion = 1
+
+const (
+	RegistryDirName  = ".zelma"
+	RegistryFileName = "sessions.json"
+)
+
+var ErrRegistryLocked = errors.New("sessions registry is locked by another writer")
 
 type ErrorCode string
 
@@ -77,6 +87,118 @@ type Session struct {
 	CodexSession  string `json:"codex_session"`
 	OpenedPath    string `json:"opened_path"`
 	State         State  `json:"state"`
+}
+
+type WriteError struct {
+	Op   string
+	Path string
+	Err  error
+}
+
+func (e *WriteError) Error() string {
+	return fmt.Sprintf("write sessions registry: %s %s: %v", e.Op, e.Path, e.Err)
+}
+
+func (e *WriteError) Unwrap() error {
+	return e.Err
+}
+
+func RegistryPath(repoRoot string) string {
+	return filepath.Join(repoRoot, RegistryDirName, RegistryFileName)
+}
+
+func WriteFile(path string, registry Registry) (err error) {
+	return withRegistryLock(path, func() error {
+		return writeFileLocked(path, registry)
+	})
+}
+
+func UpdateFile(path string, update func(Registry) (Registry, error)) (err error) {
+	return withRegistryLock(path, func() error {
+		current, err := readFileIfExists(path)
+		if err != nil {
+			return &WriteError{Op: "read", Path: path, Err: err}
+		}
+
+		next, err := update(current)
+		if err != nil {
+			return &WriteError{Op: "update", Path: path, Err: err}
+		}
+		return writeFileLocked(path, next)
+	})
+}
+
+func withRegistryLock(path string, fn func() error) (err error) {
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return &WriteError{Op: "prepare", Path: dir, Err: err}
+	}
+
+	lock, err := lockRegistry(path)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if unlockErr := lock.Unlock(); err == nil && unlockErr != nil {
+			err = &WriteError{Op: "unlock", Path: lock.Path(), Err: unlockErr}
+		}
+	}()
+
+	return fn()
+}
+
+func writeFileLocked(path string, registry Registry) error {
+	registry = normalizeRegistry(registry)
+	if err := Validate(registry); err != nil {
+		return &WriteError{Op: "validate", Path: path, Err: err}
+	}
+
+	data, err := json.MarshalIndent(registry, "", "  ")
+	if err != nil {
+		return &WriteError{Op: "encode", Path: path, Err: err}
+	}
+	data = append(data, '\n')
+
+	if err := renameio.WriteFile(path, data, 0o644); err != nil {
+		return &WriteError{Op: "commit", Path: path, Err: err}
+	}
+	return nil
+}
+
+func normalizeRegistry(registry Registry) Registry {
+	if registry.Sessions == nil {
+		registry.Sessions = []Session{}
+	}
+	return registry
+}
+
+func readFileIfExists(path string) (Registry, error) {
+	data, err := os.ReadFile(path)
+	if os.IsNotExist(err) {
+		return Registry{Version: SchemaVersion, Sessions: []Session{}}, nil
+	}
+	if err != nil {
+		return Registry{}, diagnostic(ErrorCodeReadFailed, path, fmt.Sprintf("read registry file: %v", err), "inspect the registry path and filesystem permissions, then retry", err)
+	}
+	registry, err := Parse(data)
+	if err != nil {
+		return Registry{}, withPath(err, path)
+	}
+	return registry, nil
+}
+
+func lockRegistry(path string) (*flock.Flock, error) {
+	lockPath := path + ".lock"
+	lock := flock.New(lockPath)
+
+	locked, err := lock.TryLock()
+	if err != nil {
+		return nil, &WriteError{Op: "lock", Path: lockPath, Err: err}
+	}
+	if !locked {
+		return nil, &WriteError{Op: "lock", Path: lockPath, Err: ErrRegistryLocked}
+	}
+	return lock, nil
 }
 
 func Parse(data []byte) (Registry, error) {
