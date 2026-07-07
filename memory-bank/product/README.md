@@ -15,7 +15,9 @@ audience: humans_and_agents
 why, users, outcomes, metrics, positioning и roadmap. Этот слой помогает не
 повторять общий product background в PRD, use cases и feature packages.
 
-Product-документы не определяют предметную модель, архитектуру реализации, feature acceptance criteria или execution sequence.
+Product-документы не определяют предметную модель, архитектуру реализации или
+feature acceptance criteria. Delivery sequencing изолирован в
+[`Execution Order`](execution-order.md) и не заменяет brief конкретной feature.
 
 ## На Какие Вопросы Отвечает Product
 

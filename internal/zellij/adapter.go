@@ -265,6 +265,9 @@ func parseSessionList(stdout []byte) ([]Session, error) {
 	if strings.ContainsRune(text, '\x1b') {
 		return nil, errors.New("stdout contains ANSI escape sequence")
 	}
+	if strings.Contains(text, "[Created ") {
+		return nil, errors.New("stdout contains formatted metadata; use list-sessions --short --no-formatting")
+	}
 
 	lines := strings.Split(text, "\n")
 	sessions := make([]Session, 0, len(lines))
