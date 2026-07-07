@@ -16,3 +16,6 @@ audience: humans_and_agents
 
 - [Brief](brief.md)
   Читать, когда нужно понять scope и verify для чтения zellij panes.
+- [Design](design.md)
+  Читать, когда нужно понять выбранный adapter contract, нормализацию pane
+  records и failure modes.
