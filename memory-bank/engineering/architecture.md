@@ -30,6 +30,8 @@ audience: humans_and_agents
 
 Detailed zellij integration research and links live in
 [`zellij-integration.md`](zellij-integration.md).
+Codex runtime identification and `CodexSessionRef` extraction rules live in
+[`codex-runtime-identification.md`](codex-runtime-identification.md).
 
 ## Module Boundaries
 
@@ -52,6 +54,8 @@ Detailed zellij integration research and links live in
 - `registry` must not shell out to `zellij` or inspect processes; it validates and persists facts passed by adapters.
 - `zellij-adapter` must expose typed methods such as `ListSessions`,
   `ListPanes`, `RunCodexPane` and keep raw command execution details private.
+- `codex-adapter` must expose typed evidence and verdict inputs rather than raw
+  Codex transcript contents or unredacted process argv.
 
 ## CLI Help And Output Contract
 

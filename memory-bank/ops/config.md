@@ -74,7 +74,7 @@ Rules:
 
 | Dependency | Current local probe | Minimum supported version | Notes |
 | --- | --- | --- | --- |
-| Go | missing from `PATH` on `2026-07-07` | `unknown` | Decide during scaffold |
+| Go | pinned by `.mise.toml` as `1.25.11`; plain `go` may be absent from shell `PATH` | `1.25.11` for scaffold | Use `mise install` and `mise exec -- go ...` unless shell activates mise shims |
 | zellij | `0.44.0` on `2026-07-07` | likely `0.44.0` | `list-panes --json --all` and returned pane IDs are core MVP assumptions |
 | Codex CLI | not probed yet | `unknown` | Needed for create/detect Codex identity |
 
@@ -84,4 +84,4 @@ Rules:
 - [x] задокументирована naming convention
 - [x] перечислены ключевые runtime/env contracts
 - [x] описан secret handling
-- [ ] после scaffold уточнить Go/zellij/Codex minimum versions
+- [ ] после scaffold уточнить zellij/Codex minimum versions

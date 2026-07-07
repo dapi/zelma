@@ -29,3 +29,7 @@ audience: humans_and_agents
 - Базовый формат: `FT-XXX/`
 - Вместо `XXX` используй идентификатор, принятый в проекте: issue id, ticket id или другой стабильный ключ
 - Один package = одна delivery-единица
+
+## Instantiated Features
+
+- [FT-001: Go Module Scaffold](FT-001/README.md) — first `EP-001` delivery slice: Go module scaffold and empty `zelma` binary without registry or zellij side effects.
