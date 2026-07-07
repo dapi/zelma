@@ -90,10 +90,17 @@ MAX_CI_CYCLES: {{MAX_CI_CYCLES}}
 - `AUTO_MERGE` must be explicit: `yes` or `no`.
 </defaults>
 
+<model_policy>
+- Run implementation, fix requests, CI debugging and general supervision on `GPT-5.5 medium` unless the caller explicitly overrides the agent model.
+- Run every fresh `/review` on `GPT-5.5 Extra high`.
+- After each `/review` completes, return the implementation/fix loop to `GPT-5.5 medium`.
+- If the UI or CLI cannot switch the `/review` model, stop before treating the review gate as satisfied and report the blocker with the exact model that was available.
+</model_policy>
+
 <definition_of_done>
 Success is allowed only when all conditions are true:
 1. `start-issue` implementation finished.
-2. Fresh `/review` against `BASE_BRANCH` finished with no critical/high/important findings.
+2. Fresh `/review` against `BASE_BRANCH` finished on `GPT-5.5 Extra high` with no critical/high/important findings.
 3. All review findings that matter for correctness, maintainability, tests, security or scope were fixed, committed and pushed.
 4. PR exists for the issue branch against `BASE_BRANCH`.
 5. PR is open, non-draft, mergeable and clean.
@@ -138,17 +145,19 @@ Success is allowed only when all conditions are true:
      - For `implementation`, the diff must include relevant code/tests/docs required by acceptance.
      - If the diff is docs-only while acceptance requires runtime behavior, do not start PR review; tell the implementation agent to run `PROMPT-003` for the issue and continue implementation.
      - For `feature_pack_only`, feature-doc changes may be sufficient if they satisfy the issue acceptance.
-   - Send `/review` to the same pane only after the delivery-mode check passes.
+   - Before sending `/review`, switch the task pane review model to `GPT-5.5 Extra high`.
+   - Send `/review` to the same pane only after the delivery-mode check passes and review model is confirmed.
    - Select review against base branch / PR-style review.
    - Select `BASE_BRANCH` as the base.
    - Wait for review output.
+   - After review output is captured, switch implementation/fix work back to `GPT-5.5 medium`.
 
 5. Review/fix loop:
    - If review has no critical/high/important findings, continue to PR gate.
    - If review has findings, send the implementation agent:
      `Исправь все critical/high/important review findings в scope issue {{ISSUE_NUMBER}}. Запусти релевантные проверки, закоммить и запушь изменения. Не исправляй unrelated findings.`
    - Wait for completion.
-   - Run `/review` again.
+   - Run `/review` again on `GPT-5.5 Extra high`.
    - Repeat until clean review or `MAX_REVIEW_CYCLES` is reached.
    - If max cycles is reached, stop with `max_cycles_reached` and include findings.
 
@@ -191,6 +200,7 @@ Success is allowed only when all conditions are true:
 
 <constraints>
 - Do not announce success without clean review.
+- Do not satisfy the review gate with a `/review` that did not run on `GPT-5.5 Extra high`.
 - Do not announce green CI when checks are absent.
 - Do not merge if PR is draft, not mergeable, dirty, conflicted, or checks are failed/pending/cancelled/absent.
 - Do not bypass branch protection, required approvals, security gates or human gates.
@@ -239,8 +249,10 @@ Return a concise final report:
 | Dry run with generic repo variables | Prompt contains no hardcoded repository and requires explicit repo/base/merge policy. | passed |
 | Scope gate for absent CI | Prompt stops with blocker instead of calling absent checks green. | passed |
 | Implementation issue routing | Prompt selects `PROMPT-003` before PR review when issue acceptance requires runtime/code behavior. | drafted |
+| Review model policy | Prompt requires `GPT-5.5 Extra high` for `/review` and medium for implementation/fixes. | drafted |
 
 ## Change Notes
 
+- 2026-07-07: Added model policy: implementation/fixes on `GPT-5.5 medium`, `/review` gates on `GPT-5.5 Extra high`.
 - 2026-07-07: Added delivery-mode preflight so implementation issues run through `PROMPT-003` before PR review/fix cycles.
 - 2026-07-07: Created reusable generic supervisor prompt from live FT-001 delivery workflow; repository-specific values were converted to variables.
