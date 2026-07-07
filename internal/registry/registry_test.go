@@ -326,6 +326,60 @@ func TestWriteFileCreatesAtomicRegistryFile(t *testing.T) {
 	}
 }
 
+func TestWriteFileNormalizesNilSessionsToReadableEmptyArray(t *testing.T) {
+	path := RegistryPath(t.TempDir())
+	registry := Registry{Version: SchemaVersion}
+
+	if err := WriteFile(path, registry); err != nil {
+		t.Fatalf("WriteFile() error = %v, want nil", err)
+	}
+
+	content := readTestFile(t, path)
+	if strings.Contains(content, `"sessions": null`) {
+		t.Fatalf("registry must not encode nil sessions as null:\n%s", content)
+	}
+
+	got, err := ReadFile(path)
+	if err != nil {
+		t.Fatalf("ReadFile() error = %v, want nil", err)
+	}
+	if got.Version != SchemaVersion || len(got.Sessions) != 0 {
+		t.Fatalf("ReadFile() = %+v, want empty schema v1 registry", got)
+	}
+}
+
+func TestUpdateFileReadsAndWritesUnderRegistryLock(t *testing.T) {
+	path := RegistryPath(t.TempDir())
+	if err := WriteFile(path, validRegistry("/workspace/existing")); err != nil {
+		t.Fatalf("WriteFile(existing) error = %v, want nil", err)
+	}
+
+	err := UpdateFile(path, func(current Registry) (Registry, error) {
+		if len(current.Sessions) != 1 || current.Sessions[0].OpenedPath != "/workspace/existing" {
+			t.Fatalf("UpdateFile() current = %+v, want existing registry", current)
+		}
+		current.Sessions = append(current.Sessions, Session{
+			ZellijSession: "main",
+			ZellijPane:    "2",
+			CodexSession:  "codex-b",
+			OpenedPath:    "/workspace/next",
+			State:         StateActive,
+		})
+		return current, nil
+	})
+	if err != nil {
+		t.Fatalf("UpdateFile() error = %v, want nil", err)
+	}
+
+	got, err := ReadFile(path)
+	if err != nil {
+		t.Fatalf("ReadFile() error = %v, want nil", err)
+	}
+	if len(got.Sessions) != 2 {
+		t.Fatalf("len(Sessions) = %d, want 2", len(got.Sessions))
+	}
+}
+
 func TestWriteFileRejectsInvalidRegistryBeforeReplacingExistingFile(t *testing.T) {
 	path := RegistryPath(t.TempDir())
 	existing := validRegistry("/workspace/existing")
@@ -396,6 +450,37 @@ func TestWriteFileReportsLockConflictWithoutChangingRegistry(t *testing.T) {
 	}
 	if _, err := Parse([]byte(after)); err != nil {
 		t.Fatalf("registry corrupted after lock conflict: %v", err)
+	}
+}
+
+func TestUpdateFileReportsLockConflictWithoutChangingRegistry(t *testing.T) {
+	path := RegistryPath(t.TempDir())
+	existing := validRegistry("/workspace/existing")
+	if err := WriteFile(path, existing); err != nil {
+		t.Fatalf("WriteFile(existing) error = %v, want nil", err)
+	}
+	before := readTestFile(t, path)
+
+	lock, err := lockRegistry(path)
+	if err != nil {
+		t.Fatalf("lockRegistry() error = %v, want nil", err)
+	}
+	defer lock.Unlock()
+
+	err = UpdateFile(path, func(current Registry) (Registry, error) {
+		current.Sessions = nil
+		return current, nil
+	})
+	if err == nil {
+		t.Fatal("UpdateFile() error = nil, want lock conflict")
+	}
+	if !errors.Is(err, ErrRegistryLocked) {
+		t.Fatalf("UpdateFile() error = %v, want ErrRegistryLocked", err)
+	}
+
+	after := readTestFile(t, path)
+	if after != before {
+		t.Fatalf("registry changed during update lock conflict\nbefore:\n%s\nafter:\n%s", before, after)
 	}
 }
 

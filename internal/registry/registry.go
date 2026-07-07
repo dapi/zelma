@@ -108,16 +108,27 @@ func RegistryPath(repoRoot string) string {
 }
 
 func WriteFile(path string, registry Registry) (err error) {
-	if err := Validate(registry); err != nil {
-		return &WriteError{Op: "validate", Path: path, Err: err}
-	}
+	return withRegistryLock(path, func() error {
+		return writeFileLocked(path, registry)
+	})
+}
 
-	data, err := json.MarshalIndent(registry, "", "  ")
-	if err != nil {
-		return &WriteError{Op: "encode", Path: path, Err: err}
-	}
-	data = append(data, '\n')
+func UpdateFile(path string, update func(Registry) (Registry, error)) (err error) {
+	return withRegistryLock(path, func() error {
+		current, err := readFileIfExists(path)
+		if err != nil {
+			return &WriteError{Op: "read", Path: path, Err: err}
+		}
 
+		next, err := update(current)
+		if err != nil {
+			return &WriteError{Op: "update", Path: path, Err: err}
+		}
+		return writeFileLocked(path, next)
+	})
+}
+
+func withRegistryLock(path string, fn func() error) (err error) {
 	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return &WriteError{Op: "prepare", Path: dir, Err: err}
@@ -133,10 +144,47 @@ func WriteFile(path string, registry Registry) (err error) {
 		}
 	}()
 
+	return fn()
+}
+
+func writeFileLocked(path string, registry Registry) error {
+	registry = normalizeRegistry(registry)
+	if err := Validate(registry); err != nil {
+		return &WriteError{Op: "validate", Path: path, Err: err}
+	}
+
+	data, err := json.MarshalIndent(registry, "", "  ")
+	if err != nil {
+		return &WriteError{Op: "encode", Path: path, Err: err}
+	}
+	data = append(data, '\n')
+
 	if err := renameio.WriteFile(path, data, 0o644); err != nil {
 		return &WriteError{Op: "commit", Path: path, Err: err}
 	}
 	return nil
+}
+
+func normalizeRegistry(registry Registry) Registry {
+	if registry.Sessions == nil {
+		registry.Sessions = []Session{}
+	}
+	return registry
+}
+
+func readFileIfExists(path string) (Registry, error) {
+	data, err := os.ReadFile(path)
+	if os.IsNotExist(err) {
+		return Registry{Version: SchemaVersion, Sessions: []Session{}}, nil
+	}
+	if err != nil {
+		return Registry{}, diagnostic(ErrorCodeReadFailed, path, fmt.Sprintf("read registry file: %v", err), "inspect the registry path and filesystem permissions, then retry", err)
+	}
+	registry, err := Parse(data)
+	if err != nil {
+		return Registry{}, withPath(err, path)
+	}
+	return registry, nil
 }
 
 func lockRegistry(path string) (*flock.Flock, error) {
