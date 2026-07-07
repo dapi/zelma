@@ -191,6 +191,7 @@ func TestOutputAndErrorStreamContract(t *testing.T) {
 	tests := []struct {
 		name       string
 		args       []string
+		arrange    func(*testing.T)
 		wantCode   int
 		wantStdout string
 		wantStderr string
@@ -212,6 +213,7 @@ func TestOutputAndErrorStreamContract(t *testing.T) {
 		{
 			name:       "list empty registry writes stdout only",
 			args:       []string{"sessions", "list"},
+			arrange:    chdirToEmptyGitRepo,
 			wantCode:   0,
 			wantStdout: "STATE  ZELLIJ_SESSION  ZELLIJ_PANE  CODEX_SESSION  OPENED_PATH\n",
 			wantStderr: "",
@@ -234,6 +236,9 @@ func TestOutputAndErrorStreamContract(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			if tt.arrange != nil {
+				tt.arrange(t)
+			}
 			var stdout, stderr bytes.Buffer
 
 			code := Run(context.Background(), tt.args, &stdout, &stderr)
@@ -249,6 +254,12 @@ func TestOutputAndErrorStreamContract(t *testing.T) {
 			}
 		})
 	}
+}
+
+func chdirToEmptyGitRepo(t *testing.T) {
+	t.Helper()
+
+	t.Chdir(newTestGitRepo(t))
 }
 
 func TestBuiltInHelpIsNotRenderedAsStub(t *testing.T) {
