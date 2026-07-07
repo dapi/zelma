@@ -129,6 +129,136 @@ func TestHelpRoutes(t *testing.T) {
 	}
 }
 
+func TestStubHelpSnapshots(t *testing.T) {
+	tests := []struct {
+		name string
+		args []string
+		want string
+	}{
+		{
+			name: "sessions list help",
+			args: []string{"sessions", "list", "--help"},
+			want: `Usage:
+  zelma sessions list
+
+Status:
+  stub: not implemented yet.
+
+Description:
+  List known zelma sessions.
+`,
+		},
+		{
+			name: "sessions create help",
+			args: []string{"sessions", "create", "--help"},
+			want: `Usage:
+  zelma sessions create
+
+Status:
+  stub: not implemented yet.
+
+Description:
+  Create a zelma session.
+`,
+		},
+		{
+			name: "sessions detect help",
+			args: []string{"sessions", "detect", "--help"},
+			want: `Usage:
+  zelma sessions detect
+
+Status:
+  stub: not implemented yet.
+
+Description:
+  Detect existing Codex panes.
+`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var stdout, stderr bytes.Buffer
+
+			code := Run(context.Background(), tt.args, &stdout, &stderr)
+
+			if code != 0 {
+				t.Fatalf("Run() code = %d, want 0; stderr = %q", code, stderr.String())
+			}
+			if stderr.Len() != 0 {
+				t.Fatalf("stderr = %q, want empty", stderr.String())
+			}
+			if stdout.String() != tt.want {
+				t.Fatalf("stdout mismatch\nwant:\n%s\ngot:\n%s", tt.want, stdout.String())
+			}
+		})
+	}
+}
+
+func TestOutputAndErrorStreamContract(t *testing.T) {
+	tests := []struct {
+		name       string
+		args       []string
+		wantCode   int
+		wantStdout string
+		wantStderr string
+	}{
+		{
+			name:       "root help writes stdout only",
+			args:       []string{"help"},
+			wantCode:   0,
+			wantStdout: rootHelpSnapshot,
+			wantStderr: "",
+		},
+		{
+			name:       "sessions help writes stdout only",
+			args:       []string{"sessions", "help"},
+			wantCode:   0,
+			wantStdout: sessionsHelpSnapshot,
+			wantStderr: "",
+		},
+		{
+			name:       "list stub writes stderr only",
+			args:       []string{"sessions", "list"},
+			wantCode:   1,
+			wantStdout: "",
+			wantStderr: "zelma sessions list is not implemented yet\n",
+		},
+		{
+			name:       "create stub writes stderr only",
+			args:       []string{"sessions", "create"},
+			wantCode:   1,
+			wantStdout: "",
+			wantStderr: "zelma sessions create is not implemented yet\n",
+		},
+		{
+			name:       "detect stub writes stderr only",
+			args:       []string{"sessions", "detect"},
+			wantCode:   1,
+			wantStdout: "",
+			wantStderr: "zelma sessions detect is not implemented yet\n",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var stdout, stderr bytes.Buffer
+
+			code := Run(context.Background(), tt.args, &stdout, &stderr)
+
+			if code != tt.wantCode {
+				t.Fatalf("Run() code = %d, want %d", code, tt.wantCode)
+			}
+			if stdout.String() != tt.wantStdout {
+				t.Fatalf("stdout mismatch\nwant:\n%s\ngot:\n%s", tt.wantStdout, stdout.String())
+			}
+			if stderr.String() != tt.wantStderr {
+				t.Fatalf("stderr mismatch\nwant:\n%s\ngot:\n%s", tt.wantStderr, stderr.String())
+			}
+		})
+	}
+}
+
 func TestBuiltInHelpIsNotRenderedAsStub(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 
