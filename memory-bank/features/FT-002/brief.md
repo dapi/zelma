@@ -4,16 +4,17 @@ doc_kind: feature
 doc_function: canonical
 purpose: "Канонический brief для delivery slice: завести Cobra command tree для `zelma setup` и `zelma sessions` без registry/zellij behavior."
 derived_from:
+  - ../../flows/feature-flow.md
   - ../../product/roadmap.md
   - ../../epics/EP-001/brief.md
   - ../../epics/EP-001/charter.md
   - ../../adr/ADR-001-mvp-cli-architecture.md
-status: draft
-delivery_status: planned
+status: active
+delivery_status: in_progress
 audience: humans_and_agents
 must_not_define:
   - implementation_sequence
-  - selected_solution
+  - solution_space
 ---
 
 # FT-002: Дерево Команд Cobra
@@ -66,25 +67,44 @@ downstream features могли добавлять behavior без переиме
 
 ### Матрица Трассировки
 
-| ID требования | Ссылки на приемку | Проверки | ID доказательств |
-| --- | --- | --- | --- |
-| `REQ-01` | `EC-01`, `SC-01` | `CHK-01` | `EVID-01` |
-| `REQ-02` | `EC-01`, `SC-01` | `CHK-01` | `EVID-01` |
-| `REQ-03` | `EC-02`, `SC-02` | `CHK-02` | `EVID-02` |
+| ID требования | Ссылки на проблему | Ссылки на приемку | Проверки | ID доказательств |
+| --- | --- | --- | --- | --- |
+| `REQ-01` | `CON-01`, `ASM-01` | `EC-01`, `SC-01` | `CHK-01` | `EVID-01` |
+| `REQ-02` | `CON-01`, `ASM-01` | `EC-01`, `SC-01` | `CHK-01` | `EVID-01` |
+| `REQ-03` | `ASM-01` | `EC-02`, `SC-02`, `NEG-01` | `CHK-02` | `EVID-02` |
 
 ### Сценарии Приемки
 
 - `SC-01` Агент запускает command help для `setup` и каждого session subcommand и получает routed output.
 - `SC-02` Агент запускает stub и получает predictable non-implemented behavior без side effects.
 
+### Негативные / Edge Сценарии
+
+- `NEG-01` Stub-команды не создают, не читают и не изменяют `.zelma/sessions.json`
+  и не вызывают live `zellij`.
+
 ### Проверки
 
 | ID проверки | Покрывает | Как проверить | Ожидаемый результат | Путь доказательств |
 | --- | --- | --- | --- | --- |
-| `CHK-01` | `EC-01` | Go CLI command tests | routes существуют | `artifacts/ft-002/verify/chk-01/` |
-| `CHK-02` | `EC-02` | static/search или fake adapters | нет registry/zellij behavior | `artifacts/ft-002/verify/chk-02/` |
+| `CHK-01` | `EC-01`, `SC-01` | Go CLI command tests | routes существуют | `artifacts/ft-002/verify/chk-01/` |
+| `CHK-02` | `EC-02`, `SC-02`, `NEG-01` | static/search или fake adapters | нет registry/zellij behavior | `artifacts/ft-002/verify/chk-02/` |
+
+### Матрица Тестов
+
+| ID проверки | ID доказательств | Путь доказательств |
+| --- | --- | --- |
+| `CHK-01` | `EVID-01` | `artifacts/ft-002/verify/chk-01/` |
+| `CHK-02` | `EVID-02` | `artifacts/ft-002/verify/chk-02/` |
 
 ### Доказательства
 
 - `EVID-01` Output тестов command routing.
 - `EVID-02` Output проверки side-effect boundary.
+
+### Контракт Доказательств
+
+| ID доказательства | Artifact | Producer | Path contract | Используется проверками |
+| --- | --- | --- | --- | --- |
+| `EVID-01` | Test output для Cobra routing | implementer | `artifacts/ft-002/verify/chk-01/` | `CHK-01` |
+| `EVID-02` | Test output или review note для side-effect boundary | implementer / reviewer | `artifacts/ft-002/verify/chk-02/` | `CHK-02` |
