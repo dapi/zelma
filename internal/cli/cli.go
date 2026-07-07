@@ -31,6 +31,7 @@ func NewRootCommand(stdout, stderr io.Writer) *cobra.Command {
 	root.SetOut(stdout)
 	root.SetErr(stderr)
 	root.SetHelpFunc(renderHelp)
+	root.CompletionOptions.DisableDefaultCmd = true
 
 	root.AddCommand(newStubCommand("setup", "Prepare a repository for zelma."))
 
@@ -57,8 +58,23 @@ func renderHelp(cmd *cobra.Command, args []string) {
 		fmt.Fprint(cmd.OutOrStdout(), rootHelp)
 	case "zelma sessions":
 		fmt.Fprint(cmd.OutOrStdout(), sessionsHelp)
+	case "zelma help":
+		fmt.Fprint(cmd.OutOrStdout(), helpCommandHelp)
 	default:
-		fmt.Fprintf(cmd.OutOrStdout(), commandHelp, cmd.CommandPath(), cmd.Short)
+		if isStubCommand(cmd) {
+			fmt.Fprintf(cmd.OutOrStdout(), stubCommandHelp, cmd.CommandPath(), cmd.Short)
+			return
+		}
+		fmt.Fprintf(cmd.OutOrStdout(), "Usage:\n  %s\n", cmd.CommandPath())
+	}
+}
+
+func isStubCommand(cmd *cobra.Command) bool {
+	switch cmd.CommandPath() {
+	case "zelma setup", "zelma sessions list", "zelma sessions create", "zelma sessions detect":
+		return true
+	default:
+		return false
 	}
 }
 
@@ -112,7 +128,17 @@ Usage:
   zelma sessions [command]
 `
 
-const commandHelp = `Usage:
+const helpCommandHelp = `Usage:
+  zelma help [command]
+
+Status:
+  built-in: implemented by Cobra.
+
+Description:
+  Show help for zelma or a subcommand.
+`
+
+const stubCommandHelp = `Usage:
   %s
 
 Status:

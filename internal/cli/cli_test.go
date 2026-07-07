@@ -127,6 +127,40 @@ func TestHelpRoutes(t *testing.T) {
 	}
 }
 
+func TestBuiltInHelpIsNotRenderedAsStub(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+
+	code := Run(context.Background(), []string{"help", "--help"}, &stdout, &stderr)
+
+	if code != 0 {
+		t.Fatalf("Run() code = %d, want 0; stderr = %q", code, stderr.String())
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("stderr = %q, want empty", stderr.String())
+	}
+	output := stdout.String()
+	if strings.Contains(output, "stub: not implemented yet") {
+		t.Fatalf("stdout = %q, must not render built-in help as stub", output)
+	}
+	if !strings.Contains(output, "built-in: implemented by Cobra") {
+		t.Fatalf("stdout = %q, want built-in status", output)
+	}
+}
+
+func TestCompletionCommandIsNotExposedAsStub(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+
+	code := Run(context.Background(), []string{"completion", "--help"}, &stdout, &stderr)
+
+	if code == 0 {
+		t.Fatalf("Run() code = %d, want non-zero for disabled completion command", code)
+	}
+	if strings.Contains(stdout.String(), "stub: not implemented yet") ||
+		strings.Contains(stderr.String(), "stub: not implemented yet") {
+		t.Fatalf("completion output must not render as stub; stdout = %q stderr = %q", stdout.String(), stderr.String())
+	}
+}
+
 func assertBefore(t *testing.T, output, first, second string) {
 	t.Helper()
 
