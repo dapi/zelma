@@ -122,14 +122,16 @@ Success is allowed only when all conditions are true:
    - Classify the issue delivery mode before starting work:
      - `implementation`: acceptance requires runtime behavior, CLI commands, tests, code, files, migrations, integrations or observable product behavior.
      - `feature_pack_only`: acceptance explicitly asks only for planning/docs/brief/design review with no runtime/code behavior.
-   - If the issue is `implementation`, use `memory-bank/prompts/PROMPT-003-implement-and-test.md` as the effective start-issue prompt when it exists, unless `PROMPT_FILE` explicitly overrides it.
+   - If the issue is `implementation`, use `memory-bank/prompts/PROMPT-003-implement-and-test.md` as the effective implementation instruction when it exists, unless `PROMPT_FILE` explicitly overrides it.
+   - Before passing any markdown prompt file through `start-issue --prompt-file`, verify the selected `AGENT` can accept that exact file format and invocation. For Codex, do not pass repository markdown prompt files with frontmatter through `--prompt-file` unless a dry run proves the launch works; launch without `--prompt-file` and send/read the prompt instructions inside the task pane instead.
    - Do not start PR review/improve cycles for an `implementation` issue until the task pane has produced implementation-scope changes, not only feature-pack/docs updates.
 
 2. Запусти start-issue в новой zellij pane или tab:
    - Create a new zellij pane or tab named `issue-{{ISSUE_NUMBER}}`.
    - Run `start-issue {{ISSUE_NUMBER}} --repo {{OWNER_REPO}} --base <START_ISSUE_BASE or BASE_BRANCH>`.
    - Add `--agent {{AGENT}}` only if `AGENT` is provided.
-   - Add `--prompt-file <effective prompt file>` when `PROMPT_FILE` is provided or when preflight selected `PROMPT-003` for an `implementation` issue.
+   - Add `--prompt-file <effective prompt file>` only when `PROMPT_FILE` is provided or preflight selected a prompt file and the agent compatibility check passed.
+   - If prompt-file compatibility is not confirmed, launch `start-issue` without `--prompt-file`, then immediately instruct the task agent to read and apply the effective prompt file before implementation.
    - Record the task `pane_id`, command, cwd and start time.
 
 3. Observe pane:
@@ -139,6 +141,7 @@ Success is allowed only when all conditions are true:
    - Periodically snapshot the screen.
    - Do not interrupt while the implementation agent is actively working.
    - If the pane exits unexpectedly, capture exit status and stop with blocker.
+   - If the task pane exits with a launch/usage error caused by prompt-file incompatibility before any implementation work starts, do not count it as an implementation failure. Relaunch once without `--prompt-file`, inject the effective prompt instruction into the new task pane, and continue observation.
 
 4. Start review:
    - When implementation appears complete, verify the diff matches the issue delivery mode:
@@ -254,9 +257,11 @@ Return a concise final report:
 | Implementation issue routing | Prompt selects `PROMPT-003` before PR review when issue acceptance requires runtime/code behavior. | drafted |
 | Review model policy | Prompt requires `GPT-5.5 Extra high` for `/review` and medium for implementation/fixes. | drafted |
 | Review quiz polling | Prompt polls `/review` quiz/menu after 3 seconds and answers prompts quickly before returning to normal polling. | drafted |
+| Codex prompt-file compatibility | Prompt avoids passing markdown/frontmatter prompt files to Codex through `start-issue --prompt-file` unless compatibility is verified. | drafted |
 
 ## Change Notes
 
+- 2026-07-07: Added prompt-file compatibility guard and recovery for Codex launch usage failures.
 - 2026-07-07: Added fast 3-second polling for `/review` preset/base/model quiz prompts.
 - 2026-07-07: Added model policy: implementation/fixes on `GPT-5.5 medium`, `/review` gates on `GPT-5.5 Extra high`.
 - 2026-07-07: Added delivery-mode preflight so implementation issues run through `PROMPT-003` before PR review/fix cycles.
