@@ -112,12 +112,17 @@ Success is allowed only when all conditions are true:
    - Verify zellij is available:
      - `zellij action list-panes --json --all`
    - Inspect current git status and avoid overwriting unrelated user changes.
+   - Classify the issue delivery mode before starting work:
+     - `implementation`: acceptance requires runtime behavior, CLI commands, tests, code, files, migrations, integrations or observable product behavior.
+     - `feature_pack_only`: acceptance explicitly asks only for planning/docs/brief/design review with no runtime/code behavior.
+   - If the issue is `implementation`, use `memory-bank/prompts/PROMPT-003-implement-and-test.md` as the effective start-issue prompt when it exists, unless `PROMPT_FILE` explicitly overrides it.
+   - Do not start PR review/improve cycles for an `implementation` issue until the task pane has produced implementation-scope changes, not only feature-pack/docs updates.
 
 2. Запусти start-issue в новой zellij pane или tab:
    - Create a new zellij pane or tab named `issue-{{ISSUE_NUMBER}}`.
    - Run `start-issue {{ISSUE_NUMBER}} --repo {{OWNER_REPO}} --base <START_ISSUE_BASE or BASE_BRANCH>`.
    - Add `--agent {{AGENT}}` only if `AGENT` is provided.
-   - Add `--prompt-file {{PROMPT_FILE}}` only if `PROMPT_FILE` is provided.
+   - Add `--prompt-file <effective prompt file>` when `PROMPT_FILE` is provided or when preflight selected `PROMPT-003` for an `implementation` issue.
    - Record the task `pane_id`, command, cwd and start time.
 
 3. Observe pane:
@@ -129,7 +134,11 @@ Success is allowed only when all conditions are true:
    - If the pane exits unexpectedly, capture exit status and stop with blocker.
 
 4. Start review:
-   - When implementation appears complete, send `/review` to the same pane.
+   - When implementation appears complete, verify the diff matches the issue delivery mode:
+     - For `implementation`, the diff must include relevant code/tests/docs required by acceptance.
+     - If the diff is docs-only while acceptance requires runtime behavior, do not start PR review; tell the implementation agent to run `PROMPT-003` for the issue and continue implementation.
+     - For `feature_pack_only`, feature-doc changes may be sufficient if they satisfy the issue acceptance.
+   - Send `/review` to the same pane only after the delivery-mode check passes.
    - Select review against base branch / PR-style review.
    - Select `BASE_BRANCH` as the base.
    - Wait for review output.
@@ -186,6 +195,7 @@ Success is allowed only when all conditions are true:
 - Do not merge if PR is draft, not mergeable, dirty, conflicted, or checks are failed/pending/cancelled/absent.
 - Do not bypass branch protection, required approvals, security gates or human gates.
 - Do not fix unrelated findings.
+- Do not treat feature-pack review/improve output as completion for an issue whose acceptance requires implementation behavior.
 - Do not close the task pane before terminal outcome.
 - Do not overwrite unrelated local changes.
 - If a prompt override is used, report the selected prompt source.
@@ -228,7 +238,9 @@ Return a concise final report:
 | --- | --- | --- |
 | Dry run with generic repo variables | Prompt contains no hardcoded repository and requires explicit repo/base/merge policy. | passed |
 | Scope gate for absent CI | Prompt stops with blocker instead of calling absent checks green. | passed |
+| Implementation issue routing | Prompt selects `PROMPT-003` before PR review when issue acceptance requires runtime/code behavior. | drafted |
 
 ## Change Notes
 
+- 2026-07-07: Added delivery-mode preflight so implementation issues run through `PROMPT-003` before PR review/fix cycles.
 - 2026-07-07: Created reusable generic supervisor prompt from live FT-001 delivery workflow; repository-specific values were converted to variables.
