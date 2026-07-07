@@ -2,7 +2,7 @@
 title: "FT-001: Go Module Scaffold"
 doc_kind: feature
 doc_function: index
-purpose: "Bootstrap-safe навигация по feature package для первого Go scaffold delivery slice."
+purpose: "Bootstrap-safe навигация по package фичи для первого Go scaffold delivery slice."
 derived_from:
   - ../../dna/governance.md
   - brief.md
@@ -14,7 +14,7 @@ audience: humans_and_agents
 
 ## О разделе
 
-Каталог feature package начинается с canonical `brief.md`. Execution route
+Каталог package фичи начинается с canonical `brief.md`. Execution route
 добавлен сразу, потому что design не требуется: архитектурное решение уже
 зафиксировано в ADR-001, а feature ограничена scaffold без runtime side effects.
 

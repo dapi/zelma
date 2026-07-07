@@ -30,7 +30,7 @@ developer workflow.
 command stubs `list/create/detect`, agent-first help и contract tests для
 базового output.
 
-## Набросок Scope
+## Набросок Объема
 
 - `EP-001-REQ-01` Создать Go module и buildable `cmd/zelma`.
 - `EP-001-REQ-02` Завести Cobra command tree для `zelma setup` и `zelma sessions`.
@@ -43,7 +43,7 @@ command stubs `list/create/detect`, agent-first help и contract tests для
 - `EP-001-NS-02` Нет live `zellij` integration.
 - `EP-001-NS-03` Нет Codex session identity.
 
-## Briefs Feature
+## Briefs Фич
 
 - [FT-001: Go Module Scaffold](../../features/FT-001/README.md)
 - [FT-002: Cobra Command Tree](../../features/FT-002/README.md)

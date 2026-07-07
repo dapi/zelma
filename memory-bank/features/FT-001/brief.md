@@ -2,7 +2,7 @@
 title: "FT-001: Go Module Scaffold"
 doc_kind: feature
 doc_function: canonical
-purpose: "Canonical brief для первого delivery slice: создать Go module scaffold и пустой `zelma` binary без registry/zellij side effects."
+purpose: "Канонический brief для первого delivery slice: создать Go module scaffold и пустой `zelma` binary без registry/zellij side effects."
 derived_from:
   - ../../flows/feature-flow.md
   - ../../product/context.md
@@ -21,70 +21,70 @@ must_not_define:
 
 # FT-001: Go Module Scaffold
 
-## What
+## Что
 
-### Problem
+### Проблема
 
 У проекта `zelma` есть принятая архитектура MVP CLI и roadmap, но нет Go module,
 entrypoint и проверяемого binary skeleton. Без scaffold нельзя начать
 реализацию command tree, help output и последующих registry/zellij features.
 
-### Outcome
+### Результат
 
-| Metric ID | Metric | Baseline | Target | Measurement method |
+| ID метрики | Метрика | База | Цель | Способ измерения |
 | --- | --- | --- | --- | --- |
-| `MET-01` | Go module exists | no `go.mod` | `go test ./...` can discover module packages | local command |
-| `MET-02` | Binary entrypoint exists | no `cmd/zelma` | `go build ./cmd/zelma` succeeds | local command |
-| `MET-03` | Scope remains side-effect free | no code | no runtime `.zelma/` writes and no live `zellij` invocation | code review + tests |
+| `MET-01` | Go module существует | нет `go.mod` | `go test ./...` обнаруживает module packages | local command |
+| `MET-02` | Binary entrypoint существует | нет `cmd/zelma` | `go build ./cmd/zelma` завершается успешно | local command |
+| `MET-03` | Scope остается без side effects | кода нет | нет runtime-записей `.zelma/` и live-вызовов `zellij` | code review + tests |
 
-### Scope
+### Объем Работ
 
-- `REQ-01` Create `go.mod` for the repository.
-- `REQ-02` Create `cmd/zelma/main.go` entrypoint.
-- `REQ-03` Create minimal internal package layout aligned with ADR-001 without
-  implementing registry or zellij behavior.
-- `REQ-04` Ensure `go test ./...` and `go build ./cmd/zelma` are the canonical
-  checks for this slice.
-- `REQ-05` Keep CLI behavior minimal enough that `FT-002` can own Cobra command
-  tree and `FT-003` can own agent-first help templates.
+- `REQ-01` Создать `go.mod` для репозитория.
+- `REQ-02` Создать entrypoint `cmd/zelma/main.go`.
+- `REQ-03` Создать минимальный internal package layout, совместимый с ADR-001,
+  без реализации registry или zellij behavior.
+- `REQ-04` Зафиксировать `go test ./...` и `go build ./cmd/zelma` как
+  canonical checks для этого slice.
+- `REQ-05` Оставить CLI behavior достаточно минимальным, чтобы `FT-002` владел
+  Cobra command tree, а `FT-003` владел agent-first help templates.
 
-### Non-Scope
+### Что Не Входит
 
-- `NS-01` No Cobra command tree beyond what is strictly necessary to compile, if
-  any.
-- `NS-02` No `sessions list/create/detect` behavior.
-- `NS-03` No `.zelma/sessions.json` schema, read or write behavior.
-- `NS-04` No live `zellij` execution.
-- `NS-05` No Codex session identification.
-- `NS-06` No GitHub Actions or release packaging.
+- `NS-01` Нет Cobra command tree сверх строго необходимого для компиляции, если
+  это вообще понадобится.
+- `NS-02` Нет behavior для `sessions list/create/detect`.
+- `NS-03` Нет schema, read или write behavior для `.zelma/sessions.json`.
+- `NS-04` Нет live-выполнения `zellij`.
+- `NS-05` Нет Codex session identification.
+- `NS-06` Нет GitHub Actions или release packaging.
 
-### Constraints / Assumptions
+### Ограничения И Предположения
 
-- `ASM-01` Go toolchain will be installed before implementation starts.
-- `CON-01` Package layout must remain compatible with
+- `ASM-01` Go toolchain будет установлен до начала реализации.
+- `CON-01` Package layout должен оставаться совместимым с
   [ADR-001](../../adr/ADR-001-mvp-cli-architecture.md).
-- `CON-02` This feature must not introduce runtime side effects.
-- `DEC-01` Cobra is selected by ADR-001, but full Cobra command tree is owned by
-  the next feature unless scaffold requires a minimal dependency.
+- `CON-02` Эта feature не должна добавлять runtime side effects.
+- `DEC-01` Cobra выбрана в ADR-001, но полный Cobra command tree принадлежит
+  следующей feature, если scaffold не потребует минимальную dependency.
 
-## Design Requirement Decision
+## Решение О Необходимости Design
 
-| Decision | Reason | Downstream owner |
+| Решение | Причина | Downstream-владелец |
 | --- | --- | --- |
-| `Design required: no` | Architecture is already accepted in ADR-001 and this feature only creates scaffold. No new integration contract, schema or runtime side effect is selected here. | `none` |
+| `Design required: no` | Architecture уже принята в ADR-001, а эта feature только создает scaffold. Здесь не выбирается новый integration contract, schema или runtime side effect. | `none` |
 
-## Verify
+## Проверка
 
-### Exit Criteria
+### Критерии Готовности
 
-- `EC-01` `go.mod` exists and declares the project module.
-- `EC-02` `cmd/zelma/main.go` exists and builds.
-- `EC-03` `go test ./...` succeeds.
-- `EC-04` implementation does not call `zellij` or write `.zelma/sessions.json`.
+- `EC-01` `go.mod` существует и объявляет project module.
+- `EC-02` `cmd/zelma/main.go` существует и собирается.
+- `EC-03` `go test ./...` завершается успешно.
+- `EC-04` implementation не вызывает `zellij` и не пишет `.zelma/sessions.json`.
 
-### Traceability matrix
+### Матрица Трассировки
 
-| Requirement ID | Problem refs | Acceptance refs | Checks | Evidence IDs |
+| ID требования | Ссылки на проблему | Ссылки на приемку | Проверки | ID доказательств |
 | --- | --- | --- | --- | --- |
 | `REQ-01` | `ASM-01`, `CON-01` | `EC-01`, `SC-01` | `CHK-01` | `EVID-01` |
 | `REQ-02` | `ASM-01`, `CON-01` | `EC-02`, `SC-01` | `CHK-02` | `EVID-02` |
@@ -92,38 +92,38 @@ entrypoint и проверяемого binary skeleton. Без scaffold нель
 | `REQ-04` | `ASM-01` | `EC-03` | `CHK-01`, `CHK-02` | `EVID-01`, `EVID-02` |
 | `REQ-05` | `DEC-01`, `CON-02` | `EC-04`, `SC-02` | `CHK-03` | `EVID-03` |
 
-### Acceptance Scenarios
+### Сценарии Приемки
 
-- `SC-01` A developer or agent with Go installed can run `go test ./...` and
-  `go build ./cmd/zelma` from repo root.
-- `SC-02` The scaffold establishes package boundaries without attempting to
-  access live `zellij`, Codex or `.zelma/sessions.json`.
+- `SC-01` Разработчик или агент с установленным Go может запустить
+  `go test ./...` и `go build ./cmd/zelma` из repo root.
+- `SC-02` Scaffold задает package boundaries без попытки обращаться к live
+  `zellij`, Codex или `.zelma/sessions.json`.
 
-### Checks
+### Проверки
 
-| Check ID | Covers | How to check | Expected result | Evidence path |
+| ID проверки | Покрывает | Как проверить | Ожидаемый результат | Путь доказательств |
 | --- | --- | --- | --- | --- |
-| `CHK-01` | `EC-01`, `EC-03`, `SC-01` | `go test ./...` | Command exits 0 | `artifacts/ft-001/verify/chk-01/` |
-| `CHK-02` | `EC-02`, `SC-01` | `go build ./cmd/zelma` | Command exits 0 | `artifacts/ft-001/verify/chk-02/` |
-| `CHK-03` | `EC-04`, `SC-02` | code review / `rg -n "zellij|sessions.json|\\.zelma" cmd internal` | No runtime invocation/write behavior in scaffold | `artifacts/ft-001/verify/chk-03/` |
+| `CHK-01` | `EC-01`, `EC-03`, `SC-01` | `go test ./...` | command exits 0 | `artifacts/ft-001/verify/chk-01/` |
+| `CHK-02` | `EC-02`, `SC-01` | `go build ./cmd/zelma` | command exits 0 | `artifacts/ft-001/verify/chk-02/` |
+| `CHK-03` | `EC-04`, `SC-02` | code review / `rg -n "zellij|sessions.json|\\.zelma" cmd internal` | нет runtime invocation/write behavior в scaffold | `artifacts/ft-001/verify/chk-03/` |
 
-### Test matrix
+### Матрица Тестов
 
-| Check ID | Evidence IDs | Evidence path |
+| ID проверки | ID доказательств | Путь доказательств |
 | --- | --- | --- |
 | `CHK-01` | `EVID-01` | `artifacts/ft-001/verify/chk-01/` |
 | `CHK-02` | `EVID-02` | `artifacts/ft-001/verify/chk-02/` |
 | `CHK-03` | `EVID-03` | `artifacts/ft-001/verify/chk-03/` |
 
-### Evidence
+### Доказательства
 
-- `EVID-01` Captured output for `go test ./...`.
-- `EVID-02` Captured output for `go build ./cmd/zelma`.
-- `EVID-03` Review note or command output proving no runtime side effects.
+- `EVID-01` Captured output для `go test ./...`.
+- `EVID-02` Captured output для `go build ./cmd/zelma`.
+- `EVID-03` Review note или command output, подтверждающий отсутствие runtime side effects.
 
-### Evidence contract
+### Контракт Доказательств
 
-| Evidence ID | Artifact | Producer | Path contract | Reused by checks |
+| ID доказательства | Artifact | Producer | Path contract | Используется проверками |
 | --- | --- | --- | --- | --- |
 | `EVID-01` | Test output | implementer | `artifacts/ft-001/verify/chk-01/` | `CHK-01` |
 | `EVID-02` | Build output | implementer | `artifacts/ft-001/verify/chk-02/` | `CHK-02` |

@@ -2,7 +2,7 @@
 title: "FT-002: Дерево Команд Cobra"
 doc_kind: feature
 doc_function: canonical
-purpose: "Canonical brief для delivery slice: завести Cobra command tree для `zelma setup` и `zelma sessions` без registry/zellij behavior."
+purpose: "Канонический brief для delivery slice: завести Cobra command tree для `zelma setup` и `zelma sessions` без registry/zellij behavior."
 derived_from:
   - ../../product/roadmap.md
   - ../../epics/EP-001/brief.md
@@ -33,7 +33,7 @@ downstream features могли добавлять behavior без переиме
 | --- | --- | --- | --- | --- |
 | `MET-01` | Маршрутизируемые команды | routed stubs отсутствуют | `setup` и `sessions list/create/detect` маршрутизируются через Cobra | CLI tests |
 
-### Scope
+### Объем Работ
 
 - `REQ-01` Добавить root command `zelma`, command `setup` и command group `sessions`.
 - `REQ-02` Добавить routed stubs для `sessions list`, `sessions create` и `sessions detect`.
@@ -44,16 +44,16 @@ downstream features могли добавлять behavior без переиме
 - `NS-01` Нет `.zelma/sessions.json` behavior.
 - `NS-02` Нет zellij integration.
 - `NS-03` Нет finalized help templates за пределами route availability.
-- `NS-04` Нет изменения `.gitignore`; это scope `FT-031`.
+- `NS-04` Нет изменения `.gitignore`; это scope [FT-031](../FT-031/README.md).
 
 ### Ограничения И Предположения
 
-- `CON-01` Command names must match product roadmap and domain language.
-- `ASM-01` FT-001 scaffold exists and builds.
+- `CON-01` Имена команд должны соответствовать product roadmap и domain language.
+- `ASM-01` FT-001 scaffold существует и собирается.
 
 ## Решение О Необходимости Design
 
-| Decision | Reason | Downstream owner |
+| Решение | Причина | Downstream-владелец |
 | --- | --- | --- |
 | `Design required: yes` | CLI command surface является contract для пользователя и агента. | `design.md` |
 
@@ -61,8 +61,8 @@ downstream features могли добавлять behavior без переиме
 
 ### Критерии Готовности
 
-- `EC-01` `zelma setup --help` и `zelma sessions list/create/detect --help` route to existing commands.
-- `EC-02` Running command stubs does not touch registry or zellij.
+- `EC-01` `zelma setup --help` и `zelma sessions list/create/detect --help` маршрутизируются в существующие команды.
+- `EC-02` Запуск command stubs не трогает registry или zellij.
 
 ### Матрица Трассировки
 
@@ -74,17 +74,17 @@ downstream features могли добавлять behavior без переиме
 
 ### Сценарии Приемки
 
-- `SC-01` Agent runs command help for `setup` and each session subcommand and receives routed output.
-- `SC-02` Agent runs a stub and receives predictable non-implemented behavior with no side effects.
+- `SC-01` Агент запускает command help для `setup` и каждого session subcommand и получает routed output.
+- `SC-02` Агент запускает stub и получает predictable non-implemented behavior без side effects.
 
 ### Проверки
 
 | ID проверки | Покрывает | Как проверить | Ожидаемый результат | Путь доказательств |
 | --- | --- | --- | --- | --- |
-| `CHK-01` | `EC-01` | Go CLI command tests | routes exist | `artifacts/ft-002/verify/chk-01/` |
-| `CHK-02` | `EC-02` | static/search or fake adapters | no registry/zellij behavior | `artifacts/ft-002/verify/chk-02/` |
+| `CHK-01` | `EC-01` | Go CLI command tests | routes существуют | `artifacts/ft-002/verify/chk-01/` |
+| `CHK-02` | `EC-02` | static/search или fake adapters | нет registry/zellij behavior | `artifacts/ft-002/verify/chk-02/` |
 
 ### Доказательства
 
-- `EVID-01` Command routing test output.
-- `EVID-02` Side-effect boundary check output.
+- `EVID-01` Output тестов command routing.
+- `EVID-02` Output проверки side-effect boundary.

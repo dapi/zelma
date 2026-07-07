@@ -26,6 +26,7 @@ canonical_for:
 | --- | --- | --- | --- | --- | --- |
 | `now` | Project bootstrap and docs | Репозиторий содержит memory-bank, product/domain model и первичный roadmap | `unknown` | none | active |
 | `now` | Go CLI skeleton and command routing | Есть запускаемый `zelma` binary с группой `sessions` и predictable errors | `unknown` | Go toolchain; Cobra | draft |
+| `now` | `zelma setup` repo initialization | CLI готовит репозиторий к работе zelma и добавляет `.zelma` в `.gitignore` | `FT-031` | Go CLI skeleton; repo root resolver | draft |
 | `now` | Session registry foundation | `.zelma/sessions.json` имеет versioned schema, atomic writes, validation и duplicate prevention | `unknown` | Domain model/rules | draft |
 | `now` | `zelma sessions list` | Пользователь видит известные `zelma sessions` текущего repo | `unknown` | Registry foundation | draft |
 | `now` | `zelma sessions create` | CLI создает `zellij pane`, запускает Codex и регистрирует active session | `unknown` | Registry foundation; zellij adapter; Codex launch contract | draft |
@@ -33,6 +34,7 @@ canonical_for:
 | `next` | Reconciliation and stale handling | Registry отражает закрытые, moved или недоступные panes без разрушительных действий | `unknown` | create/list/detect MVP | idea |
 | `next` | Codex skill pack | Skills вызывают CLI для create/list/detect и используют тот же domain contract | `unknown` | Stable CLI output/schema | idea |
 | `next` | Test harness for zellij/Codex integration | Поддерживаемые workflows проверяются fixtures/integration tests, а не только manual QA | `unknown` | MVP commands | idea |
+| `next` | Autonomous issue shipping supervisor | Пользователь задает issue, а supervisor доводит `start-issue` delivery до reviewed, mergeable PR with green CI and merge | `EP-008` | zellij control; GitHub CLI; stable prompt policy | draft |
 | `later` | Session focus/attach helpers | Пользователь может быстро перейти к нужному pane/session из CLI | `unknown` | Reliable registry + zellij control | idea |
 | `later` | Multi-repo and worktree ergonomics | `zelma` лучше работает с несколькими worktrees и repo roots | `unknown` | Real usage feedback | idea |
 | `later` | Rich status surfaces | Машиночитаемый status, summaries или zellij status integration | `unknown` | Skill pack and reconciliation | idea |
@@ -53,6 +55,8 @@ canonical_for:
 | `SLICE-06` | Managed create workflow | Первый end-to-end value path | Должен сохранять opened path |
 | `SLICE-07` | Manual detect workflow | Критичный workflow для уже запущенных panes | Требует conservative matching |
 | `SLICE-08` | Codex skills | Делает `zelma` полезной для agentic workflows | Skills должны быть thin wrappers |
+| `SLICE-09` | `zelma setup` gitignore initialization | Repo-local state не должен случайно попадать в git | Команда должна идемпотентно добавлять `.zelma` в `.gitignore` |
+| `SLICE-10` | Autonomous issue shipping supervisor | Убирает ручное наблюдение за `start-issue`, `/review`, PR, CI и merge | Prompt должен быть редактируемым и overridable через `.zelma` |
 
 ## Proposed Epics And Features
 
@@ -63,13 +67,14 @@ canonical_for:
 
 | Epic ID | Epic | Outcome | Candidate features | Dependencies |
 | --- | --- | --- | --- | --- |
-| `EP-001` | Go CLI Foundation | Есть installable/testable `zelma` binary с agent-first help и command tree | `FT-001` Go module scaffold; `FT-002` Cobra command tree; `FT-003` agent-first help templates; `FT-004` output/error contract tests | Go toolchain |
-| `EP-002` | Registry And Repo State | `.zelma/sessions.json` безопасно хранит known sessions текущего repo | `FT-005` repo root resolver; `FT-006` schema v1; `FT-007` atomic writes + lock; `FT-008` registry validation/recovery; `FT-009` `sessions list --json/table` | `EP-001` |
+| `EP-001` | Go CLI Foundation | Есть installable/testable `zelma` binary с agent-first help и command tree | `FT-001` Go module scaffold; `FT-002` Cobra command tree including `zelma setup`; `FT-003` agent-first help templates; `FT-004` output/error contract tests | Go toolchain |
+| `EP-002` | Registry And Repo State | `.zelma/sessions.json` безопасно хранит known sessions текущего repo, а repo setup исключает `.zelma` из git | `FT-005` repo root resolver; `FT-006` schema v1; `FT-007` atomic writes + lock; `FT-008` registry validation/recovery; `FT-009` `sessions list --json/table`; `FT-031` `zelma setup` gitignore initialization | `EP-001` |
 | `EP-003` | Zellij Read Integration And Detect | `sessions detect` находит manual Codex panes без unsafe takeover | `FT-010` zellij adapter `ListSessions`; `FT-011` zellij adapter `ListPanes`; `FT-012` fixture tests for zellij JSON; `FT-013` Codex pane candidate classifier; `FT-014` detect upsert/idempotency | `EP-001`, `EP-002` |
 | `EP-004` | Managed Create Workflow | `sessions create` создает Codex pane и регистрирует active session | `FT-015` Codex launch contract; `FT-016` zellij run/new-pane adapter; `FT-017` create confirmation/reconciliation; `FT-018` create failure recovery hints | `EP-002`, `EP-003` |
 | `EP-005` | Codex Session Identity | Active records получают надежный `CodexSessionRef` | `FT-019` identify available Codex metadata sources; `FT-020` session log/process evidence parser; `FT-021` candidate vs active state rules; `FT-022` privacy-safe evidence fixtures | `EP-003`, `EP-004` |
 | `EP-006` | Agent Skill Pack | Codex skills управляют `zelma` через стабильный CLI contract | `FT-023` skill command wrappers; `FT-024` machine-readable output compatibility tests; `FT-025` skill docs; `FT-026` agent recovery flows | `EP-001`-`EP-004` |
 | `EP-007` | Reconciliation And Lifecycle | Registry отражает stale/closed sessions без разрушительных действий | `FT-027` `sessions list --live`; `FT-028` stale detection; `FT-029` cleanup/remove proposal; `FT-030` lifecycle state tests | `EP-002`, `EP-003` |
+| `EP-008` | Autonomous Issue Shipping Supervisor | Supervisor запускает `start-issue` для issue и доводит delivery до clean review, green CI, mergeable PR, merge и notification | `FT-032` supervisor launch; `FT-033` editable prompt and `.zelma` override; `FT-034` pane observation; `FT-035` review/fix loop; `FT-036` PR/CI gate; `FT-037` merge cleanup notification | `EP-001`, zellij control, GitHub CLI |
 
 ## First Epic Recommendation
 

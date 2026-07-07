@@ -34,6 +34,13 @@ canonical_for:
 | `stale session` | Registry record, который больше не подтверждается live `zellij`/Codex state | Reconciliation | Closed session |
 | `session origin` | Способ попадания записи в registry: `create`, `detect` или future import/migration | Audit, debugging | Lifecycle state |
 
+## Colloquial Aliases
+
+| Alias | Canonical term | Allowed use | Notes |
+| --- | --- | --- | --- |
+| `зессия` | `zelma session` | Разговорный обиход, planning notes, informal handoff | Не использовать как CLI command, JSON field или canonical domain term |
+| `зешка` | `zelma session` | Короткий сленг для быстрого общения внутри команды | Не использовать как CLI command, JSON field или canonical domain term |
+
 ## Naming Rules
 
 - Используй domain terms последовательно в PRD, use cases, features, code comments и ADR.
@@ -41,6 +48,7 @@ canonical_for:
 - UI labels могут отличаться от domain terms, но разница должна быть объяснена в product или UX документах.
 - Пиши `zelma`, а не `zelima`.
 - Пиши `zelma session`, когда речь о repo-local управляемой записи.
+- `зессия` и `зешка` допустимы только как разговорные aliases для `zelma session`; в контрактах, schema, CLI help и governed terminology используй canonical term.
 - Пиши `zellij session`, когда речь о runtime session мультиплексора.
 - Пиши `codex session`, когда речь о Codex identity внутри pane.
 

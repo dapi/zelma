@@ -2,7 +2,7 @@
 title: "FT-004: Output And Error Contract Tests"
 doc_kind: feature
 doc_function: index
-purpose: "Навигация по feature package для базовых CLI output/error contract tests."
+purpose: "Навигация по package фичи для базовых CLI output/error contract tests."
 derived_from:
   - ../../dna/governance.md
   - brief.md

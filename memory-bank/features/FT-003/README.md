@@ -2,7 +2,7 @@
 title: "FT-003: Agent-First Help Templates"
 doc_kind: feature
 doc_function: index
-purpose: "Навигация по feature package для agent-first help output."
+purpose: "Навигация по package фичи для agent-first help output."
 derived_from:
   - ../../dna/governance.md
   - brief.md

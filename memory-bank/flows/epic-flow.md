@@ -35,19 +35,23 @@ FPF-основание:
 
 1. Все документы одного epic живут в `memory-bank/epics/EP-XXX/`.
 2. `README.md` - routing layer и annotated index.
-3. `charter.md` - canonical owner intent: problem, outcome, scope/non-scope, stakeholder channels, source/evidence boundaries.
-4. `roadmap.md` - execution order owner: waves, gates, dependencies, stop rules and handoff protocol.
-5. `decision-log.md` - local decision ledger for decisions that affect the epic but do not require global ADR.
-6. `subissues.md` - registry of candidate and accepted delivery subissues, each mapped to roadmap waves and source `SLICE-*`/`UC-*`.
-7. `risks.md` - epic-level risk register for financial, operational, scope and delivery risks.
-8. `design.md`, `specs/**`, `diagrams/**`, `source-docs/**` — опциональные knowledge-артефакты. Они допустимы только когда индексируются из epic package и подчиняются правилам knowledge-артефактов ниже.
-9. `implementation-plan.md` не создаётся внутри epic. Code-level execution belongs to a separate `memory-bank/features/FT-<issue>/` package.
-10. Для canonical epic docs используй templates from `memory-bank/flows/templates/epic/`.
+3. `brief.md` - опциональный intake-документ для ранней декомпозиции:
+   problem, outcome, набросок scope и ссылки на candidate feature briefs. Он не
+   заменяет `charter.md`.
+4. `charter.md` - canonical owner intent: problem, outcome, scope/non-scope, stakeholder channels, source/evidence boundaries.
+5. `roadmap.md` - execution order owner: waves, gates, dependencies, stop rules and handoff protocol.
+6. `decision-log.md` - local decision ledger for decisions that affect the epic but do not require global ADR.
+7. `subissues.md` - registry of candidate and accepted delivery subissues, each mapped to roadmap waves and source `SLICE-*`/`UC-*`.
+8. `risks.md` - epic-level risk register for financial, operational, scope and delivery risks.
+9. `design.md`, `specs/**`, `diagrams/**`, `source-docs/**` — опциональные knowledge-артефакты. Они допустимы только когда индексируются из epic package и подчиняются правилам knowledge-артефактов ниже.
+10. `implementation-plan.md` не создаётся внутри epic. Code-level execution принадлежит отдельному package `memory-bank/features/FT-<issue>/`.
+11. Для canonical epic docs используй templates from `memory-bank/flows/templates/epic/`.
 
 ## Layer Model
 
 | Layer | Primary docs | Owns | Must NOT define |
 | --- | --- | --- | --- |
+| Intake | `brief.md` | ранний problem frame, outcome sketch, ссылки на candidate features | canonical scope, roadmap waves, feature acceptance contracts |
 | Intent | `charter.md` | business/problem frame, scope, non-scope, source evidence, stakeholder channels | file paths, code steps, final implementation sequence |
 | Roadmap | `roadmap.md`, `subissues.md` | waves, dependencies, issue candidates, handoff gates | final code plan, exact migrations, test commands |
 | Governance | `decision-log.md`, `risks.md` | local decisions, risk controls, stop rules | global architecture policy unless promoted to ADR |

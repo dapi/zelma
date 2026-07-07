@@ -2,7 +2,7 @@
 title: "FT-003: Agent-First Шаблоны Help"
 doc_kind: feature
 doc_function: canonical
-purpose: "Canonical brief для agent-first help templates в `zelma` и `zelma sessions`."
+purpose: "Канонический brief для agent-first help templates в `zelma` и `zelma sessions`."
 derived_from:
   - ../../product/context.md
   - ../../product/vision.md
@@ -32,7 +32,7 @@ Default CLI help обычно оптимизирован для человека
 | --- | --- | --- | --- | --- |
 | `MET-01` | Agent-first help | generic/default help | command map и machine-use hints выводятся раньше prose | snapshot tests |
 
-### Scope
+### Объем Работ
 
 - `REQ-01` Настроить top-level help для `zelma`.
 - `REQ-02` Настроить `zelma sessions help`.
@@ -40,18 +40,18 @@ Default CLI help обычно оптимизирован для человека
 
 ### Что Не Входит
 
-- `NS-01` No final behavior for session commands.
-- `NS-02` No skill implementation.
-- `NS-03` No localization system.
+- `NS-01` Нет final behavior для session commands.
+- `NS-02` Нет реализации skills.
+- `NS-03` Нет localization system.
 
 ### Ограничения И Предположения
 
-- `CON-01` Help must remain readable by humans after agent-first sections.
-- `CON-02` Help must not promise behavior outside implemented or stubbed commands.
+- `CON-01` Help должен оставаться читаемым человеком после agent-first sections.
+- `CON-02` Help не должен обещать behavior вне реализованных или stubbed commands.
 
 ## Решение О Необходимости Design
 
-| Decision | Reason | Downstream owner |
+| Решение | Причина | Downstream-владелец |
 | --- | --- | --- |
 | `Design required: yes` | Help output является стабильным CLI contract для агентов. | `design.md` |
 
@@ -59,8 +59,8 @@ Default CLI help обычно оптимизирован для человека
 
 ### Критерии Готовности
 
-- `EC-01` `zelma help` and bare `zelma` output are agent-first.
-- `EC-02` `zelma sessions help` shows subcommand map and expected output modes.
+- `EC-01` `zelma help` и bare `zelma` output являются agent-first.
+- `EC-02` `zelma sessions help` показывает subcommand map и ожидаемые output modes.
 
 ### Матрица Трассировки
 
@@ -72,17 +72,17 @@ Default CLI help обычно оптимизирован для человека
 
 ### Сценарии Приемки
 
-- `SC-01` Agent reads top-level help and can identify next commands without prose parsing.
-- `SC-02` Agent reads `sessions` help and can choose list/create/detect.
+- `SC-01` Агент читает top-level help и может выбрать next commands без prose parsing.
+- `SC-02` Агент читает `sessions` help и может выбрать list/create/detect.
 
 ### Проверки
 
 | ID проверки | Покрывает | Как проверить | Ожидаемый результат | Путь доказательств |
 | --- | --- | --- | --- | --- |
-| `CHK-01` | `EC-01`, `EC-02` | CLI snapshot tests | expected help layout | `artifacts/ft-003/verify/chk-01/` |
-| `CHK-02` | `REQ-03` | review output headings/order | command map precedes prose | `artifacts/ft-003/verify/chk-02/` |
+| `CHK-01` | `EC-01`, `EC-02` | CLI snapshot tests | ожидаемый help layout | `artifacts/ft-003/verify/chk-01/` |
+| `CHK-02` | `REQ-03` | review output headings/order | command map идет перед prose | `artifacts/ft-003/verify/chk-02/` |
 
 ### Доказательства
 
-- `EVID-01` Snapshot test output.
-- `EVID-02` Help contract review note.
+- `EVID-01` Output snapshot tests.
+- `EVID-02` Review note по help contract.

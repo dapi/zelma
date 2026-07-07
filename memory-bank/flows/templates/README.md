@@ -8,6 +8,7 @@ derived_from:
   - prd/PRD-XXX.md
   - use-case/UC-XXX.md
   - epic/README.md
+  - epic/brief.md
   - epic/charter.md
   - epic/roadmap.md
   - epic/decision-log.md
@@ -37,14 +38,15 @@ audience: humans_and_agents
 - [PRD-XXX: Product Initiative Name](prd/PRD-XXX.md) — компактный Product Requirements Document для инициативы, которая еще не разложена на один конкретный feature slice.
 - [UC-XXX: Use Case Name](use-case/UC-XXX.md) — канонический use case для устойчивого пользовательского или операционного сценария.
 - [Epic Templates](epic/README.md) — индекс шаблонов `EP-XXX` package.
+- [EP-XXX: Brief Template](epic/brief.md) — легкий intake-шаблон для ранней декомпозиции epic до полного charter/roadmap.
 - [EP-XXX: Charter Template](epic/charter.md) — intent, scope, source/evidence and stakeholder channels.
 - [EP-XXX: Roadmap Template](epic/roadmap.md) — waves, dependencies, gates and stop rules.
 - [EP-XXX: Decision Log Template](epic/decision-log.md) — local epic decisions that do not require global ADR.
 - [EP-XXX: Subissues Template](epic/subissues.md) — candidate/accepted delivery subissue registry.
 - [EP-XXX: Risks Template](epic/risks.md) — epic-level risk register.
 - [FT-XXX Feature README Template](feature/README.md) — шаблон README для feature-каталога. Отвечает на вопрос: как оформить feature-level index.
-- [FT-XXX: Brief Template](feature/brief.md) — canonical problem-space template для новых feature packages. Отвечает на вопрос: как зафиксировать intent, scope и verify contract без solution/execution деталей.
-- [FT-XXX: Design Template](feature/design.md) — canonical solution-space template для feature package. Отвечает на вопрос: как зафиксировать selected design, rationale, contracts, failure modes и design-pack routing.
+- [FT-XXX: Brief Template](feature/brief.md) — canonical problem-space template для новых package фичиs. Отвечает на вопрос: как зафиксировать intent, scope и verify contract без solution/execution деталей.
+- [FT-XXX: Design Template](feature/design.md) — canonical solution-space template для package фичи. Отвечает на вопрос: как зафиксировать selected design, rationale, contracts, failure modes и design-pack routing.
 - [FT-XXX: Implementation Plan](feature/implementation-plan.md) — шаблон derived execution-плана. Отвечает на вопрос: как оформить sequencing и checkpoints после готовности upstream owners.
 - [FT-XXX: Runtime Surfaces Template](feature/support/runtime-surfaces.md) — optional support template для current runtime inventory, semantic mapping, context matrix и resolution tables.
 - [FT-XXX: UI Reference Template](feature/support/ui-reference.md) — optional support template для interface changes, screen map, interaction states и mockups.
