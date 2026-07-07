@@ -65,6 +65,7 @@ type Session struct {
 type ErrorCode string
 
 const (
+	ErrorCodeInvalidInput  ErrorCode = "zellij_invalid_input"
 	ErrorCodeMissingBinary ErrorCode = "zellij_missing_binary"
 	ErrorCodeCommandFailed ErrorCode = "zellij_command_failed"
 	ErrorCodeInvalidOutput ErrorCode = "zellij_invalid_output"
