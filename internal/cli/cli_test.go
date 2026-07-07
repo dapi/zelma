@@ -138,15 +138,7 @@ func TestStubHelpSnapshots(t *testing.T) {
 		{
 			name: "sessions list help",
 			args: []string{"sessions", "list", "--help"},
-			want: `Usage:
-  zelma sessions list
-
-Status:
-  stub: not implemented yet.
-
-Description:
-  List known zelma sessions.
-`,
+			want: sessionsListHelp,
 		},
 		{
 			name: "sessions create help",
@@ -218,11 +210,11 @@ func TestOutputAndErrorStreamContract(t *testing.T) {
 			wantStderr: "",
 		},
 		{
-			name:       "list stub writes stderr only",
+			name:       "list empty registry writes stdout only",
 			args:       []string{"sessions", "list"},
-			wantCode:   1,
-			wantStdout: "",
-			wantStderr: "zelma sessions list is not implemented yet\n",
+			wantCode:   0,
+			wantStdout: "STATE  ZELLIJ_SESSION  ZELLIJ_PANE  CODEX_SESSION  OPENED_PATH\n",
+			wantStderr: "",
 		},
 		{
 			name:       "create stub writes stderr only",
@@ -313,7 +305,7 @@ const rootHelpSnapshot = `COMMAND MAP
   zelma help              Show this command map.
   zelma setup             Add .zelma to this repository .gitignore. Status: implemented.
   zelma sessions help     Show the sessions command map.
-  zelma sessions list     List known zelma sessions. Status: stub.
+  zelma sessions list     List known zelma sessions. Status: implemented.
   zelma sessions create   Create a zelma session. Status: stub.
   zelma sessions detect   Detect existing Codex panes. Status: stub.
 
@@ -321,8 +313,9 @@ OUTPUT CONVENTIONS
   help output: stdout, exit 0, plain text.
   setup changed: stdout, exit 0, "changed: added .zelma to <path>".
   setup unchanged: stdout, exit 0, "already configured: <path> contains .zelma".
+  sessions list: stdout, exit 0, table by default or schema v1 JSON with --json.
   stub commands: stderr, exit 1, "<command> is not implemented yet".
-  machine-readable session data: not implemented in this feature.
+  machine-readable session data: use "zelma sessions list --json".
 
 RECOVERY HINTS
   unknown command: run "zelma help".
@@ -330,8 +323,9 @@ RECOVERY HINTS
   setup task: run "zelma setup" from inside a git repository.
 
 HUMAN NOTES
-  zelma manages Codex sessions in zellij panes. Runtime session behavior is not
-  implemented yet; setup only configures repository-local ignore rules.
+  zelma manages Codex sessions in zellij panes. sessions list reads the
+  repository-local registry only; setup configures repository-local ignore
+  rules.
 
 Usage:
   zelma [command]
@@ -339,14 +333,16 @@ Usage:
 
 const sessionsHelpSnapshot = `COMMAND MAP
   zelma sessions help     Show this sessions command map.
-  zelma sessions list     List known zelma sessions. Status: stub.
+  zelma sessions list     List known zelma sessions. Status: implemented.
   zelma sessions create   Create a zelma session. Status: stub.
   zelma sessions detect   Detect existing Codex panes. Status: stub.
 
 OUTPUT CONVENTIONS
   help output: stdout, exit 0, plain text.
-  list/create/detect: stderr, exit 1, "<command> is not implemented yet".
-  sessions registry output: not implemented in this feature.
+  list: stdout, exit 0, table by default or schema v1 JSON with --json.
+  create/detect: stderr, exit 1, "<command> is not implemented yet".
+  sessions registry output: preserves zellij_session, zellij_pane,
+  codex_session, opened_path and state fields.
 
 RECOVERY HINTS
   inventory task: inspect "zelma sessions list --help".
@@ -354,8 +350,8 @@ RECOVERY HINTS
   manual detect task: inspect "zelma sessions detect --help".
 
 HUMAN NOTES
-  sessions commands are present as routed stubs. They do not read or write
-  .zelma/sessions.json yet.
+  sessions list reads .zelma/sessions.json without live zellij checks. create
+  and detect remain routed stubs.
 
 Usage:
   zelma sessions [command]
@@ -367,11 +363,6 @@ func TestStubDiagnostics(t *testing.T) {
 		args       []string
 		wantStderr string
 	}{
-		{
-			name:       "sessions list",
-			args:       []string{"sessions", "list"},
-			wantStderr: "zelma sessions list is not implemented yet\n",
-		},
 		{
 			name:       "sessions create",
 			args:       []string{"sessions", "create"},
@@ -400,6 +391,142 @@ func TestStubDiagnostics(t *testing.T) {
 				t.Fatalf("stderr = %q, want %q", stderr.String(), tt.wantStderr)
 			}
 		})
+	}
+}
+
+func TestSessionsListEmptyRegistrySucceeds(t *testing.T) {
+	root := newTestGitRepo(t)
+	writeRegistryFile(t, root, `{
+  "version": 1,
+  "sessions": []
+}
+`)
+	t.Chdir(root)
+
+	var stdout, stderr bytes.Buffer
+
+	code := Run(context.Background(), []string{"sessions", "list"}, &stdout, &stderr)
+
+	if code != 0 {
+		t.Fatalf("Run() code = %d, want 0; stderr = %q", code, stderr.String())
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("stderr = %q, want empty", stderr.String())
+	}
+	want := "STATE  ZELLIJ_SESSION  ZELLIJ_PANE  CODEX_SESSION  OPENED_PATH\n"
+	if stdout.String() != want {
+		t.Fatalf("stdout mismatch\nwant:\n%s\ngot:\n%s", want, stdout.String())
+	}
+}
+
+func TestSessionsListMissingRegistrySucceedsAsEmpty(t *testing.T) {
+	root := newTestGitRepo(t)
+	t.Chdir(root)
+
+	var stdout, stderr bytes.Buffer
+
+	code := Run(context.Background(), []string{"sessions", "list", "--json"}, &stdout, &stderr)
+
+	if code != 0 {
+		t.Fatalf("Run() code = %d, want 0; stderr = %q", code, stderr.String())
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("stderr = %q, want empty", stderr.String())
+	}
+	want := `{
+  "version": 1,
+  "sessions": []
+}
+`
+	if stdout.String() != want {
+		t.Fatalf("stdout mismatch\nwant:\n%s\ngot:\n%s", want, stdout.String())
+	}
+}
+
+func TestSessionsListJSONPreservesRegistryFields(t *testing.T) {
+	root := newTestGitRepo(t)
+	writeRegistryFile(t, root, `{
+  "version": 1,
+  "sessions": [
+    {
+      "zellij_session": "zelma-main",
+      "zellij_pane": "1",
+      "codex_session": "codex-2026-07-07T10-00-00Z-a1b2",
+      "opened_path": "/workspace/zelma",
+      "state": "active"
+    }
+  ]
+}
+`)
+	t.Chdir(filepath.Join(root, "nested"))
+
+	var stdout, stderr bytes.Buffer
+
+	code := Run(context.Background(), []string{"sessions", "list", "--json"}, &stdout, &stderr)
+
+	if code != 0 {
+		t.Fatalf("Run() code = %d, want 0; stderr = %q", code, stderr.String())
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("stderr = %q, want empty", stderr.String())
+	}
+	want := `{
+  "version": 1,
+  "sessions": [
+    {
+      "zellij_session": "zelma-main",
+      "zellij_pane": "1",
+      "codex_session": "codex-2026-07-07T10-00-00Z-a1b2",
+      "opened_path": "/workspace/zelma",
+      "state": "active"
+    }
+  ]
+}
+`
+	if stdout.String() != want {
+		t.Fatalf("stdout mismatch\nwant:\n%s\ngot:\n%s", want, stdout.String())
+	}
+}
+
+func TestSessionsListTableOutput(t *testing.T) {
+	root := newTestGitRepo(t)
+	writeRegistryFile(t, root, `{
+  "version": 1,
+  "sessions": [
+    {
+      "zellij_session": "zelma-main",
+      "zellij_pane": "1",
+      "codex_session": "codex-a",
+      "opened_path": "/workspace/zelma",
+      "state": "active"
+    },
+    {
+      "zellij_session": "feature-issue-6",
+      "zellij_pane": "3",
+      "codex_session": "codex-b",
+      "opened_path": "/workspace/zelma/memory-bank/features/FT-006",
+      "state": "closed"
+    }
+  ]
+}
+`)
+	t.Chdir(root)
+
+	var stdout, stderr bytes.Buffer
+
+	code := Run(context.Background(), []string{"sessions", "list"}, &stdout, &stderr)
+
+	if code != 0 {
+		t.Fatalf("Run() code = %d, want 0; stderr = %q", code, stderr.String())
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("stderr = %q, want empty", stderr.String())
+	}
+	want := "STATE   ZELLIJ_SESSION   ZELLIJ_PANE  CODEX_SESSION  OPENED_PATH\n" +
+		"active  zelma-main       1            codex-a        /workspace/zelma\n" +
+		"closed  feature-issue-6  3            codex-b        /workspace/zelma/memory-bank/features/FT-006\n"
+	if stdout.String() != want {
+		t.Fatalf("stdout mismatch\nwant:\n%s\ngot:\n%s", want, stdout.String())
 	}
 }
 
@@ -539,6 +666,18 @@ func newTestGitRepo(t *testing.T) string {
 		t.Fatal(err)
 	}
 	return root
+}
+
+func writeRegistryFile(t *testing.T, root, content string) {
+	t.Helper()
+
+	registryDir := filepath.Join(root, ".zelma")
+	if err := os.Mkdir(registryDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(registryDir, "sessions.json"), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func assertFileContent(t *testing.T, path, want string) {
