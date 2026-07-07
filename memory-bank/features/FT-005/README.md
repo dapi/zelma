@@ -6,7 +6,7 @@ purpose: "Навигация по package фичи для определения
 derived_from:
   - ../../dna/governance.md
   - brief.md
-status: draft
+status: active
 audience: humans_and_agents
 ---
 
@@ -16,3 +16,10 @@ audience: humans_and_agents
 
 - [Brief](brief.md)
   Читать, когда нужно понять scope и verify для repo root resolution.
+- [Design](design.md)
+  Читать, когда нужно проверить selected solution, repo boundary decision,
+  contracts, C4 applicability и failure modes.
+- [Implementation Plan](implementation-plan.md)
+  Читать, когда нужно исполнять feature по шагам, test strategy и checkpoints.
+- [Decision Log](decision-log.md)
+  Читать, когда нужно увидеть FPF-обоснование закрытых вопросов review-improve.

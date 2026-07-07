@@ -2,12 +2,12 @@
 title: "FT-005: Repo Root Resolver"
 doc_kind: feature
 doc_function: canonical
-purpose: "Канонический brief для определения корня репозитория, относительно которого `zelma` хранит `.zelma/sessions.json`."
+purpose: "Канонический brief для определения корня репозитория, относительно которого `zelma` работает с repo-local `.zelma/` и `.gitignore`."
 derived_from:
   - ../../product/roadmap.md
   - ../../epics/EP-002/brief.md
   - ../../adr/ADR-001-mvp-cli-architecture.md
-status: draft
+status: active
 delivery_status: planned
 audience: humans_and_agents
 must_not_define:
@@ -21,19 +21,21 @@ must_not_define:
 
 ### Проблема
 
-Все registry-команды должны одинаково понимать, какой каталог является корнем
-проекта. Иначе `.zelma/sessions.json` может появиться не там, где его ожидают
-агенты и пользователи.
+Все команды, которые работают с repo-local `.zelma/` или `.gitignore`, должны
+одинаково понимать, какой каталог является корнем проекта. Иначе
+`.zelma/sessions.json`, `.zelma/` и `.gitignore` могут относиться к разным
+каталогам, чем ожидают агенты и пользователи.
 
 ### Результат
 
-`zelma` стабильно определяет repo root из вложенного каталога и явно сообщает
-ошибку, если команда запущена вне поддерживаемого проекта.
+`zelma` стабильно определяет repo root из вложенного каталога, нормализует путь
+для downstream filesystem operations и явно сообщает ошибку, если команда
+запущена вне поддерживаемого проекта.
 
 ### Объем Работ
 
 - `REQ-01` Определить правила поиска repo root.
-- `REQ-02` Нормализовать путь repo root для последующих registry operations.
+- `REQ-02` Нормализовать путь repo root для последующих repo-local filesystem operations.
 - `REQ-03` Вернуть agent-friendly ошибку вне repo.
 
 ### Что Не Входит
@@ -41,6 +43,7 @@ must_not_define:
 - `NS-01` Нет чтения или записи `.zelma/sessions.json`.
 - `NS-02` Нет multi-repo/global registry.
 - `NS-03` Нет zellij integration.
+- `NS-04` Нет изменения `.gitignore`; это scope `zelma setup`.
 
 ## Решение О Необходимости Design
 
@@ -52,6 +55,19 @@ must_not_define:
 
 - `SC-01` Из вложенного каталога команда находит один и тот же repo root.
 - `SC-02` Вне repo команда завершает работу с понятной диагностикой.
+
+### Negative / Edge Coverage
+
+- `NEG-01` Запуск из каталога без поддерживаемого repo marker не должен
+  создавать repo-local state или принимать текущий каталог за repo root.
+
+### Traceability Matrix
+
+| Requirement | Acceptance scenarios | Checks | Evidence |
+| --- | --- | --- | --- |
+| `REQ-01` | `SC-01`, `SC-02`, `NEG-01` | `CHK-01`, `CHK-02` | `EVID-01`, `EVID-02` |
+| `REQ-02` | `SC-01` | `CHK-01` | `EVID-01` |
+| `REQ-03` | `SC-02`, `NEG-01` | `CHK-02` | `EVID-02` |
 
 | ID проверки | Покрывает | Как проверить | Ожидаемый результат | Путь доказательств |
 | --- | --- | --- | --- | --- |
