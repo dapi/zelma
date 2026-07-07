@@ -9,7 +9,7 @@ derived_from:
   - ../../epics/EP-001/brief.md
   - ../../engineering/architecture.md
 status: draft
-delivery_status: planned
+delivery_status: in_progress
 audience: humans_and_agents
 must_not_define:
   - implementation_sequence

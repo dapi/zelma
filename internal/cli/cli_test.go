@@ -9,6 +9,77 @@ import (
 	"testing"
 )
 
+func TestAgentFirstHelpSnapshots(t *testing.T) {
+	tests := []struct {
+		name string
+		args []string
+		want string
+	}{
+		{
+			name: "bare root",
+			args: nil,
+			want: rootHelpSnapshot,
+		},
+		{
+			name: "root help",
+			args: []string{"help"},
+			want: rootHelpSnapshot,
+		},
+		{
+			name: "sessions help",
+			args: []string{"sessions", "help"},
+			want: sessionsHelpSnapshot,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var stdout, stderr bytes.Buffer
+
+			code := Run(context.Background(), tt.args, &stdout, &stderr)
+
+			if code != 0 {
+				t.Fatalf("Run() code = %d, want 0; stderr = %q", code, stderr.String())
+			}
+			if stderr.Len() != 0 {
+				t.Fatalf("stderr = %q, want empty", stderr.String())
+			}
+			if stdout.String() != tt.want {
+				t.Fatalf("stdout mismatch\nwant:\n%s\ngot:\n%s", tt.want, stdout.String())
+			}
+		})
+	}
+}
+
+func TestAgentFirstHelpOrder(t *testing.T) {
+	tests := []struct {
+		name string
+		args []string
+	}{
+		{name: "root help", args: []string{"help"}},
+		{name: "sessions help", args: []string{"sessions", "help"}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var stdout, stderr bytes.Buffer
+
+			code := Run(context.Background(), tt.args, &stdout, &stderr)
+
+			if code != 0 {
+				t.Fatalf("Run() code = %d, want 0; stderr = %q", code, stderr.String())
+			}
+			output := stdout.String()
+			assertBefore(t, output, "COMMAND MAP\n", "HUMAN NOTES\n")
+			assertBefore(t, output, "COMMAND MAP\n", "Usage:\n")
+			assertBefore(t, output, "OUTPUT CONVENTIONS\n", "HUMAN NOTES\n")
+			if !strings.Contains(output, "not implemented") {
+				t.Fatalf("stdout = %q, want explicit not implemented status", output)
+			}
+		})
+	}
+}
+
 func TestHelpRoutes(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -18,7 +89,7 @@ func TestHelpRoutes(t *testing.T) {
 		{
 			name:       "setup",
 			args:       []string{"setup", "--help"},
-			wantOutput: []string{"Usage:", "zelma setup"},
+			wantOutput: []string{"COMMAND MAP", "STATUS", "OUTPUT CONVENTIONS", "RECOVERY HINTS", "zelma setup", "implemented"},
 		},
 		{
 			name:       "sessions list",
@@ -57,6 +128,108 @@ func TestHelpRoutes(t *testing.T) {
 		})
 	}
 }
+
+func TestBuiltInHelpIsNotRenderedAsStub(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+
+	code := Run(context.Background(), []string{"help", "--help"}, &stdout, &stderr)
+
+	if code != 0 {
+		t.Fatalf("Run() code = %d, want 0; stderr = %q", code, stderr.String())
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("stderr = %q, want empty", stderr.String())
+	}
+	output := stdout.String()
+	if strings.Contains(output, "stub: not implemented yet") {
+		t.Fatalf("stdout = %q, must not render built-in help as stub", output)
+	}
+	if !strings.Contains(output, "built-in: implemented by Cobra") {
+		t.Fatalf("stdout = %q, want built-in status", output)
+	}
+}
+
+func TestCompletionCommandIsNotExposedAsStub(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+
+	code := Run(context.Background(), []string{"completion", "--help"}, &stdout, &stderr)
+
+	if code == 0 {
+		t.Fatalf("Run() code = %d, want non-zero for disabled completion command", code)
+	}
+	if strings.Contains(stdout.String(), "stub: not implemented yet") ||
+		strings.Contains(stderr.String(), "stub: not implemented yet") {
+		t.Fatalf("completion output must not render as stub; stdout = %q stderr = %q", stdout.String(), stderr.String())
+	}
+}
+
+func assertBefore(t *testing.T, output, first, second string) {
+	t.Helper()
+
+	firstIndex := strings.Index(output, first)
+	if firstIndex < 0 {
+		t.Fatalf("stdout = %q, want substring %q", output, first)
+	}
+	secondIndex := strings.Index(output, second)
+	if secondIndex < 0 {
+		t.Fatalf("stdout = %q, want substring %q", output, second)
+	}
+	if firstIndex >= secondIndex {
+		t.Fatalf("stdout = %q, want %q before %q", output, first, second)
+	}
+}
+
+const rootHelpSnapshot = `COMMAND MAP
+  zelma help              Show this command map.
+  zelma setup             Add .zelma to this repository .gitignore. Status: implemented.
+  zelma sessions help     Show the sessions command map.
+  zelma sessions list     List known zelma sessions. Status: stub.
+  zelma sessions create   Create a zelma session. Status: stub.
+  zelma sessions detect   Detect existing Codex panes. Status: stub.
+
+OUTPUT CONVENTIONS
+  help output: stdout, exit 0, plain text.
+  setup changed: stdout, exit 0, "changed: added .zelma to <path>".
+  setup unchanged: stdout, exit 0, "already configured: <path> contains .zelma".
+  stub commands: stderr, exit 1, "<command> is not implemented yet".
+  machine-readable session data: not implemented in this feature.
+
+RECOVERY HINTS
+  unknown command: run "zelma help".
+  session task: run "zelma sessions help" before choosing list/create/detect.
+  setup task: run "zelma setup" from inside a git repository.
+
+HUMAN NOTES
+  zelma manages Codex sessions in zellij panes. Runtime session behavior is not
+  implemented yet; setup only configures repository-local ignore rules.
+
+Usage:
+  zelma [command]
+`
+
+const sessionsHelpSnapshot = `COMMAND MAP
+  zelma sessions help     Show this sessions command map.
+  zelma sessions list     List known zelma sessions. Status: stub.
+  zelma sessions create   Create a zelma session. Status: stub.
+  zelma sessions detect   Detect existing Codex panes. Status: stub.
+
+OUTPUT CONVENTIONS
+  help output: stdout, exit 0, plain text.
+  list/create/detect: stderr, exit 1, "<command> is not implemented yet".
+  sessions registry output: not implemented in this feature.
+
+RECOVERY HINTS
+  inventory task: inspect "zelma sessions list --help".
+  managed create task: inspect "zelma sessions create --help".
+  manual detect task: inspect "zelma sessions detect --help".
+
+HUMAN NOTES
+  sessions commands are present as routed stubs. They do not read or write
+  .zelma/sessions.json yet.
+
+Usage:
+  zelma sessions [command]
+`
 
 func TestStubDiagnostics(t *testing.T) {
 	tests := []struct {
