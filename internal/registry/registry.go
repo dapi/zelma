@@ -6,10 +6,21 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"path/filepath"
+
+	"github.com/gofrs/flock"
+	"github.com/google/renameio/v2"
 )
 
 const SchemaVersion = 1
+
+const (
+	RegistryDirName  = ".zelma"
+	RegistryFileName = "sessions.json"
+)
+
+var ErrRegistryLocked = errors.New("sessions registry is locked by another writer")
 
 type State string
 
@@ -32,6 +43,70 @@ type Session struct {
 	CodexSession  string `json:"codex_session"`
 	OpenedPath    string `json:"opened_path"`
 	State         State  `json:"state"`
+}
+
+type WriteError struct {
+	Op   string
+	Path string
+	Err  error
+}
+
+func (e *WriteError) Error() string {
+	return fmt.Sprintf("write sessions registry: %s %s: %v", e.Op, e.Path, e.Err)
+}
+
+func (e *WriteError) Unwrap() error {
+	return e.Err
+}
+
+func RegistryPath(repoRoot string) string {
+	return filepath.Join(repoRoot, RegistryDirName, RegistryFileName)
+}
+
+func WriteFile(path string, registry Registry) (err error) {
+	if err := Validate(registry); err != nil {
+		return &WriteError{Op: "validate", Path: path, Err: err}
+	}
+
+	data, err := json.MarshalIndent(registry, "", "  ")
+	if err != nil {
+		return &WriteError{Op: "encode", Path: path, Err: err}
+	}
+	data = append(data, '\n')
+
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return &WriteError{Op: "prepare", Path: dir, Err: err}
+	}
+
+	lock, err := lockRegistry(path)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if unlockErr := lock.Unlock(); err == nil && unlockErr != nil {
+			err = &WriteError{Op: "unlock", Path: lock.Path(), Err: unlockErr}
+		}
+	}()
+
+	if err := renameio.WriteFile(path, data, 0o644); err != nil {
+		return &WriteError{Op: "commit", Path: path, Err: err}
+	}
+	return nil
+}
+
+func lockRegistry(path string) (*flock.Flock, error) {
+	lockPath := path + ".lock"
+	lock := flock.New(lockPath)
+
+	locked, err := lock.TryLock()
+	if err != nil {
+		return nil, &WriteError{Op: "lock", Path: lockPath, Err: err}
+	}
+	if !locked {
+		return nil, &WriteError{Op: "lock", Path: lockPath, Err: ErrRegistryLocked}
+	}
+	return lock, nil
 }
 
 func Parse(data []byte) (Registry, error) {

@@ -1,6 +1,7 @@
 package registry
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -189,6 +190,120 @@ func TestValidateAllowsNonActiveDuplicatePane(t *testing.T) {
 	}
 }
 
+func TestWriteFileCreatesAtomicRegistryFile(t *testing.T) {
+	path := RegistryPath(t.TempDir())
+	registry := validRegistry("/workspace/zelma")
+
+	if err := WriteFile(path, registry); err != nil {
+		t.Fatalf("WriteFile() error = %v, want nil", err)
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasSuffix(string(data), "\n") {
+		t.Fatalf("registry file must end with newline, got %q", string(data))
+	}
+
+	got, err := Parse(data)
+	if err != nil {
+		t.Fatalf("Parse(written registry) error = %v, want nil", err)
+	}
+	if len(got.Sessions) != 1 || got.Sessions[0] != registry.Sessions[0] {
+		t.Fatalf("written registry = %+v, want %+v", got, registry)
+	}
+}
+
+func TestWriteFileRejectsInvalidRegistryBeforeReplacingExistingFile(t *testing.T) {
+	path := RegistryPath(t.TempDir())
+	existing := validRegistry("/workspace/existing")
+	if err := WriteFile(path, existing); err != nil {
+		t.Fatalf("WriteFile(existing) error = %v, want nil", err)
+	}
+	before := readTestFile(t, path)
+
+	invalid := validRegistry("/workspace/next")
+	invalid.Sessions[0].OpenedPath = "relative/path"
+
+	err := WriteFile(path, invalid)
+	if err == nil {
+		t.Fatal("WriteFile(invalid) error = nil, want validation error")
+	}
+	var writeErr *WriteError
+	if !errors.As(err, &writeErr) {
+		t.Fatalf("WriteFile(invalid) error = %T, want *WriteError", err)
+	}
+	if writeErr.Op != "validate" {
+		t.Fatalf("WriteFile(invalid) op = %q, want validate", writeErr.Op)
+	}
+	after := readTestFile(t, path)
+	if after != before {
+		t.Fatalf("existing registry changed after validation failure\nbefore:\n%s\nafter:\n%s", before, after)
+	}
+}
+
+func TestWriteFileReportsLockConflictWithoutChangingRegistry(t *testing.T) {
+	path := RegistryPath(t.TempDir())
+	existing := validRegistry("/workspace/existing")
+	if err := WriteFile(path, existing); err != nil {
+		t.Fatalf("WriteFile(existing) error = %v, want nil", err)
+	}
+	before := readTestFile(t, path)
+
+	lock, err := lockRegistry(path)
+	if err != nil {
+		t.Fatalf("lockRegistry() error = %v, want nil", err)
+	}
+	defer lock.Unlock()
+
+	err = WriteFile(path, validRegistry("/workspace/next"))
+	if err == nil {
+		t.Fatal("WriteFile() error = nil, want lock conflict")
+	}
+	if !errors.Is(err, ErrRegistryLocked) {
+		t.Fatalf("WriteFile() error = %v, want ErrRegistryLocked", err)
+	}
+	var writeErr *WriteError
+	if !errors.As(err, &writeErr) {
+		t.Fatalf("WriteFile() error = %T, want *WriteError", err)
+	}
+	if writeErr.Op != "lock" {
+		t.Fatalf("WriteFile() op = %q, want lock", writeErr.Op)
+	}
+
+	after := readTestFile(t, path)
+	if after != before {
+		t.Fatalf("registry changed during lock conflict\nbefore:\n%s\nafter:\n%s", before, after)
+	}
+	if _, err := Parse([]byte(after)); err != nil {
+		t.Fatalf("registry corrupted after lock conflict: %v", err)
+	}
+}
+
+func TestWriteFileReportsCommitFailure(t *testing.T) {
+	root := t.TempDir()
+	path := RegistryPath(root)
+	if err := os.MkdirAll(path, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	err := WriteFile(path, validRegistry("/workspace/zelma"))
+	if err == nil {
+		t.Fatal("WriteFile() error = nil, want commit failure")
+	}
+	var writeErr *WriteError
+	if !errors.As(err, &writeErr) {
+		t.Fatalf("WriteFile() error = %T, want *WriteError", err)
+	}
+	if writeErr.Op != "commit" {
+		t.Fatalf("WriteFile() op = %q, want commit", writeErr.Op)
+	}
+	if writeErr.Path != path {
+		t.Fatalf("WriteFile() path = %q, want %q", writeErr.Path, path)
+	}
+}
+
 func decodeFixture(t *testing.T, name string) Registry {
 	t.Helper()
 
@@ -202,4 +317,29 @@ func decodeFixture(t *testing.T, name string) Registry {
 		t.Fatalf("Parse(%s) error = %v", name, err)
 	}
 	return registry
+}
+
+func validRegistry(openedPath string) Registry {
+	return Registry{
+		Version: SchemaVersion,
+		Sessions: []Session{
+			{
+				ZellijSession: "main",
+				ZellijPane:    "1",
+				CodexSession:  "codex-a",
+				OpenedPath:    openedPath,
+				State:         StateActive,
+			},
+		},
+	}
+}
+
+func readTestFile(t *testing.T, path string) string {
+	t.Helper()
+
+	content, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(content)
 }
