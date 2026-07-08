@@ -195,6 +195,69 @@ func TestParseListPanesRejectsInvalidFixtures(t *testing.T) {
 	}
 }
 
+func TestParsePaneIDOutput(t *testing.T) {
+	tests := []struct {
+		name string
+		data []byte
+		want PaneID
+	}{
+		{
+			name: "terminal",
+			data: []byte("terminal_7\n"),
+			want: PaneID{Kind: PaneKindTerminal, Number: 7},
+		},
+		{
+			name: "plugin",
+			data: []byte(" plugin_3 "),
+			want: PaneID{Kind: PaneKindPlugin, Number: 3},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := ParsePaneIDOutput(tt.data)
+			if err != nil {
+				t.Fatalf("ParsePaneIDOutput() error = %v, want nil", err)
+			}
+			if got != tt.want {
+				t.Fatalf("pane id = %+v, want %+v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestParsePaneIDOutputRejectsInvalidValues(t *testing.T) {
+	tests := []struct {
+		name string
+		data []byte
+	}{
+		{name: "empty", data: nil},
+		{name: "blank", data: []byte("\n")},
+		{name: "unknown kind", data: []byte("command_1\n")},
+		{name: "missing separator", data: []byte("terminal1\n")},
+		{name: "negative", data: []byte("terminal_-1\n")},
+		{name: "control character", data: []byte("terminal_1\nplugin_2\n")},
+		{name: "invalid utf8", data: []byte{0xff}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := ParsePaneIDOutput(tt.data)
+			if err == nil {
+				t.Fatal("ParsePaneIDOutput() error = nil, want error")
+			}
+
+			var parseErr *ParseError
+			if !errors.As(err, &parseErr) {
+				t.Fatalf("ParsePaneIDOutput() error = %T, want *ParseError", err)
+			}
+			if parseErr.Kind != OutputKindPaneID {
+				t.Fatalf("Kind = %q, want %q", parseErr.Kind, OutputKindPaneID)
+			}
+		})
+	}
+}
+
 func readZellijFixture(t *testing.T, parts ...string) []byte {
 	t.Helper()
 

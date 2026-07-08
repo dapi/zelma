@@ -6,12 +6,15 @@ import (
 	"fmt"
 	"io"
 	"strconv"
+	"strings"
+	"unicode/utf8"
 )
 
 type OutputKind string
 
 const (
-	OutputKindPanes OutputKind = "panes"
+	OutputKindPanes  OutputKind = "panes"
+	OutputKindPaneID OutputKind = "pane_id"
 )
 
 type ParseErrorCode string
@@ -62,6 +65,58 @@ type PaneID struct {
 
 func (id PaneID) String() string {
 	return string(id.Kind) + "_" + strconv.Itoa(id.Number)
+}
+
+func ParsePaneIDOutput(data []byte) (PaneID, error) {
+	if len(data) == 0 {
+		return PaneID{}, parseError(OutputKindPaneID, ParseErrorInvalidField, "stdout", "pane id output is empty", nil)
+	}
+	if !utf8.Valid(data) {
+		return PaneID{}, parseError(OutputKindPaneID, ParseErrorInvalidField, "stdout", "pane id output is not valid UTF-8", nil)
+	}
+	if bytes.Contains(data, []byte{0}) {
+		return PaneID{}, parseError(OutputKindPaneID, ParseErrorInvalidField, "stdout", "pane id output contains NUL byte", nil)
+	}
+
+	value := strings.TrimSpace(string(data))
+	if value == "" {
+		return PaneID{}, parseError(OutputKindPaneID, ParseErrorInvalidField, "stdout", "pane id output is blank", nil)
+	}
+	if containsControl(value) {
+		return PaneID{}, parseError(OutputKindPaneID, ParseErrorInvalidField, "stdout", "pane id output contains control character", nil)
+	}
+
+	paneID, err := ParsePaneID(value)
+	if err != nil {
+		return PaneID{}, err
+	}
+	return paneID, nil
+}
+
+func ParsePaneID(value string) (PaneID, error) {
+	kindValue, numberValue, ok := strings.Cut(value, "_")
+	if !ok {
+		return PaneID{}, parseError(OutputKindPaneID, ParseErrorInvalidField, "stdout", "pane id must use <kind>_<id> format", nil)
+	}
+
+	var kind PaneKind
+	switch PaneKind(kindValue) {
+	case PaneKindTerminal:
+		kind = PaneKindTerminal
+	case PaneKindPlugin:
+		kind = PaneKindPlugin
+	default:
+		return PaneID{}, parseError(OutputKindPaneID, ParseErrorInvalidField, "stdout", "pane id kind must be terminal or plugin", nil)
+	}
+
+	number, err := strconv.Atoi(numberValue)
+	if err != nil {
+		return PaneID{}, parseError(OutputKindPaneID, ParseErrorInvalidField, "stdout", "pane id number must be an integer", err)
+	}
+	if number < 0 {
+		return PaneID{}, parseError(OutputKindPaneID, ParseErrorInvalidField, "stdout", "pane id number must be non-negative", nil)
+	}
+	return PaneID{Kind: kind, Number: number}, nil
 }
 
 type Pane struct {

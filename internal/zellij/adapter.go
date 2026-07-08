@@ -186,6 +186,24 @@ func runCommand(ctx context.Context, binary string, args []string) commandResult
 }
 
 func normalizeCommandError(command string, result commandResult) error {
+	return normalizeCommandErrorWithRecovery(
+		command,
+		result,
+		"install zellij or configure the adapter binary path, then verify with zellij --version",
+		"inspect zellij availability and retry; this read-only command does not change zelma registry state",
+	)
+}
+
+func normalizeRunPaneCommandError(command string, result commandResult) error {
+	return normalizeCommandErrorWithRecovery(
+		command,
+		result,
+		"install zellij or configure the adapter binary path, then verify with zellij --version; zelma did not write registry state",
+		"inspect zellij session and command availability, then retry; zelma did not write registry state",
+	)
+}
+
+func normalizeCommandErrorWithRecovery(command string, result commandResult, missingBinaryRecoveryHint, recoveryHint string) error {
 	if isMissingBinary(result.err) {
 		return &DiagnosticError{
 			Diagnostic: Diagnostic{
@@ -193,7 +211,7 @@ func normalizeCommandError(command string, result commandResult) error {
 				Command:      command,
 				ExitCode:     -1,
 				Message:      "zellij binary was not found",
-				RecoveryHint: "install zellij or configure the adapter binary path, then verify with zellij --version",
+				RecoveryHint: missingBinaryRecoveryHint,
 			},
 			Err: result.err,
 		}
@@ -212,7 +230,7 @@ func normalizeCommandError(command string, result commandResult) error {
 			ExitCode:     exitCode,
 			Stderr:       trimStderr(result.stderr),
 			Message:      message,
-			RecoveryHint: "inspect zellij availability and retry; this read-only command does not change zelma registry state",
+			RecoveryHint: recoveryHint,
 		},
 		Err: result.err,
 	}

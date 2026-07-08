@@ -189,3 +189,256 @@ func TestListPanesRejectsMissingSessionName(t *testing.T) {
 		t.Fatalf("code = %q, want %q", diagnosticErr.Diagnostic.Code, ErrorCodeInvalidInput)
 	}
 }
+
+func TestRunPaneRunsExplicitSessionCommandAndReturnsReference(t *testing.T) {
+	var gotBinary string
+	var gotArgs []string
+	var gotDeadline bool
+	client := New(WithBinary("fake-zellij"), WithTimeout(time.Minute))
+	client.run = func(ctx context.Context, binary string, args []string) commandResult {
+		_, gotDeadline = ctx.Deadline()
+		gotBinary = binary
+		gotArgs = append([]string(nil), args...)
+		return commandResult{stdout: []byte("terminal_7\n")}
+	}
+
+	got, err := client.RunPane(context.Background(), RunPaneRequest{
+		Session: "zelma-main",
+		CWD:     "/workspace/zelma",
+		Name:    "codex",
+		Command: []string{"codex", "--cd", "/workspace/zelma"},
+	})
+
+	if err != nil {
+		t.Fatalf("RunPane() error = %v, want nil", err)
+	}
+	if gotBinary != "fake-zellij" {
+		t.Fatalf("binary = %q, want fake-zellij", gotBinary)
+	}
+	wantArgs := []string{"--session", "zelma-main", "run", "--cwd", "/workspace/zelma", "--name", "codex", "--", "codex", "--cd", "/workspace/zelma"}
+	if !reflect.DeepEqual(gotArgs, wantArgs) {
+		t.Fatalf("args = %#v, want %#v", gotArgs, wantArgs)
+	}
+	if !gotDeadline {
+		t.Fatal("runner context has no deadline, want adapter timeout")
+	}
+	if got.Session != "zelma-main" || got.PaneID.String() != "terminal_7" {
+		t.Fatalf("pane ref = %+v, want session zelma-main and terminal_7", got)
+	}
+}
+
+func TestRunPaneOmitsOptionalNameAndCWD(t *testing.T) {
+	var gotArgs []string
+	client := New()
+	client.run = func(_ context.Context, _ string, args []string) commandResult {
+		gotArgs = append([]string(nil), args...)
+		return commandResult{stdout: []byte("terminal_1\n")}
+	}
+
+	_, err := client.RunPane(context.Background(), RunPaneRequest{
+		Session: "zelma-main",
+		Command: []string{"codex"},
+	})
+
+	if err != nil {
+		t.Fatalf("RunPane() error = %v, want nil", err)
+	}
+	wantArgs := []string{"--session", "zelma-main", "run", "--", "codex"}
+	if !reflect.DeepEqual(gotArgs, wantArgs) {
+		t.Fatalf("args = %#v, want %#v", gotArgs, wantArgs)
+	}
+}
+
+func TestRunPanePreservesExactSessionName(t *testing.T) {
+	var gotArgs []string
+	client := New()
+	client.run = func(ctx context.Context, binary string, args []string) commandResult {
+		gotArgs = append([]string(nil), args...)
+		return commandResult{stdout: []byte("terminal_2\n")}
+	}
+
+	_, err := client.RunPane(context.Background(), RunPaneRequest{
+		Session: "  leading-and-trailing  ",
+		Command: []string{"codex"},
+	})
+	if err != nil {
+		t.Fatalf("RunPane() error = %v, want nil", err)
+	}
+
+	wantArgs := []string{"--session", "  leading-and-trailing  ", "run", "--", "codex"}
+	if !reflect.DeepEqual(gotArgs, wantArgs) {
+		t.Fatalf("args = %#v, want exact session name in %#v", gotArgs, wantArgs)
+	}
+}
+
+func TestRunPaneRejectsMissingSessionName(t *testing.T) {
+	client := New()
+	client.run = func(context.Context, string, []string) commandResult {
+		t.Fatal("runner must not be called for missing session")
+		return commandResult{}
+	}
+
+	_, err := client.RunPane(context.Background(), RunPaneRequest{
+		Command: []string{"codex"},
+	})
+
+	var diagnosticErr *DiagnosticError
+	if !errors.As(err, &diagnosticErr) {
+		t.Fatalf("error = %T, want *DiagnosticError", err)
+	}
+	if diagnosticErr.Diagnostic.Code != ErrorCodeInvalidInput {
+		t.Fatalf("code = %q, want %q", diagnosticErr.Diagnostic.Code, ErrorCodeInvalidInput)
+	}
+}
+
+func TestRunPaneRejectsMissingCommand(t *testing.T) {
+	tests := []struct {
+		name    string
+		command []string
+	}{
+		{name: "nil", command: nil},
+		{name: "empty", command: []string{}},
+		{name: "blank executable", command: []string{""}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client := New()
+			client.run = func(context.Context, string, []string) commandResult {
+				t.Fatal("runner must not be called for missing command")
+				return commandResult{}
+			}
+
+			_, err := client.RunPane(context.Background(), RunPaneRequest{
+				Session: "zelma-main",
+				Command: tt.command,
+			})
+
+			var diagnosticErr *DiagnosticError
+			if !errors.As(err, &diagnosticErr) {
+				t.Fatalf("error = %T, want *DiagnosticError", err)
+			}
+			if diagnosticErr.Diagnostic.Code != ErrorCodeInvalidInput {
+				t.Fatalf("code = %q, want %q", diagnosticErr.Diagnostic.Code, ErrorCodeInvalidInput)
+			}
+		})
+	}
+}
+
+func TestRunPaneMapsMissingBinary(t *testing.T) {
+	client := New(WithBinary("missing-zellij"))
+	client.run = func(context.Context, string, []string) commandResult {
+		return commandResult{err: exec.ErrNotFound}
+	}
+
+	_, err := client.RunPane(context.Background(), RunPaneRequest{
+		Session: "zelma-main",
+		Command: []string{"codex"},
+	})
+
+	diagnostic := requireDiagnostic(t, err, ErrorCodeMissingBinary)
+	if diagnostic.Command != "missing-zellij --session zelma-main run -- codex" {
+		t.Fatalf("command = %q, want configured run command", diagnostic.Command)
+	}
+	if !strings.Contains(diagnostic.RecoveryHint, "did not write registry state") {
+		t.Fatalf("recovery hint = %q, want registry-state disclaimer", diagnostic.RecoveryHint)
+	}
+}
+
+func TestRunPaneMapsCommandFailure(t *testing.T) {
+	client := New(WithBinary("/opt/bin/zellij"))
+	client.run = func(context.Context, string, []string) commandResult {
+		return commandResult{
+			stderr: []byte("command failed\n"),
+			err:    fakeExitError{code: 2},
+		}
+	}
+
+	_, err := client.RunPane(context.Background(), RunPaneRequest{
+		Session: "zelma-main",
+		Command: []string{"codex"},
+	})
+
+	diagnostic := requireDiagnostic(t, err, ErrorCodeCommandFailed)
+	if diagnostic.Command != "/opt/bin/zellij --session zelma-main run -- codex" {
+		t.Fatalf("command = %q, want configured run command", diagnostic.Command)
+	}
+	if diagnostic.ExitCode != 2 {
+		t.Fatalf("exit code = %d, want 2", diagnostic.ExitCode)
+	}
+	if diagnostic.Stderr != "command failed" {
+		t.Fatalf("stderr = %q, want trimmed stderr", diagnostic.Stderr)
+	}
+	if strings.Contains(diagnostic.RecoveryHint, "read-only") {
+		t.Fatalf("recovery hint = %q, must not describe mutating run as read-only", diagnostic.RecoveryHint)
+	}
+}
+
+func TestRunPaneMapsInvalidPaneReferenceOutput(t *testing.T) {
+	client := New()
+	client.run = func(context.Context, string, []string) commandResult {
+		return commandResult{stdout: []byte("created terminal_1\n")}
+	}
+
+	_, err := client.RunPane(context.Background(), RunPaneRequest{
+		Session: "zelma-main",
+		Command: []string{"codex"},
+	})
+
+	diagnostic := requireDiagnostic(t, err, ErrorCodeInvalidOutput)
+	if diagnostic.Command != "zellij --session zelma-main run -- codex" {
+		t.Fatalf("command = %q, want run command", diagnostic.Command)
+	}
+	if !strings.Contains(err.Error(), "pane id") {
+		t.Fatalf("error = %q, want pane id parse detail", err.Error())
+	}
+}
+
+func TestRunPaneRejectsPluginPaneReferenceOutput(t *testing.T) {
+	client := New()
+	client.run = func(context.Context, string, []string) commandResult {
+		return commandResult{stdout: []byte("plugin_1\n")}
+	}
+
+	_, err := client.RunPane(context.Background(), RunPaneRequest{
+		Session: "zelma-main",
+		Command: []string{"codex"},
+	})
+
+	diagnostic := requireDiagnostic(t, err, ErrorCodeInvalidOutput)
+	if diagnostic.Command != "zellij --session zelma-main run -- codex" {
+		t.Fatalf("command = %q, want run command", diagnostic.Command)
+	}
+	if !strings.Contains(err.Error(), "expected terminal pane id") {
+		t.Fatalf("error = %q, want terminal pane detail", err.Error())
+	}
+}
+
+func TestRunPaneMapsExitZeroSessionNotFoundToCommandFailure(t *testing.T) {
+	client := New()
+	client.run = func(context.Context, string, []string) commandResult {
+		return commandResult{
+			stdout: []byte("zelma-main\nother-session\n"),
+			stderr: []byte("Session 'missing-session' not found. Active sessions:\n"),
+		}
+	}
+
+	_, err := client.RunPane(context.Background(), RunPaneRequest{
+		Session: "missing-session",
+		Command: []string{"codex"},
+	})
+
+	diagnostic := requireDiagnostic(t, err, ErrorCodeCommandFailed)
+	if diagnostic.Command != "zellij --session missing-session run -- codex" {
+		t.Fatalf("command = %q, want run command", diagnostic.Command)
+	}
+	if diagnostic.ExitCode != 0 {
+		t.Fatalf("exit code = %d, want 0", diagnostic.ExitCode)
+	}
+	if !strings.Contains(diagnostic.Stderr, "missing-session") {
+		t.Fatalf("stderr = %q, want session-not-found detail", diagnostic.Stderr)
+	}
+	if strings.Contains(err.Error(), string(ErrorCodeInvalidOutput)) {
+		t.Fatalf("error = %q, must not report invalid output", err.Error())
+	}
+}
