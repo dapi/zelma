@@ -28,7 +28,7 @@ func RecoveryForListResult(result SessionsList, options ListRecoveryOptions) Rec
 		return Recovery{
 			Action:      RecoveryActionDetect,
 			ReasonCode:  ReasonEmptyRegistryPanesLikely,
-			Message:     "Registry is empty, but live Codex panes are likely; reconcile them through zelma sessions detect.",
+			Message:     "Registry is empty, but live Codex panes are likely; force detection through zelma sessions detect.",
 			NextCommand: detectCommand(),
 		}
 	}
@@ -59,21 +59,21 @@ var recoveryRules = append([]recoveryRule{
 	{
 		reasonCode:  "create_pane_unconfirmed",
 		action:      RecoveryActionDetect,
-		message:     "Do not retry blindly; reconcile live Codex panes through detect before retrying create.",
+		message:     "Do not retry blindly; force detection of live Codex panes before retrying create.",
 		nextCommand: detectCommand(),
 		needles:     []string{"create_pane_unconfirmed"},
 	},
 	{
 		reasonCode:  "create_confirmation_failed",
 		action:      RecoveryActionDetect,
-		message:     "Reconcile any live Codex panes through detect, then retry only after resolving the confirmation failure.",
+		message:     "Force detection of any live Codex panes, then retry only after resolving the confirmation failure.",
 		nextCommand: detectCommand(),
 		needles:     []string{"create_confirmation_failed"},
 	},
 	{
 		reasonCode:  "create_registry_write_failed",
 		action:      RecoveryActionDetect,
-		message:     "Fix the registry write problem, then reconcile any created pane through detect before retrying create.",
+		message:     "Fix the registry write problem, then force detection of any created pane before retrying create.",
 		nextCommand: detectCommand(),
 		needles:     []string{"create_registry_write_failed"},
 	},

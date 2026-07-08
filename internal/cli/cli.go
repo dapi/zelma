@@ -7,11 +7,14 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"text/tabwriter"
+	"time"
 
 	"github.com/dapi/zelma/internal/codex"
+	"github.com/dapi/zelma/internal/config"
 	"github.com/dapi/zelma/internal/create"
 	"github.com/dapi/zelma/internal/detection"
 	"github.com/dapi/zelma/internal/live"
@@ -25,6 +28,8 @@ import (
 var paneProcessEvidenceResolverFactory = func() codex.PaneProcessEvidenceResolver {
 	return codex.UnsupportedPaneProcessEvidenceResolver{}
 }
+
+var nowFunc = time.Now
 
 func Run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	root := NewRootCommand(stdout, stderr)
@@ -113,7 +118,8 @@ OUTPUT CONVENTIONS
   setup unchanged: stdout, exit 0, "already configured: <path> contains .zelma".
   sessions list: stdout, exit 0, active-only table by default or schema v1
   registry JSON with --json; add --all for inactive records in human output;
-  add --live to include live/unreachable zellij status without registry writes.
+  auto-detects by default; add --no-detect for registry-only reads; add --live
+  to include live/unreachable zellij status.
   sessions detect: stdout, exit 0, summary with active/candidate/stale counts,
   stale reason lines when found, or JSON with --json.
   sessions focus: stdout, exit 0, focused summary or JSON with --json.
@@ -125,14 +131,14 @@ OUTPUT CONVENTIONS
 
 RECOVERY HINTS
   unknown command: run "zelma help".
-  session task: run "zelma sessions help" before choosing list/create/detect.
+  session inventory task: run "zelma sessions list --json".
   setup task: run "zelma setup" from inside a git repository.
 
 HUMAN NOTES
-  zelma manages Codex sessions in zellij panes. sessions list reads the
-  repository-local registry; --live additionally checks current zellij state
-  without mutating registry. setup creates .zelma and configures repository-
-  local ignore rules.
+  zelma manages Codex sessions in zellij panes. sessions list is the primary
+  inventory command and auto-detects fresh-enough manual panes before rendering
+  the repository-local registry. setup creates .zelma and configures
+  repository-local ignore rules.
 
 Usage:
   zelma [command]
@@ -173,8 +179,9 @@ const sessionsHelp = `COMMAND MAP
 OUTPUT CONVENTIONS
   help output: stdout, exit 0, plain text.
   list: stdout, exit 0, active-only table by default or schema v1 registry JSON
-  with --json; add --all for inactive records in human output; add --live to
-  include live/unreachable zellij status without registry writes.
+  with --json; add --all for inactive records in human output; auto-detects by
+  default; add --no-detect for registry-only reads; add --live to include
+  live/unreachable zellij status.
   create --dry-run: stdout, exit 0, resolved Codex command/opened path.
   create: stdout, exit 0, created/registered/skipped summary.
   detect: stdout, exit 0, added/unchanged/skipped summary with
@@ -188,14 +195,14 @@ OUTPUT CONVENTIONS
 RECOVERY HINTS
   inventory task: inspect "zelma sessions list --help".
   managed create task: inspect "zelma sessions create --help".
-  manual detect task: inspect "zelma sessions detect --help".
+  diagnostic/manual detect task: inspect "zelma sessions detect --help".
   focus task: inspect "zelma sessions focus --help".
 
 HUMAN NOTES
-  sessions list reads .zelma/sessions.json; --live checks current zellij panes
-  without registry writes. detect inspects live zellij panes and only upserts
-  unresolved candidate records. focus switches zellij UI to a stored pane and
-  does not mutate registry. cleanup removes stale records only after explicit
+  sessions list is the primary inventory command and auto-detects fresh-enough
+  manual panes before rendering .zelma/sessions.json. --no-detect keeps a
+  registry-only read path. focus switches zellij UI to a stored pane and does
+  not mutate registry. cleanup removes stale records only after explicit
   --confirm.
 
 Usage:
@@ -203,21 +210,24 @@ Usage:
 `
 
 const sessionsListHelp = `Usage:
-  zelma sessions list [--json] [--live] [--all]
+  zelma sessions list [--json] [--live] [--all] [--no-detect]
 
 Status:
-  implemented: reads the repository-local sessions registry; --live reconciles
-  records with current zellij panes.
+  implemented: auto-detects fresh-enough zellij/Codex panes, then reads the
+  repository-local sessions registry; --live adds live reachability.
 
 Output:
   default: tabular human-readable active session inventory.
   --all: include stale, candidate, closed and archived records in human output.
   --json: schema v1 registry JSON object with version and all sessions.
   --live: adds live_status values: live or unreachable.
+  --no-detect: skip auto-detect and read only .zelma/sessions.json before
+  optional --live enrichment.
 
 Notes:
-  Does not create, detect or mutate registry records. Without --live, does not
-  contact zellij.
+  Default list may update registry records through the same detection rules as
+  "zelma sessions detect". A successful detect is cached by timestamp for the
+  configured TTL, default 5s. Use --no-detect for the old registry-only read.
 `
 
 const sessionsCreateHelp = `Usage:
@@ -249,7 +259,8 @@ const sessionsDetectHelp = `Usage:
   zelma sessions detect [--json] [--explain]
 
 Status:
-  implemented: reads zellij panes and upserts candidate registry records.
+  implemented: diagnostic/manual command for reading zellij panes and upserting
+  candidate registry records. Normal inventory should use "sessions list".
 
 Output:
   default: added/unchanged/skipped summary with active/candidate/stale counts.
@@ -343,13 +354,24 @@ func newSessionsListCommand(stdout io.Writer) *cobra.Command {
 	var jsonOutput bool
 	var liveOutput bool
 	var allOutput bool
+	var noDetect bool
 
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List known zelma sessions.",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			reg, err := readCurrentRegistry(cmd.CommandPath())
+			root, err := repo.ResolveRoot("")
+			if err != nil {
+				return errors.New(repo.Diagnostic(cmd.CommandPath(), err))
+			}
+			if !noDetect {
+				if err := ensureAutoDetectFresh(cmd.Context(), cmd.CommandPath(), root.Path); err != nil {
+					return err
+				}
+			}
+
+			reg, err := readRegistryForRoot(cmd.CommandPath(), root.Path)
 			if err != nil {
 				return err
 			}
@@ -379,6 +401,7 @@ func newSessionsListCommand(stdout io.Writer) *cobra.Command {
 	cmd.Flags().BoolVar(&jsonOutput, "json", false, "Print schema v1 JSON.")
 	cmd.Flags().BoolVar(&liveOutput, "live", false, "Include live zellij pane status without mutating the registry.")
 	cmd.Flags().BoolVar(&allOutput, "all", false, "Include inactive sessions in human-readable output.")
+	cmd.Flags().BoolVar(&noDetect, "no-detect", false, "Skip auto-detect and read only the sessions registry.")
 	return cmd
 }
 
@@ -482,30 +505,9 @@ func newSessionsDetectCommand(stdout io.Writer) *cobra.Command {
 			}
 
 			client := zellij.New(zellij.WithBinary(os.Getenv("ZELMA_ZELLIJ_BIN")))
-			detected, err := detection.DetectCandidates(cmd.Context(), root.Path, client)
+			summary, staleCandidates, explanations, err := detectIntoRegistry(cmd.Context(), cmd.CommandPath(), root.Path, client)
 			if err != nil {
-				return fmt.Errorf("%s: %w", cmd.CommandPath(), err)
-			}
-			candidates, explanations := withSessionEvidenceAll(cmd.Context(), detected.Candidates, detected.ProcessEvidenceInputs, paneProcessEvidenceResolverFactory())
-
-			path := registry.RegistryPath(root.Path)
-			var summary registry.DetectUpsertSummary
-			var staleCandidates []registry.StaleCandidate
-			err = registry.UpdateFile(path, func(current registry.Registry) (registry.Registry, error) {
-				next, upsertSummary := registry.UpsertDetectedCandidates(current, candidates)
-				var currentStaleCandidates []registry.StaleCandidate
-				next, currentStaleCandidates = registry.MarkStaleCandidates(next, registry.RuntimeSnapshot{
-					ZellijSessions: detected.LiveSessions,
-					Panes:          detected.LivePanes,
-				})
-				upsertSummary.Skipped += detected.Skipped
-				upsertSummary.Stale = len(currentStaleCandidates)
-				staleCandidates = currentStaleCandidates
-				summary = upsertSummary
-				return next, nil
-			})
-			if err != nil {
-				return fmt.Errorf("%s: %w", cmd.CommandPath(), err)
+				return err
 			}
 
 			if jsonOutput {
@@ -525,6 +527,58 @@ func newSessionsDetectCommand(stdout io.Writer) *cobra.Command {
 	cmd.Flags().BoolVar(&jsonOutput, "json", false, "Print detect summary JSON.")
 	cmd.Flags().BoolVar(&explainOutput, "explain", false, "Print per-candidate evidence decisions.")
 	return cmd
+}
+
+func ensureAutoDetectFresh(ctx context.Context, command, repoRoot string) error {
+	ttl, err := config.SessionsListAutoDetectTTL(repoRoot)
+	if err != nil {
+		return fmt.Errorf("%s: %w", command, err)
+	}
+	fresh, err := autoDetectCacheFresh(repoRoot, nowFunc(), ttl)
+	if err != nil {
+		return fmt.Errorf("%s: %w", command, err)
+	}
+	if fresh {
+		return nil
+	}
+
+	client := zellij.New(zellij.WithBinary(os.Getenv("ZELMA_ZELLIJ_BIN")))
+	if _, _, _, err := detectIntoRegistry(ctx, command, repoRoot, client); err != nil {
+		return err
+	}
+	if err := writeAutoDetectCache(repoRoot, nowFunc()); err != nil {
+		return fmt.Errorf("%s: %w", command, err)
+	}
+	return nil
+}
+
+func detectIntoRegistry(ctx context.Context, command, repoRoot string, client detection.Inventory) (registry.DetectUpsertSummary, []registry.StaleCandidate, []candidateEvidenceExplanation, error) {
+	detected, err := detection.DetectCandidates(ctx, repoRoot, client)
+	if err != nil {
+		return registry.DetectUpsertSummary{}, nil, nil, fmt.Errorf("%s: %w", command, err)
+	}
+	candidates, explanations := withSessionEvidenceAll(ctx, detected.Candidates, detected.ProcessEvidenceInputs, paneProcessEvidenceResolverFactory())
+
+	path := registry.RegistryPath(repoRoot)
+	var summary registry.DetectUpsertSummary
+	var staleCandidates []registry.StaleCandidate
+	err = registry.UpdateFile(path, func(current registry.Registry) (registry.Registry, error) {
+		next, upsertSummary := registry.UpsertDetectedCandidates(current, candidates)
+		var currentStaleCandidates []registry.StaleCandidate
+		next, currentStaleCandidates = registry.MarkStaleCandidates(next, registry.RuntimeSnapshot{
+			ZellijSessions: detected.LiveSessions,
+			Panes:          detected.LivePanes,
+		})
+		upsertSummary.Skipped += detected.Skipped
+		upsertSummary.Stale = len(currentStaleCandidates)
+		staleCandidates = currentStaleCandidates
+		summary = upsertSummary
+		return next, nil
+	})
+	if err != nil {
+		return registry.DetectUpsertSummary{}, nil, nil, fmt.Errorf("%s: %w", command, err)
+	}
+	return summary, staleCandidates, explanations, nil
 }
 
 func newSessionsFocusCommand(stdout io.Writer) *cobra.Command {
@@ -723,8 +777,11 @@ func readCurrentRegistry(command string) (registry.Registry, error) {
 	if err != nil {
 		return registry.Registry{}, errors.New(repo.Diagnostic(command, err))
 	}
+	return readRegistryForRoot(command, root.Path)
+}
 
-	path := registry.RegistryPath(root.Path)
+func readRegistryForRoot(command, rootPath string) (registry.Registry, error) {
+	path := registry.RegistryPath(rootPath)
 	reg, err := registry.ReadFile(path)
 	if errors.Is(err, os.ErrNotExist) {
 		return registry.Registry{Version: registry.SchemaVersion, Sessions: []registry.Session{}}, nil
@@ -733,6 +790,64 @@ func readCurrentRegistry(command string) (registry.Registry, error) {
 		return registry.Registry{}, fmt.Errorf("%s: %w", command, err)
 	}
 	return reg, nil
+}
+
+type autoDetectCacheFile struct {
+	LastSuccessfulDetectionAt time.Time `json:"last_successful_detection_at"`
+}
+
+func autoDetectCachePath(repoRoot string) string {
+	return filepath.Join(repoRoot, ".zelma", "detection-cache.json")
+}
+
+func autoDetectCacheFresh(repoRoot string, now time.Time, ttl time.Duration) (bool, error) {
+	data, err := os.ReadFile(autoDetectCachePath(repoRoot))
+	if errors.Is(err, os.ErrNotExist) {
+		return false, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("read auto-detect cache %s: %w", autoDetectCachePath(repoRoot), err)
+	}
+	var cache autoDetectCacheFile
+	if err := json.Unmarshal(data, &cache); err != nil {
+		return false, nil
+	}
+	if cache.LastSuccessfulDetectionAt.IsZero() {
+		return false, nil
+	}
+	age := now.Sub(cache.LastSuccessfulDetectionAt)
+	return age >= 0 && age < ttl, nil
+}
+
+func writeAutoDetectCache(repoRoot string, detectedAt time.Time) error {
+	path := autoDetectCachePath(repoRoot)
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return fmt.Errorf("prepare auto-detect cache %s: %w", path, err)
+	}
+	data, err := json.MarshalIndent(autoDetectCacheFile{LastSuccessfulDetectionAt: detectedAt.UTC()}, "", "  ")
+	if err != nil {
+		return fmt.Errorf("encode auto-detect cache: %w", err)
+	}
+	data = append(data, '\n')
+	tmp, err := os.CreateTemp(filepath.Dir(path), "."+filepath.Base(path)+".*.tmp")
+	if err != nil {
+		return fmt.Errorf("prepare auto-detect cache temp %s: %w", path, err)
+	}
+	tmpPath := tmp.Name()
+	defer func() {
+		_ = os.Remove(tmpPath)
+	}()
+	if _, err := tmp.Write(data); err != nil {
+		_ = tmp.Close()
+		return fmt.Errorf("write auto-detect cache %s: %w", tmpPath, err)
+	}
+	if err := tmp.Close(); err != nil {
+		return fmt.Errorf("close auto-detect cache %s: %w", tmpPath, err)
+	}
+	if err := os.Rename(tmpPath, path); err != nil {
+		return fmt.Errorf("commit auto-detect cache %s: %w", path, err)
+	}
+	return nil
 }
 
 func writeSessionsJSON(stdout io.Writer, reg registry.Registry) error {

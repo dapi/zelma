@@ -41,7 +41,7 @@ Incoming agent.
 
 ## Alternate Flows / Exceptions
 
-- `ALT-01` Registry отсутствует: агент запускает `zelma sessions detect --json`.
+- `ALT-01` Registry отсутствует: агент продолжает через `zelma sessions list --json`, который auto-detects по умолчанию.
 - `ALT-02` Есть stale entries: агент применяет cleanup flow.
 - `EX-01` Live state недоступен: агент получает diagnostic и не делает destructive action.
 

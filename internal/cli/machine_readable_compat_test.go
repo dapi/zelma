@@ -42,7 +42,7 @@ func TestMachineReadableOutputCompatibilityExamples(t *testing.T) {
 		},
 		{
 			name: "sessions list json",
-			args: []string{"sessions", "list", "--json"},
+			args: []string{"sessions", "list", "--no-detect", "--json"},
 			arrange: func(t *testing.T) string {
 				root := newTestGitRepo(t)
 				writeRegistryFile(t, root, `{
@@ -82,7 +82,7 @@ func TestMachineReadableOutputCompatibilityExamples(t *testing.T) {
 		},
 		{
 			name: "sessions list live json",
-			args: []string{"sessions", "list", "--live", "--json"},
+			args: []string{"sessions", "list", "--no-detect", "--live", "--json"},
 			arrange: func(t *testing.T) string {
 				root := newTestGitRepo(t)
 				openedPath := resolvedPath(t, root)
@@ -381,7 +381,7 @@ func TestMachineReadableDiagnosticCompatibility(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 
-	code := Run(context.Background(), []string{"sessions", "list", "--json"}, &stdout, &stderr)
+	code := Run(context.Background(), []string{"sessions", "list", "--no-detect", "--json"}, &stdout, &stderr)
 
 	if code != 1 {
 		t.Fatalf("Run() code = %d, want 1", code)

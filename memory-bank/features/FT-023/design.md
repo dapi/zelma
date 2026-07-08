@@ -52,7 +52,7 @@ They depend on the command contract documented in
 | --- | --- | --- |
 | `FM-01` | CLI exits non-zero | Return `CommandError` with exit code and stderr. |
 | `FM-02` | Registry schema diagnostic | Stop and ask for valid schema v1 recovery before mutation. |
-| `FM-03` | Create partial failure | Suggest `zelma sessions detect --json` instead of blind retry. |
+| `FM-03` | Create partial failure | Suggest uncached `zelma sessions detect --json` instead of blind retry. |
 | `FM-04` | Successful command emits invalid JSON | Return `DecodeError` with preserved stdout for debugging. |
 
 ## Verification

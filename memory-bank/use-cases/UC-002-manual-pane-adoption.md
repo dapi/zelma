@@ -25,7 +25,7 @@ Supervising agent.
 
 ## Trigger
 
-Пользователь вручную создал pane и запустил Codex, после чего агент вызывает `zelma sessions detect --json`.
+Пользователь вручную создал pane и запустил Codex, после чего агент вызывает `zelma sessions list --json`.
 
 ## Preconditions
 
@@ -35,7 +35,7 @@ Supervising agent.
 
 ## Main Flow
 
-1. Агент вызывает `zelma sessions detect --json`.
+1. Агент вызывает `zelma sessions list --json`.
 2. Zelma получает список pane и классифицирует Codex candidates.
 3. Zelma idempotent upsert записывает уверенные совпадения в registry.
 4. Zelma возвращает JSON с добавленными, уже известными и пропущенными pane.
@@ -48,7 +48,7 @@ Supervising agent.
 
 ## Postconditions
 
-- Обнаруженные Codex pane доступны в `sessions list`.
+- Обнаруженные Codex pane доступны в `sessions list`; standalone `sessions detect` остается diagnostic/manual вариантом.
 - Не-Codex pane не записываются как active sessions.
 
 ## Business Rules

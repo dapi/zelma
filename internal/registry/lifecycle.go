@@ -9,6 +9,9 @@ type LifecycleSummary struct {
 func ReconcileLifecycle(current Registry, observed []Session, reliable bool) (Registry, LifecycleSummary) {
 	next := normalizeRegistry(current)
 	next.Sessions = append([]Session(nil), next.Sessions...)
+	if next.Sessions == nil {
+		next.Sessions = []Session{}
+	}
 	if next.Version == 0 {
 		next.Version = SchemaVersion
 	}

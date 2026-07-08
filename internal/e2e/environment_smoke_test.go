@@ -39,7 +39,7 @@ func TestEnvironmentSmokeDiagnosticsE2E(t *testing.T) {
 	}
 	assertOneZelmaGitignoreEntry(t, filepath.Join(repoRoot, ".gitignore"))
 
-	list := runZelma(t, bin, repoRoot, nil, "sessions", "list", "--json")
+	list := runZelma(t, bin, repoRoot, nil, "sessions", "list", "--no-detect", "--json")
 	if list.code != 0 {
 		t.Fatalf("list code = %d, want 0; stderr = %q", list.code, list.stderr)
 	}
