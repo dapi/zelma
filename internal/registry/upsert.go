@@ -63,7 +63,7 @@ func mergeDetectedCandidate(existing, candidate Session) Session {
 	if existing.OpenedPath == "" {
 		existing.OpenedPath = candidate.OpenedPath
 	}
-	return existing
+	return applyDetectedStateRules(existing)
 }
 
 func applyDetectedStateRules(session Session) Session {

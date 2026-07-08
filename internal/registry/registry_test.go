@@ -489,6 +489,32 @@ func TestUpsertDetectedCandidatesPromotesExistingCandidateWithFullEvidence(t *te
 	}
 }
 
+func TestUpsertDetectedCandidatesPromotesMergedSplitEvidence(t *testing.T) {
+	existing := Session{
+		ZellijSession: "main",
+		ZellijPane:    "terminal_1",
+		CodexSession:  "11111111-1111-4111-8111-111111111111",
+		State:         StateCandidate,
+	}
+	detected := Session{
+		ZellijSession: "main",
+		ZellijPane:    "terminal_1",
+		OpenedPath:    "/workspace/zelma",
+		State:         StateCandidate,
+	}
+
+	got, summary := UpsertDetectedCandidates(
+		Registry{Version: SchemaVersion, Sessions: []Session{existing}},
+		[]Session{detected},
+	)
+	if summary != (DetectUpsertSummary{Unchanged: 1, Active: 1}) {
+		t.Fatalf("summary = %+v, want unchanged active", summary)
+	}
+	if got.Sessions[0].State != StateActive || got.Sessions[0].CodexSession != existing.CodexSession || got.Sessions[0].OpenedPath != detected.OpenedPath {
+		t.Fatalf("session = %+v, want active from merged split evidence", got.Sessions[0])
+	}
+}
+
 func TestUpsertDetectedCandidatesKeepsPartialEvidenceCandidate(t *testing.T) {
 	detected := Session{
 		ZellijSession: "main",
