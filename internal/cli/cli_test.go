@@ -1262,6 +1262,11 @@ func TestSessionsListLiveTableFiltersInactiveBeforeReconcile(t *testing.T) {
   ]
 }
 `, paneRoot, paneRoot))
+	now := time.Date(2026, 7, 8, 12, 0, 0, 0, time.UTC)
+	withNow(t, now)
+	if err := writeAutoDetectCache(root, now.Add(-time.Second)); err != nil {
+		t.Fatal(err)
+	}
 	t.Setenv("ZELMA_ZELLIJ_BIN", writeFakeZellijWithFailingHiddenSession(t, panesJSON(paneRoot, true)))
 	t.Chdir(root)
 
