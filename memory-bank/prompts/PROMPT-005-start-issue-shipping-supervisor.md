@@ -102,11 +102,13 @@ Success is allowed only when all conditions are true:
 1. `start-issue` implementation finished.
 2. Fresh `/review` against `BASE_BRANCH` finished on `GPT-5.5 Extra high` with no critical/high/important findings.
 3. All review findings that matter for correctness, maintainability, tests, security or scope were fixed, committed and pushed.
-4. PR exists for the issue branch against `BASE_BRANCH`.
-5. PR is open, non-draft, mergeable and clean.
-6. GitHub checks are present and green.
-7. If `AUTO_MERGE=yes`, PR was merged and the merge commit was verified.
-8. The task zellij pane/tab was closed only after terminal outcome.
+4. After every fix commit/push, another fresh `/review` ran against the updated head commit and returned no critical/high/important findings.
+5. The accepted clean review result corresponds to the same `headRefOid` that will be merged.
+6. PR exists for the issue branch against `BASE_BRANCH`.
+7. PR is open, non-draft, mergeable and clean.
+8. GitHub checks are present and green.
+9. If `AUTO_MERGE=yes`, PR was merged and the merge commit was verified.
+10. The task zellij pane/tab was closed only after terminal outcome.
 </definition_of_done>
 
 <instructions>
@@ -163,8 +165,10 @@ Success is allowed only when all conditions are true:
    - If review has findings, send the implementation agent:
      `Исправь все critical/high/important review findings в scope issue {{ISSUE_NUMBER}}. Запусти релевантные проверки, закоммить и запушь изменения. Не исправляй unrelated findings.`
    - Wait for completion.
+   - Verify that the fixes were committed and pushed; record the new `headRefOid`.
    - Run `/review` again on `GPT-5.5 Extra high`.
-   - Repeat until clean review or `MAX_REVIEW_CYCLES` is reached.
+   - The previous review result is invalid after any fix commit, amend, rebase, merge-base update, or force-push.
+   - Repeat until a fresh `/review` on the latest `headRefOid` is clean or `MAX_REVIEW_CYCLES` is reached.
    - If max cycles is reached, stop with `max_cycles_reached` and include findings.
 
 6. PR gate:
@@ -178,6 +182,7 @@ Success is allowed only when all conditions are true:
      - `mergeable=MERGEABLE`
      - `mergeStateStatus=CLEAN`
    - If merge conflicts or dirty merge state exist, ask the implementation agent to fix, commit and push, then repeat review and PR gates.
+   - If `headRefOid` changed since the last clean `/review`, return to the Review/fix loop before treating the PR gate as satisfied.
 
 7. CI gate:
    - Run:
@@ -188,6 +193,7 @@ Success is allowed only when all conditions are true:
      - Send logs and exact fix request to the implementation agent in the pane.
      - Wait for fix commit/push.
      - Repeat fresh `/review`, PR gate and CI gate.
+   - If a CI fix changes `headRefOid`, the review gate is no longer valid until a fresh `/review` passes on that new head.
    - Repeat until green CI or `MAX_CI_CYCLES` is reached.
 
 8. Merge:
@@ -207,6 +213,8 @@ Success is allowed only when all conditions are true:
 <constraints>
 - Do not announce success without clean review.
 - Do not satisfy the review gate with a `/review` that did not run on `GPT-5.5 Extra high`.
+- Do not satisfy the review gate with a clean `/review` from an older `headRefOid`.
+- Do not merge immediately after fixes are committed and pushed; first run another fresh `/review` on the fixed head and require it to be clean.
 - Do not announce green CI when checks are absent.
 - Do not merge if PR is draft, not mergeable, dirty, conflicted, or checks are failed/pending/cancelled/absent.
 - Do not bypass branch protection, required approvals, security gates or human gates.

@@ -62,7 +62,8 @@ MAX_ITERATIONS: {{MAX_ITERATIONS}}
 4. Создан или обновлен PR против правильной base branch.
 5. PR не имеет merge conflicts.
 6. Обязательные CI checks зеленые.
-7. Review/fix loop завершен: не осталось critical/high замечаний.
+7. Последний head commit после всех fixes прошел fresh review.
+8. Review/fix loop завершен только после fresh review без critical/high замечаний.
 </definition_of_done>
 
 <instructions>
@@ -96,7 +97,9 @@ MAX_ITERATIONS: {{MAX_ITERATIONS}}
    - Собери замечания из review comments, CI, статических проверок и доступных quality signals.
    - Исправь все critical/high замечания.
    - Повтори локальные проверки, commit, push и проверку CI.
-   - Продолжай до состояния: нет critical/high замечаний и обязательный CI зеленый.
+   - После каждого fix commit/push обязательно запусти fresh review заново на новом head commit.
+   - Не считай review/fix loop завершенным на основании того, что fixes были внесены; завершение возможно только после нового review без critical/high замечаний.
+   - Продолжай до состояния: fresh review по последнему head commit не содержит critical/high замечаний и обязательный CI зеленый.
    - Лимит: `MAX_ITERATIONS`, если задан, иначе 5 итераций.
 
 6. Остановись и отчитайся, если:
@@ -110,6 +113,7 @@ MAX_ITERATIONS: {{MAX_ITERATIONS}}
 - Не игнорируй failing CI.
 - Не объявляй готовность без PR, если задача требует PR.
 - Не закрывай задачу при наличии critical/high замечаний.
+- Не объявляй готовность сразу после исправления review findings; сначала должен пройти повторный fresh review по commit с этими исправлениями.
 - Не выполняй команды, запрещенные `AGENTS.md` или `COMMAND_POLICY`.
 - Не откатывай чужие изменения без явного разрешения.
 </constraints>
@@ -144,4 +148,5 @@ MAX_ITERATIONS: {{MAX_ITERATIONS}}
 
 ## Change Notes
 
+- 2026-07-08: Clarified that every review fix must be followed by another fresh review on the updated head commit before completion.
 - 2026-05-19: Migrated from legacy `prompts/20_Implement_And_Test.md`.
