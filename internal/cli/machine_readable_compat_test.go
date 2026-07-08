@@ -271,6 +271,56 @@ func TestMachineReadableOutputCompatibilityExamples(t *testing.T) {
 			},
 			parse: parseSkillCleanupProposal,
 		},
+		{
+			name: "sessions cleanup confirm json",
+			args: []string{"sessions", "cleanup", "--confirm", "--json"},
+			arrange: func(t *testing.T) string {
+				root := newTestGitRepo(t)
+				openedPath := resolvedPath(t, root)
+				writeRegistryFile(t, root, fmt.Sprintf(`{
+  "version": 1,
+  "sessions": [
+    {
+      "zellij_session": "zelma-main",
+      "zellij_pane": "terminal_1",
+      "codex_session": "11111111-1111-4111-8111-111111111111",
+      "opened_path": %q,
+      "state": "stale"
+    },
+    {
+      "zellij_session": "zelma-main",
+      "zellij_pane": "terminal_2",
+      "codex_session": "22222222-2222-4222-8222-222222222222",
+      "opened_path": %q,
+      "state": "active"
+    }
+  ]
+}
+`, openedPath, openedPath))
+				t.Chdir(root)
+				return openedPath
+			},
+			want: func(openedPath string) string {
+				return fmt.Sprintf(`{
+  "summary": {
+    "proposed": 1,
+    "removed": 1,
+    "kept": 1
+  },
+  "stale_records": [
+    {
+      "zellij_session": "zelma-main",
+      "zellij_pane": "terminal_1",
+      "codex_session": "11111111-1111-4111-8111-111111111111",
+      "opened_path": %q,
+      "state": "stale"
+    }
+  ]
+}
+`, openedPath)
+			},
+			parse: parseSkillCleanupConfirmed,
+		},
 	}
 
 	for _, tt := range tests {
@@ -454,6 +504,29 @@ func parseSkillCleanupProposal(t *testing.T, data []byte) {
 	decodeStrict(t, data, &output)
 	if output.Summary.Proposed != 1 || output.Summary.Removed != 0 || output.Summary.Kept != 1 {
 		t.Fatalf("cleanup summary = %+v, want proposed=1 removed=0 kept=1", output.Summary)
+	}
+	for _, record := range output.StaleRecords {
+		assertSkillSession(t, skillSession(record))
+		if record.State != "stale" {
+			t.Fatalf("stale record state = %q, want stale", record.State)
+		}
+	}
+}
+
+func parseSkillCleanupConfirmed(t *testing.T, data []byte) {
+	t.Helper()
+
+	var output struct {
+		Summary struct {
+			Proposed int `json:"proposed"`
+			Removed  int `json:"removed"`
+			Kept     int `json:"kept"`
+		} `json:"summary"`
+		StaleRecords []skillStaleRecord `json:"stale_records,omitempty"`
+	}
+	decodeStrict(t, data, &output)
+	if output.Summary.Proposed != 1 || output.Summary.Removed != 1 || output.Summary.Kept != 1 {
+		t.Fatalf("cleanup confirm summary = %+v, want proposed=1 removed=1 kept=1", output.Summary)
 	}
 	for _, record := range output.StaleRecords {
 		assertSkillSession(t, skillSession(record))
