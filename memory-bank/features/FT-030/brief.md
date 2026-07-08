@@ -7,8 +7,8 @@ derived_from:
   - ../../product/roadmap.md
   - ../../epics/EP-007/brief.md
   - ../../domain/states.md
-status: draft
-delivery_status: planned
+status: active
+delivery_status: implemented
 audience: humans_and_agents
 must_not_define:
   - implementation_sequence
