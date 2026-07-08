@@ -229,7 +229,7 @@ Notes:
 `
 
 const sessionsDetectHelp = `Usage:
-  zelma sessions detect [--json]
+  zelma sessions detect [--json] [--explain]
 
 Status:
   implemented: reads zellij panes and upserts candidate registry records.
@@ -238,6 +238,7 @@ Output:
   default: added/unchanged/skipped summary with active/candidate/stale counts.
   --json: stable summary object with added, unchanged, skipped, active,
   candidate and stale counts plus stale_candidates reason codes when found.
+  --explain: include per-candidate evidence verdict, source and reason.
 
 Notes:
   Promotes detected panes to active only when Codex session evidence resolves
@@ -397,7 +398,8 @@ func newSessionsCreateCommand(stdout io.Writer) *cobra.Command {
 
 			summary := result.Summary
 			if result.Confirmed {
-				candidate := withSessionEvidence(result.Candidate)
+				candidates, _ := withSessionEvidenceAll([]registry.Session{result.Candidate})
+				candidate := candidates[0]
 				path := registry.RegistryPath(root.Path)
 				var upsertSummary registry.DetectUpsertSummary
 				err = registry.UpdateFile(path, func(current registry.Registry) (registry.Registry, error) {
@@ -426,6 +428,7 @@ func newSessionsCreateCommand(stdout io.Writer) *cobra.Command {
 
 func newSessionsDetectCommand(stdout io.Writer) *cobra.Command {
 	var jsonOutput bool
+	var explainOutput bool
 
 	cmd := &cobra.Command{
 		Use:   "detect",
@@ -442,7 +445,7 @@ func newSessionsDetectCommand(stdout io.Writer) *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("%s: %w", cmd.CommandPath(), err)
 			}
-			candidates := withSessionEvidenceAll(detected.Candidates)
+			candidates, explanations := withSessionEvidenceAll(detected.Candidates)
 
 			path := registry.RegistryPath(root.Path)
 			var summary registry.DetectUpsertSummary
@@ -465,15 +468,21 @@ func newSessionsDetectCommand(stdout io.Writer) *cobra.Command {
 			}
 
 			if jsonOutput {
-				return writeDetectSummaryJSON(stdout, summary, staleCandidates)
+				return writeDetectSummaryJSON(stdout, summary, staleCandidates, explainOutput, explanations)
 			}
 			if _, err = fmt.Fprintf(stdout, "added=%d unchanged=%d skipped=%d active=%d candidate=%d stale=%d\n", summary.Added, summary.Unchanged, summary.Skipped, summary.Active, summary.Candidate, summary.Stale); err != nil {
 				return err
+			}
+			if explainOutput {
+				if err := writeCandidateEvidenceLines(stdout, explanations); err != nil {
+					return err
+				}
 			}
 			return writeStaleCandidateLines(stdout, staleCandidates)
 		},
 	}
 	cmd.Flags().BoolVar(&jsonOutput, "json", false, "Print detect summary JSON.")
+	cmd.Flags().BoolVar(&explainOutput, "explain", false, "Print per-candidate evidence decisions.")
 	return cmd
 }
 
@@ -555,6 +564,26 @@ func writeStaleCandidateLines(stdout io.Writer, candidates []registry.StaleCandi
 	return nil
 }
 
+func writeCandidateEvidenceLines(stdout io.Writer, explanations []candidateEvidenceExplanation) error {
+	for _, explanation := range explanations {
+		if _, err := fmt.Fprintf(
+			stdout,
+			"candidate zellij_session=%s zellij_tab=%s zellij_pane=%s evidence=%s source=%s codex_session=%s opened_path=%s reason=%q\n",
+			explanation.ZellijSession,
+			explanation.ZellijTab,
+			explanation.ZellijPane,
+			explanation.EvidenceVerdict,
+			explanation.EvidenceSource,
+			explanation.CodexSession,
+			explanation.OpenedPath,
+			explanation.EvidenceReason,
+		); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func writeCleanupProposal(stdout io.Writer, proposal registry.CleanupProposal) error {
 	if _, err := fmt.Fprintf(stdout, "proposed=%d removed=%d kept=%d\n", proposal.Summary.Proposed, proposal.Summary.Removed, proposal.Summary.Kept); err != nil {
 		return err
@@ -625,10 +654,13 @@ func writeLiveSessionsJSON(stdout io.Writer, reg live.Registry) error {
 	return err
 }
 
-func writeDetectSummaryJSON(stdout io.Writer, summary registry.DetectUpsertSummary, staleCandidates []registry.StaleCandidate) error {
+func writeDetectSummaryJSON(stdout io.Writer, summary registry.DetectUpsertSummary, staleCandidates []registry.StaleCandidate, explain bool, explanations []candidateEvidenceExplanation) error {
 	output := detectSummaryJSON{
 		DetectUpsertSummary: summary,
 		StaleCandidates:     staleCandidates,
+	}
+	if explain {
+		output.CandidateExplanations = explanations
 	}
 	data, err := json.MarshalIndent(output, "", "  ")
 	if err != nil {
@@ -649,7 +681,8 @@ func writeCleanupProposalJSON(stdout io.Writer, proposal registry.CleanupProposa
 
 type detectSummaryJSON struct {
 	registry.DetectUpsertSummary
-	StaleCandidates []registry.StaleCandidate `json:"stale_candidates,omitempty"`
+	StaleCandidates       []registry.StaleCandidate      `json:"stale_candidates,omitempty"`
+	CandidateExplanations []candidateEvidenceExplanation `json:"candidate_explanations,omitempty"`
 }
 
 type setupResultJSON struct {
@@ -669,29 +702,75 @@ func writeCreateSummaryJSON(stdout io.Writer, summary create.Summary) error {
 	return err
 }
 
-func withSessionEvidenceAll(sessions []registry.Session) []registry.Session {
-	enriched := make([]registry.Session, len(sessions))
-	for i, session := range sessions {
-		enriched[i] = withSessionEvidence(session)
-	}
-	return enriched
+type candidateEvidenceExplanation struct {
+	ZellijSession   string `json:"zellij_session"`
+	ZellijTab       string `json:"zellij_tab,omitempty"`
+	ZellijPane      string `json:"zellij_pane"`
+	OpenedPath      string `json:"opened_path"`
+	CodexSession    string `json:"codex_session,omitempty"`
+	EvidenceVerdict string `json:"evidence_verdict"`
+	EvidenceSource  string `json:"evidence_source,omitempty"`
+	EvidenceReason  string `json:"evidence_reason,omitempty"`
 }
 
-func withSessionEvidence(session registry.Session) registry.Session {
-	if session.CodexSession != "" {
-		return session
+func withSessionEvidenceAll(sessions []registry.Session) ([]registry.Session, []candidateEvidenceExplanation) {
+	enriched := make([]registry.Session, len(sessions))
+	explanations := make([]candidateEvidenceExplanation, len(sessions))
+
+	var index codex.SessionEvidenceIndex
+	var indexErr error
+	needsIndex := false
+	for _, session := range sessions {
+		if session.CodexSession == "" {
+			needsIndex = true
+			break
+		}
 	}
-	evidence, err := codex.FindSessionEvidenceForOpenedPath(session.OpenedPath, codex.MetadataDiscoveryOptions{
-		Env: map[string]string{
-			"CODEX_HOME": os.Getenv("CODEX_HOME"),
-		},
-	})
-	if err != nil || evidence.Verdict != codex.SessionEvidenceResolved || evidence.Ref == nil {
-		return session
+	if needsIndex {
+		index, indexErr = codex.BuildSessionEvidenceIndex(codex.MetadataDiscoveryOptions{
+			Env: map[string]string{
+				"CODEX_HOME": os.Getenv("CODEX_HOME"),
+			},
+		})
+	}
+
+	for i, session := range sessions {
+		enriched[i], explanations[i] = withSessionEvidence(session, index, indexErr)
+	}
+	return enriched, explanations
+}
+
+func withSessionEvidence(session registry.Session, index codex.SessionEvidenceIndex, indexErr error) (registry.Session, candidateEvidenceExplanation) {
+	explanation := candidateEvidenceExplanation{
+		ZellijSession:   session.ZellijSession,
+		ZellijTab:       session.ZellijTab,
+		ZellijPane:      session.ZellijPane,
+		OpenedPath:      session.OpenedPath,
+		CodexSession:    session.CodexSession,
+		EvidenceVerdict: string(codex.SessionEvidenceInsufficient),
+	}
+	if session.CodexSession != "" {
+		explanation.EvidenceVerdict = string(codex.SessionEvidenceResolved)
+		explanation.EvidenceSource = "command_argv"
+		return session, explanation
+	}
+	if indexErr != nil {
+		explanation.EvidenceReason = indexErr.Error()
+		return session, explanation
+	}
+	evidence := index.FindForOpenedPath(session.OpenedPath)
+	explanation.EvidenceVerdict = string(evidence.Verdict)
+	explanation.EvidenceReason = evidence.Reason
+	if evidence.Verdict != codex.SessionEvidenceResolved || evidence.Ref == nil {
+		return session, explanation
 	}
 	session.CodexSession = evidence.Ref.SessionID
 	session.OpenedPath = evidence.Ref.Metadata.CWD
-	return session
+	explanation.OpenedPath = session.OpenedPath
+	explanation.CodexSession = session.CodexSession
+	explanation.EvidenceSource = string(evidence.Ref.Source)
+	explanation.EvidenceReason = ""
+	return session, explanation
 }
 
 func configuredZellijSession() string {

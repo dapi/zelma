@@ -1041,6 +1041,82 @@ func TestSessionsDetectPromotesResumeArgToActive(t *testing.T) {
 	}
 }
 
+func TestSessionsDetectExplainOutput(t *testing.T) {
+	root := newTestGitRepo(t)
+	paneRoot := resolvedPath(t, root)
+	command := "codex --dangerously-bypass-approvals-and-sandbox --search resume 019f3d81-b070-7a91-9a6f-9f50f1cba355"
+	t.Setenv("ZELMA_ZELLIJ_BIN", writeFakeZellij(t, panesJSONWithID(75, paneRoot, command, true)))
+	t.Chdir(root)
+
+	var stdout, stderr bytes.Buffer
+
+	code := Run(context.Background(), []string{"sessions", "detect", "--explain"}, &stdout, &stderr)
+
+	if code != 0 {
+		t.Fatalf("Run() code = %d, want 0; stderr = %q", code, stderr.String())
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("stderr = %q, want empty", stderr.String())
+	}
+	output := stdout.String()
+	if !strings.Contains(output, "added=1 unchanged=0 skipped=0 active=1 candidate=0 stale=0\n") {
+		t.Fatalf("stdout = %q, want summary", output)
+	}
+	for _, want := range []string{
+		"candidate zellij_session=zelma-main",
+		"zellij_tab=tab_1",
+		"zellij_pane=terminal_75",
+		"evidence=resolved",
+		"source=command_argv",
+		"codex_session=019f3d81-b070-7a91-9a6f-9f50f1cba355",
+		"reason=\"\"",
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("stdout = %q, want %q", output, want)
+		}
+	}
+}
+
+func TestSessionsDetectExplainJSONOutput(t *testing.T) {
+	root := newTestGitRepo(t)
+	paneRoot := resolvedPath(t, root)
+	t.Setenv("ZELMA_ZELLIJ_BIN", writeFakeZellij(t, panesJSON(paneRoot, true)))
+	t.Chdir(root)
+
+	var stdout, stderr bytes.Buffer
+
+	code := Run(context.Background(), []string{"sessions", "detect", "--json", "--explain"}, &stdout, &stderr)
+
+	if code != 0 {
+		t.Fatalf("Run() code = %d, want 0; stderr = %q", code, stderr.String())
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("stderr = %q, want empty", stderr.String())
+	}
+	var got struct {
+		registry.DetectUpsertSummary
+		CandidateExplanations []struct {
+			ZellijSession   string `json:"zellij_session"`
+			ZellijPane      string `json:"zellij_pane"`
+			EvidenceVerdict string `json:"evidence_verdict"`
+			EvidenceReason  string `json:"evidence_reason"`
+		} `json:"candidate_explanations"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &got); err != nil {
+		t.Fatalf("decode detect JSON: %v; stdout = %s", err, stdout.String())
+	}
+	if got.Candidate != 1 || got.Active != 0 || len(got.CandidateExplanations) != 1 {
+		t.Fatalf("detect json = %+v, want one explained candidate", got)
+	}
+	explanation := got.CandidateExplanations[0]
+	if explanation.ZellijSession != "zelma-main" || explanation.ZellijPane != "terminal_1" {
+		t.Fatalf("explanation identity = %+v, want zelma-main terminal_1", explanation)
+	}
+	if explanation.EvidenceVerdict != "insufficient_evidence" || explanation.EvidenceReason != "no session_meta record matches opened_path" {
+		t.Fatalf("explanation = %+v, want insufficient session_meta reason", explanation)
+	}
+}
+
 func TestSessionsDetectPromotesFullEvidenceToActive(t *testing.T) {
 	root := newTestGitRepo(t)
 	paneRoot := resolvedPath(t, root)

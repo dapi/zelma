@@ -55,6 +55,47 @@ func TestFindSessionEvidenceForOpenedPathReturnsInsufficientWhenMissing(t *testi
 	}
 }
 
+func TestSessionEvidenceIndexFindsMultiplePathsFromSingleBuild(t *testing.T) {
+	codexHome := t.TempDir()
+	writeSessionEvidenceLog(t, codexHome, "a.jsonl", "11111111-1111-4111-8111-111111111111", "/workspace/zelma")
+	writeSessionEvidenceLog(t, codexHome, "b.jsonl", "22222222-2222-4222-8222-222222222222", "/workspace/zelma/internal")
+
+	index, err := BuildSessionEvidenceIndex(MetadataDiscoveryOptions{
+		Env: map[string]string{"CODEX_HOME": codexHome},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	root := index.FindForOpenedPath("/workspace/zelma")
+	if root.Verdict != SessionEvidenceResolved || root.Ref == nil || root.Ref.SessionID != "11111111-1111-4111-8111-111111111111" {
+		t.Fatalf("root evidence = %+v, want first session", root)
+	}
+	nested := index.FindForOpenedPath("/workspace/zelma/internal")
+	if nested.Verdict != SessionEvidenceResolved || nested.Ref == nil || nested.Ref.SessionID != "22222222-2222-4222-8222-222222222222" {
+		t.Fatalf("nested evidence = %+v, want second session", nested)
+	}
+}
+
+func TestSessionEvidenceIndexRequiresUnambiguousMatch(t *testing.T) {
+	codexHome := t.TempDir()
+	openedPath := "/workspace/zelma"
+	writeSessionEvidenceLog(t, codexHome, "a.jsonl", "11111111-1111-4111-8111-111111111111", openedPath)
+	writeSessionEvidenceLog(t, codexHome, "b.jsonl", "22222222-2222-4222-8222-222222222222", openedPath)
+
+	index, err := BuildSessionEvidenceIndex(MetadataDiscoveryOptions{
+		Env: map[string]string{"CODEX_HOME": codexHome},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got := index.FindForOpenedPath(openedPath)
+	if got.Verdict != SessionEvidenceInsufficient || got.Reason != "multiple session_meta records match opened_path" {
+		t.Fatalf("evidence = %+v, want ambiguous insufficient verdict", got)
+	}
+}
+
 func writeSessionEvidenceLog(t *testing.T, codexHome, name, sessionID, cwd string) {
 	t.Helper()
 

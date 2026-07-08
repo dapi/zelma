@@ -116,3 +116,5 @@ audience: humans_and_agents
   status backend для dashboard/agent UI поверх session registry и zellij state.
 - [FT-043: Command Arg Codex Session Evidence](FT-043/README.md) — извлечение
   `CodexSessionRef` из `codex resume <uuid>` и wrapper-provided external UUID.
+- [FT-044: Detect Evidence Explain And Indexed Lookup](FT-044/README.md) —
+  one-pass Codex evidence lookup и `sessions detect --explain`.
