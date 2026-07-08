@@ -114,7 +114,10 @@ func paneCommandMatchesLaunch(command *string, launchBinary string) bool {
 	if command == nil || strings.TrimSpace(launchBinary) == "" {
 		return false
 	}
-	executable := detection.CommandExecutable(*command)
+	executable := detection.CodexCommandEntrypoint(*command)
+	if executable == "" {
+		executable = detection.CommandExecutable(*command)
+	}
 	if executable == "" {
 		return false
 	}

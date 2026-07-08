@@ -103,6 +103,41 @@ func TestLaunchAndConfirmAcceptsConfiguredCodexWrapper(t *testing.T) {
 	}
 }
 
+func TestLaunchAndConfirmAcceptsNodeCodexEntrypoint(t *testing.T) {
+	root := filepath.Clean(t.TempDir())
+	launchBinary := "/Users/danil/.local/share/mise/installs/node/25.9.0/bin/codex"
+	contract := codex.LaunchContract{
+		Binary:           launchBinary,
+		Args:             []string{"--cd", root},
+		WorkingDirectory: root,
+		OpenedPath:       root,
+	}
+	runtime := fakeRuntime{
+		paneRef: zellij.PaneRef{
+			Session: "zelma-main",
+			PaneID:  zellij.PaneID{Kind: zellij.PaneKindTerminal, Number: 7},
+		},
+		panes: []zellij.Pane{
+			terminalPane(7, "node "+launchBinary+" --cd "+root, root),
+		},
+	}
+
+	got, err := LaunchAndConfirm(context.Background(), Request{
+		ZellijSession: "zelma-main",
+		Contract:      contract,
+	}, &runtime)
+
+	if err != nil {
+		t.Fatalf("LaunchAndConfirm() error = %v, want nil", err)
+	}
+	if !got.Confirmed {
+		t.Fatal("Confirmed = false, want true for node Codex entrypoint")
+	}
+	if got.Candidate.OpenedPath != root || got.Candidate.ZellijPane != "terminal_7" {
+		t.Fatalf("Candidate = %+v, want node Codex entrypoint candidate", got.Candidate)
+	}
+}
+
 func TestLaunchAndConfirmReturnsUnconfirmedPaneDiagnostic(t *testing.T) {
 	root := filepath.Clean(t.TempDir())
 	contract := codex.LaunchContract{

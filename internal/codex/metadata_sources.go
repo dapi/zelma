@@ -93,12 +93,12 @@ func DiscoverMetadataSources(options MetadataDiscoveryOptions) MetadataSourceInv
 				Status:     MetadataSourceUsable,
 				Confidence: MetadataConfidenceWeak,
 				Privacy:    MetadataPrivacySensitivePossible,
-				SafeFields: []string{"command executable basename"},
+				SafeFields: []string{"command entrypoint basename"},
 				ExcludedFields: []string{
 					"raw command arguments",
 					"user prompt text",
 				},
-				Observation: "zellij list-panes exposes pane_command and the current detector reads only the executable token",
+				Observation: "zellij list-panes exposes pane_command and the detector reads only the command entrypoint needed to identify Codex",
 			},
 			{
 				ID:          MetadataSourceZellijPaneCWD,

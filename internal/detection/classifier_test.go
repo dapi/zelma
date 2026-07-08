@@ -157,6 +157,42 @@ func TestClassifyPaneAcceptsQuotedCodexExecutable(t *testing.T) {
 	}
 }
 
+func TestClassifyPaneAcceptsNodeCodexEntrypoint(t *testing.T) {
+	pane := zellij.Pane{
+		ID:          zellij.PaneID{Kind: zellij.PaneKindTerminal, Number: 75},
+		PaneCommand: stringPtr("node /Users/danil/.local/share/mise/installs/node/25.9.0/bin/codex --dangerously-bypass-approvals-and-sandbox --search"),
+		PaneCWD:     stringPtr("/workspace/zelma"),
+	}
+
+	got := ClassifyPane(pane, "/workspace/zelma")
+
+	if got.Verdict != VerdictCandidate {
+		t.Fatalf("Verdict = %q, want %q; reasons = %#v", got.Verdict, VerdictCandidate, got.Reasons)
+	}
+	wantReasons := []ReasonCode{ReasonTerminalPane, ReasonCodexCommand, ReasonCWDInsideRepo}
+	if !reflect.DeepEqual(got.Reasons, wantReasons) {
+		t.Fatalf("Reasons = %#v, want %#v", got.Reasons, wantReasons)
+	}
+}
+
+func TestCodexCommandEntrypointHandlesNodeOptions(t *testing.T) {
+	command := `node --require ./register.js --inspect "/opt/openai/bin/codex" --search -c developer_instructions='External session UUID: test'`
+
+	got := CodexCommandEntrypoint(command)
+
+	if got != "/opt/openai/bin/codex" {
+		t.Fatalf("CodexCommandEntrypoint() = %q, want /opt/openai/bin/codex", got)
+	}
+}
+
+func TestCodexCommandEntrypointRejectsNodeNonCodexScript(t *testing.T) {
+	command := "node ./scripts/start.js --name codex"
+
+	if got := CodexCommandEntrypoint(command); got != "" {
+		t.Fatalf("CodexCommandEntrypoint() = %q, want empty for non-Codex node script", got)
+	}
+}
+
 func parsePaneFixture(t *testing.T, name string) []zellij.Pane {
 	t.Helper()
 
