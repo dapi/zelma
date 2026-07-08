@@ -16,3 +16,6 @@ audience: humans_and_agents
 
 - [Brief](brief.md)
   Читать, когда нужно понять stale detection rules.
+- [Design](design.md)
+  Читать, когда нужно понять selected implementation contract для stale
+  candidates и transient zellij failures.

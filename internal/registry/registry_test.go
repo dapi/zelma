@@ -549,6 +549,116 @@ func TestUpsertDetectedCandidatesSkipsInvalidCandidateKey(t *testing.T) {
 	}
 }
 
+func TestMarkStaleCandidatesMarksMissingPaneWithReason(t *testing.T) {
+	active := Session{
+		ZellijSession: "main",
+		ZellijPane:    "terminal_1",
+		CodexSession:  "11111111-1111-4111-8111-111111111111",
+		OpenedPath:    "/workspace/zelma",
+		State:         StateActive,
+	}
+
+	got, stale := MarkStaleCandidates(
+		Registry{Version: SchemaVersion, Sessions: []Session{active}},
+		RuntimeSnapshot{
+			ZellijSessions: []string{"main"},
+			Panes:          []PaneRef{{ZellijSession: "main", ZellijPane: "terminal_2"}},
+		},
+	)
+
+	if len(stale) != 1 {
+		t.Fatalf("len(stale) = %d, want 1", len(stale))
+	}
+	if stale[0].Reason != StaleReasonMissingPane || stale[0].PreviousState != StateActive {
+		t.Fatalf("stale candidate = %+v, want missing pane from active", stale[0])
+	}
+	if got.Sessions[0].State != StateStale {
+		t.Fatalf("state = %q, want stale", got.Sessions[0].State)
+	}
+	if active.State != StateActive {
+		t.Fatalf("input session mutated to %q, want active", active.State)
+	}
+}
+
+func TestMarkStaleCandidatesMarksMissingSessionWithReason(t *testing.T) {
+	active := Session{
+		ZellijSession: "main",
+		ZellijPane:    "terminal_1",
+		CodexSession:  "11111111-1111-4111-8111-111111111111",
+		OpenedPath:    "/workspace/zelma",
+		State:         StateActive,
+	}
+
+	got, stale := MarkStaleCandidates(
+		Registry{Version: SchemaVersion, Sessions: []Session{active}},
+		RuntimeSnapshot{ZellijSessions: []string{"other"}},
+	)
+
+	if len(stale) != 1 {
+		t.Fatalf("len(stale) = %d, want 1", len(stale))
+	}
+	if stale[0].Reason != StaleReasonMissingZellijSession || stale[0].PreviousState != StateActive {
+		t.Fatalf("stale candidate = %+v, want missing session from active", stale[0])
+	}
+	if got.Sessions[0].State != StateStale {
+		t.Fatalf("state = %q, want stale", got.Sessions[0].State)
+	}
+}
+
+func TestMarkStaleCandidatesPreservesLiveAndHistoricalRecords(t *testing.T) {
+	active := Session{
+		ZellijSession: "main",
+		ZellijPane:    "terminal_1",
+		CodexSession:  "11111111-1111-4111-8111-111111111111",
+		OpenedPath:    "/workspace/zelma",
+		State:         StateActive,
+	}
+	closed := active
+	closed.ZellijPane = "terminal_2"
+	closed.State = StateClosed
+
+	got, stale := MarkStaleCandidates(
+		Registry{Version: SchemaVersion, Sessions: []Session{active, closed}},
+		RuntimeSnapshot{
+			ZellijSessions: []string{"main"},
+			Panes:          []PaneRef{{ZellijSession: "main", ZellijPane: "terminal_1"}},
+		},
+	)
+
+	if len(stale) != 0 {
+		t.Fatalf("stale = %+v, want none", stale)
+	}
+	if got.Sessions[0] != active || got.Sessions[1] != closed {
+		t.Fatalf("sessions = %+v, want preserved records", got.Sessions)
+	}
+}
+
+func TestMarkStaleCandidatesDoesNotMutateInputRegistry(t *testing.T) {
+	active := Session{
+		ZellijSession: "main",
+		ZellijPane:    "terminal_1",
+		CodexSession:  "11111111-1111-4111-8111-111111111111",
+		OpenedPath:    "/workspace/zelma",
+		State:         StateActive,
+	}
+	current := Registry{Version: SchemaVersion, Sessions: []Session{active}}
+
+	got, stale := MarkStaleCandidates(
+		current,
+		RuntimeSnapshot{ZellijSessions: []string{"other"}},
+	)
+
+	if len(stale) != 1 {
+		t.Fatalf("len(stale) = %d, want 1", len(stale))
+	}
+	if got.Sessions[0].State != StateStale {
+		t.Fatalf("state = %q, want stale", got.Sessions[0].State)
+	}
+	if current.Sessions[0] != active {
+		t.Fatalf("input registry mutated to %+v, want %+v", current.Sessions[0], active)
+	}
+}
+
 func TestWriteFileCreatesAtomicRegistryFile(t *testing.T) {
 	path := RegistryPath(t.TempDir())
 	registry := validRegistry("/workspace/zelma")

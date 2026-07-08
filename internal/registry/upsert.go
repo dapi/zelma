@@ -8,6 +8,7 @@ type DetectUpsertSummary struct {
 	Skipped   int `json:"skipped"`
 	Active    int `json:"active"`
 	Candidate int `json:"candidate"`
+	Stale     int `json:"stale"`
 }
 
 func UpsertDetectedCandidates(current Registry, candidates []Session) (Registry, DetectUpsertSummary) {

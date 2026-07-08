@@ -72,6 +72,9 @@ func Reconcile(ctx context.Context, reg registry.Registry, inventory Inventory) 
 func paneSet(panes []zellij.Pane) map[string]struct{} {
 	ids := make(map[string]struct{}, len(panes))
 	for _, pane := range panes {
+		if pane.Exited {
+			continue
+		}
 		ids[pane.ID.String()] = struct{}{}
 	}
 	return ids

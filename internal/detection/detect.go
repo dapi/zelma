@@ -13,8 +13,10 @@ type Inventory interface {
 }
 
 type Result struct {
-	Candidates []registry.Session
-	Skipped    int
+	Candidates   []registry.Session
+	Skipped      int
+	LiveSessions []string
+	LivePanes    []registry.PaneRef
 }
 
 func DetectCandidates(ctx context.Context, repoRoot string, inventory Inventory) (Result, error) {
@@ -25,11 +27,18 @@ func DetectCandidates(ctx context.Context, repoRoot string, inventory Inventory)
 
 	var result Result
 	for _, session := range sessions {
+		result.LiveSessions = append(result.LiveSessions, session.Name)
 		panes, err := inventory.ListPanes(ctx, session.Name)
 		if err != nil {
 			return Result{}, err
 		}
 		for _, pane := range panes {
+			if !pane.Exited {
+				result.LivePanes = append(result.LivePanes, registry.PaneRef{
+					ZellijSession: session.Name,
+					ZellijPane:    pane.ID.String(),
+				})
+			}
 			candidate, ok := candidateFromPane(repoRoot, session.Name, pane)
 			if !ok {
 				result.Skipped++
