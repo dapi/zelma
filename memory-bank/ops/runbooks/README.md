@@ -13,6 +13,12 @@ audience: humans_and_agents
 
 В этом каталоге живут runbooks для повторяемых operational задач.
 
+## Доступные Runbooks
+
+- [Visible Zellij Shipping Supervisor](visible-zellij-shipping-supervisor.md) —
+  типовой алгоритм запуска supervisor/shipper/start-issue через видимые zellij
+  tab/pane без изменения ветки в основном worktree.
+
 Runbook должен отвечать на вопросы:
 
 - что является триггером;

@@ -122,6 +122,9 @@ Success is allowed only when all conditions are true:
 1. Preflight:
    - Change to `REPO_PATH` if provided.
    - Read repo instructions such as `AGENTS.md` if present.
+   - Read `memory-bank/ops/runbooks/visible-zellij-shipping-supervisor.md` when it exists and follow it as the operational runbook for visible zellij shipping.
+   - Do not change the branch in the main repository worktree. The main worktree must stay on `BASE_BRANCH`; implementation must happen only in worktrees created by `start-issue` or explicit `git worktree add`.
+   - Do not use invisible/native subagents as a fallback for shipping when the caller expects zellij-visible tab/pane output. If zellij cannot create or inspect the required tab/pane, stop with a blocker unless the caller explicitly authorizes a non-zellij fallback.
    - Resolve the zellij launch surface:
      - if `ZELMA_START_ISSUE_ZELLIJ_SURFACE` is set, use it;
      - otherwise, if `.zelma/config.json` exists and contains `start_issue.zellij_surface`, use it;
@@ -132,6 +135,7 @@ Success is allowed only when all conditions are true:
      - `gh issue view {{ISSUE_NUMBER}} --repo {{OWNER_REPO}}`
    - Verify zellij is available:
      - `zellij action list-panes --json --all`
+   - If zellij action commands hang or target a stale session context, stop with a blocker and report the session mismatch; do not continue in an invisible fallback.
    - Inspect current git status and avoid overwriting unrelated user changes.
    - Classify the issue delivery mode before starting work:
      - `implementation`: acceptance requires runtime behavior, CLI commands, tests, code, files, migrations, integrations or observable product behavior.
