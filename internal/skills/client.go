@@ -92,6 +92,8 @@ type StaleCandidate struct {
 }
 
 type Recovery struct {
+	Action      RecoveryAction
+	ReasonCode  string
 	Message     string
 	NextCommand []string
 }
@@ -280,38 +282,6 @@ func newCommandError(command []string, result CommandResult, err error) *Command
 		Stderr:   stderr,
 		Recovery: recoveryFor(stderr),
 		Err:      err,
-	}
-}
-
-func recoveryFor(stderr string) Recovery {
-	diagnostic := strings.ToLower(stderr)
-	switch {
-	case strings.Contains(diagnostic, "unsupported repo") || strings.Contains(diagnostic, "git repository"):
-		return Recovery{Message: "Run the zelma command from inside the target Git repository worktree."}
-	case strings.Contains(diagnostic, "registry_invalid_json") ||
-		strings.Contains(diagnostic, "registry_trailing_data") ||
-		strings.Contains(diagnostic, "registry_unknown_field") ||
-		strings.Contains(diagnostic, "registry_missing_required_field") ||
-		strings.Contains(diagnostic, "registry_unsupported_version"):
-		return Recovery{Message: "Stop and restore valid schema v1 registry JSON before running mutating session commands."}
-	case strings.Contains(diagnostic, "create_codex_missing_binary") || strings.Contains(diagnostic, "codex_missing_binary"):
-		return Recovery{Message: "Fix the Codex installation or ZELMA_CODEX_BIN, then retry the create command."}
-	case strings.Contains(diagnostic, "create_pane_unconfirmed"):
-		return Recovery{
-			Message:     "Do not retry blindly; inspect the pane and reconcile live Codex panes through detect.",
-			NextCommand: []string{DefaultZelmaBinary, "sessions", "detect", "--json"},
-		}
-	case strings.Contains(diagnostic, "create_registry_write_failed"):
-		return Recovery{
-			Message:     "Fix the registry write problem, then reconcile any created pane through detect before retrying create.",
-			NextCommand: []string{DefaultZelmaBinary, "sessions", "detect", "--json"},
-		}
-	case strings.Contains(diagnostic, "zellij_command_failed") ||
-		strings.Contains(diagnostic, "zellij_missing_binary") ||
-		strings.Contains(diagnostic, "zellij"):
-		return Recovery{Message: "Inspect zellij availability and session state, then retry only after the environment is fixed."}
-	default:
-		return Recovery{Message: "Preserve the CLI diagnostic for the agent and choose the next safe zelma command from the error text."}
 	}
 }
 

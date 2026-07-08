@@ -16,3 +16,5 @@ audience: humans_and_agents
 
 - [Brief](brief.md)
   Читать, когда нужно понять recovery flow scope для агентов.
+- [Design](design.md)
+  Читать, когда нужен selected recovery action contract для skill layer.

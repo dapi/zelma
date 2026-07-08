@@ -175,6 +175,9 @@ func TestCommandErrorPreservesDiagnosticsAndRecovery(t *testing.T) {
 	if !strings.Contains(commandErr.Recovery.Message, "schema v1") {
 		t.Fatalf("Recovery = %+v, want schema recovery", commandErr.Recovery)
 	}
+	if commandErr.Recovery.Action != RecoveryActionStop || commandErr.Recovery.ReasonCode != "registry_unsupported_version" {
+		t.Fatalf("Recovery = %+v, want stop for registry_unsupported_version", commandErr.Recovery)
+	}
 	assertCall(t, calls, root, "sessions", "list", "--json")
 }
 
@@ -212,9 +215,111 @@ func TestCreatePartialFailureSuggestsDetectRecovery(t *testing.T) {
 	if !errors.As(err, &commandErr) {
 		t.Fatalf("CreateSession() error = %T, want CommandError", err)
 	}
-	want := []string{DefaultZelmaBinary, "sessions", "detect", "--json"}
-	if strings.Join(commandErr.Recovery.NextCommand, "\x00") != strings.Join(want, "\x00") {
-		t.Fatalf("NextCommand = %#v, want %#v", commandErr.Recovery.NextCommand, want)
+	if commandErr.Recovery.Action != RecoveryActionDetect || commandErr.Recovery.ReasonCode != "create_pane_unconfirmed" {
+		t.Fatalf("Recovery = %+v, want detect for create_pane_unconfirmed", commandErr.Recovery)
+	}
+	assertRecoveryCommand(t, commandErr.Recovery, DefaultZelmaBinary, "sessions", "detect", "--json")
+}
+
+func TestRepoNotReadyErrorSuggestsSetup(t *testing.T) {
+	root := t.TempDir()
+	stderr := writeFile(t, root, "stderr.txt", "zelma sessions list: unsupported repo: no Git worktree found from /tmp/outside\nhint: run zelma sessions list from inside a Git repository\n")
+	calls := filepath.Join(root, "calls.txt")
+	client := fakeCLIClient(t, root, "", stderr, "1", calls)
+
+	_, err := client.ListSessions(context.Background(), ListOptions{})
+
+	var commandErr *CommandError
+	if !errors.As(err, &commandErr) {
+		t.Fatalf("ListSessions() error = %T, want CommandError", err)
+	}
+	if commandErr.Recovery.Action != RecoveryActionSetup || commandErr.Recovery.ReasonCode != ReasonUnsupportedRepo {
+		t.Fatalf("Recovery = %+v, want setup for unsupported repo", commandErr.Recovery)
+	}
+	assertRecoveryCommand(t, commandErr.Recovery, DefaultZelmaBinary, "setup")
+}
+
+func TestZellijUnavailableErrorStopsForEnvironmentFix(t *testing.T) {
+	root := t.TempDir()
+	stderr := writeFile(t, root, "stderr.txt", "zelma sessions detect: zellij adapter: zellij_missing_binary: zellij binary was not found; recovery: install zellij or configure the adapter binary path\n")
+	calls := filepath.Join(root, "calls.txt")
+	client := fakeCLIClient(t, root, "", stderr, "1", calls)
+
+	_, err := client.DetectSessions(context.Background())
+
+	var commandErr *CommandError
+	if !errors.As(err, &commandErr) {
+		t.Fatalf("DetectSessions() error = %T, want CommandError", err)
+	}
+	if commandErr.Recovery.Action != RecoveryActionStop || commandErr.Recovery.ReasonCode != "zellij_missing_binary" {
+		t.Fatalf("Recovery = %+v, want stop for zellij_missing_binary", commandErr.Recovery)
+	}
+	if len(commandErr.Recovery.NextCommand) != 0 {
+		t.Fatalf("NextCommand = %#v, want no automatic retry command", commandErr.Recovery.NextCommand)
+	}
+}
+
+func TestEmptyRegistryWithLikelyLivePanesSuggestsDetect(t *testing.T) {
+	recovery := RecoveryForListResult(SessionsList{Version: SessionsSchemaVersion}, ListRecoveryOptions{
+		LivePanesLikely: true,
+	})
+
+	if recovery.Action != RecoveryActionDetect || recovery.ReasonCode != ReasonEmptyRegistryPanesLikely {
+		t.Fatalf("Recovery = %+v, want detect for likely live panes", recovery)
+	}
+	assertRecoveryCommand(t, recovery, DefaultZelmaBinary, "sessions", "detect", "--json")
+}
+
+func TestEmptyRegistryWithoutLikelyLivePanesHasNoRecovery(t *testing.T) {
+	recovery := RecoveryForListResult(SessionsList{Version: SessionsSchemaVersion}, ListRecoveryOptions{})
+
+	if !isZeroRecovery(recovery) {
+		t.Fatalf("Recovery = %+v, want zero recovery", recovery)
+	}
+}
+
+func TestDetectStaleResultSuggestsCleanupPreviewOnly(t *testing.T) {
+	recovery := RecoveryForDetectResult(DetectSummary{
+		Stale: 1,
+		StaleCandidates: []StaleCandidate{
+			{
+				ZellijSession: "zelma-main",
+				ZellijPane:    "terminal_9",
+				PreviousState: "active",
+				Reason:        "missing_pane",
+			},
+		},
+	})
+
+	if recovery.Action != RecoveryActionInspect || recovery.ReasonCode != ReasonStaleSessionsDetected {
+		t.Fatalf("Recovery = %+v, want inspect for stale sessions", recovery)
+	}
+	assertRecoveryCommand(t, recovery, DefaultZelmaBinary, "sessions", "cleanup", "--json")
+}
+
+func TestRecoveryCommandsStayInsideSafeZelmaSurface(t *testing.T) {
+	recoveries := []Recovery{
+		recoveryFor("zelma sessions list: unsupported repo: no Git worktree found"),
+		recoveryFor("zelma sessions create: create session: create_pane_unconfirmed: created pane could not be confirmed"),
+		recoveryFor("zelma sessions create: create session: create_registry_write_failed: write sessions registry failed"),
+		RecoveryForListResult(SessionsList{Version: SessionsSchemaVersion}, ListRecoveryOptions{LivePanesLikely: true}),
+		RecoveryForDetectResult(DetectSummary{Stale: 1}),
+	}
+
+	for _, recovery := range recoveries {
+		command := recovery.NextCommand
+		if len(command) == 0 {
+			continue
+		}
+		if command[0] != DefaultZelmaBinary {
+			t.Fatalf("Recovery = %+v, want next command to use zelma CLI", recovery)
+		}
+		joined := strings.Join(command, " ")
+		for _, forbidden := range []string{"zellij", ".zelma", "sessions.json", "--confirm"} {
+			if strings.Contains(joined, forbidden) {
+				t.Fatalf("Recovery = %+v, command must not contain %q", recovery, forbidden)
+			}
+		}
 	}
 }
 
@@ -333,4 +438,19 @@ func bracketArgs(args []string) string {
 		b.WriteString("]")
 	}
 	return b.String()
+}
+
+func assertRecoveryCommand(t *testing.T, recovery Recovery, want ...string) {
+	t.Helper()
+
+	if strings.Join(recovery.NextCommand, "\x00") != strings.Join(want, "\x00") {
+		t.Fatalf("NextCommand = %#v, want %#v", recovery.NextCommand, want)
+	}
+}
+
+func isZeroRecovery(recovery Recovery) bool {
+	return recovery.Action == "" &&
+		recovery.ReasonCode == "" &&
+		recovery.Message == "" &&
+		len(recovery.NextCommand) == 0
 }

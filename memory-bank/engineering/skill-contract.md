@@ -155,18 +155,30 @@ and archived records are never removed by this command.
 
 ## Recovery Expectations
 
-The skill should preserve CLI diagnostics in its response and choose the next
-safe command from the diagnostic:
+The skill preserves CLI diagnostics in its response and attaches a structured
+recovery response when it can choose a safe next step. The recovery response
+contains:
+
+- `action`: `setup`, `detect`, `retry`, `inspect` or `stop`;
+- `reason_code`: the CLI reason code, or a skill-level scenario code for
+  successful but incomplete states;
+- `message`: agent-readable guidance;
+- `next_command`: optional safe `zelma` command.
 
 | Situation | Skill response |
 | --- | --- |
-| Not inside a git repository | Ask the user to run from a repository worktree. |
-| Registry JSON is invalid | Stop; tell the user to restore valid schema v1 JSON before mutating commands. |
-| Codex binary is missing during create | Stop; fix Codex installation or `ZELMA_CODEX_BIN`, then retry. |
-| zellij command fails before pane confirmation | Stop; inspect zellij availability/session, then retry only after the environment is fixed. |
-| Created pane cannot be confirmed | Do not retry blindly; run `zelma sessions detect --json` and inspect the zellij pane. |
-| Registry write fails after pane creation | Fix filesystem/lock issue, then run `zelma sessions detect --json` before retrying create. |
-| `list --live` or `detect` marks sessions stale | Present stale records; use `cleanup --json` for proposal and `cleanup --confirm --json` only on explicit user intent. |
+| Repository is not ready or not a Git worktree | `setup`; move into the target worktree, then run `zelma setup`. |
+| Registry JSON is invalid | `stop`; tell the user to restore valid schema v1 JSON before mutating commands. |
+| Codex binary is missing during create | `stop`; fix Codex installation or `ZELMA_CODEX_BIN`, then retry. |
+| zellij is unavailable or command execution fails | `stop`; fix zellij availability/session before retrying. |
+| Created pane cannot be confirmed | `detect`; run `zelma sessions detect --json` and inspect the pane. |
+| Registry write fails after pane creation | `detect`; fix filesystem/lock issue, then run `zelma sessions detect --json` before retrying create. |
+| Registry is empty but live panes are likely | `detect`; run `zelma sessions detect --json`. |
+| `list --live` or `detect` marks sessions stale | `inspect`; present stale records and use `cleanup --json` for proposal. |
+
+Recovery `next_command` values must stay within the public `zelma` CLI. They
+must not call `zellij` directly, read `.zelma/sessions.json`, or suggest
+`cleanup --confirm` without explicit user intent.
 
 ## Boundaries
 
