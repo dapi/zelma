@@ -36,6 +36,18 @@
 вручную открыл pane в `zellij`, запустил Codex, а потом хочет поставить эту
 сессию под контроль `zelma`.
 
+## Zellij tab focus
+
+По умолчанию `zelma` ориентируется на запуск Codex в `zellij pane`, а не в новой
+tab: текущий `zellij action new-tab` переключает focus в созданную tab и может
+мешать вводу пользователя в рабочей вкладке.
+
+Для безопасного tab workflow ждем upstream поддержку CLI в
+[`zellij-org/zellij#5220`](https://github.com/zellij-org/zellij/issues/5220):
+там обсуждается API вроде `new-tab --focus false` и attach directly to tab.
+Это нужно, чтобы создавать отдельные agent tabs без focus stealing и без
+ненадежного workaround "создать tab, затем быстро вернуться назад".
+
 ## Документация проекта
 
 - [`memory-bank/`](memory-bank/README.md) — durable knowledge layer проекта.
