@@ -2,6 +2,7 @@
   "version": 1,
   "sessions": [
     {
+      "id": 1,
       "zellij_session": "zelma-main",
       "zellij_pane": "1",
       "codex_session": "codex-2026-07-07T10-00-00Z-a1b2",
@@ -9,6 +10,7 @@
       "state": "active"
     },
     {
+      "id": 2,
       "zellij_session": "zelma-main",
       "zellij_pane": "2",
       "codex_session": "codex-2026-07-07T10-30-00Z-c3d4",
@@ -16,6 +18,7 @@
       "state": "stale"
     },
     {
+      "id": 3,
       "zellij_session": "feature-issue-6",
       "zellij_pane": "3",
       "codex_session": "codex-2026-07-07T11-00-00Z-e5f6",

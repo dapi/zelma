@@ -14,7 +14,9 @@ func TestProposeCleanupCollectsOnlyStaleRecords(t *testing.T) {
 	if proposal.Summary != (CleanupSummary{Proposed: 1, Kept: 3}) {
 		t.Fatalf("summary = %+v, want one proposed and all records kept", proposal.Summary)
 	}
-	if len(proposal.StaleRecords) != 1 || proposal.StaleRecords[0] != stale {
+	wantStale := stale
+	wantStale.ID = 2
+	if len(proposal.StaleRecords) != 1 || proposal.StaleRecords[0] != wantStale {
 		t.Fatalf("stale records = %+v, want only stale record", proposal.StaleRecords)
 	}
 }
@@ -31,10 +33,16 @@ func TestRemoveStaleRemovesOnlyStaleRecords(t *testing.T) {
 	if proposal.Summary != (CleanupSummary{Proposed: 1, Removed: 1, Kept: 2}) {
 		t.Fatalf("summary = %+v, want one removed and two kept", proposal.Summary)
 	}
-	if len(proposal.StaleRecords) != 1 || proposal.StaleRecords[0] != stale {
+	wantStale := stale
+	wantStale.ID = 2
+	if len(proposal.StaleRecords) != 1 || proposal.StaleRecords[0] != wantStale {
 		t.Fatalf("stale records = %+v, want removed stale record", proposal.StaleRecords)
 	}
-	want := []Session{active, candidate}
+	wantActive := active
+	wantActive.ID = 1
+	wantCandidate := candidate
+	wantCandidate.ID = 3
+	want := []Session{wantActive, wantCandidate}
 	if len(got.Sessions) != len(want) {
 		t.Fatalf("len(Sessions) = %d, want %d", len(got.Sessions), len(want))
 	}

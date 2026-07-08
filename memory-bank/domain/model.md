@@ -23,7 +23,8 @@ canonical_for:
 | --- | --- | --- | --- | --- |
 | `RepositoryWorkspace` | aggregate | Repo root, в котором существует `.zelma/` и локальный `session registry` | Owns one `SessionRegistry`; contains many `ZelmaSession` records | Определяется из текущего пути запуска CLI |
 | `SessionRegistry` | aggregate | `.zelma/sessions.json` как repo-local source of truth для known sessions | Belongs to `RepositoryWorkspace`; stores `ZelmaSession` records | Должен иметь versioned schema |
-| `ZelmaSession` | entity | Управляемая запись о Codex-сессии в `zellij pane` | References `ZellijSessionRef`, optional `ZellijTabRef`, `ZellijPaneRef`, `CodexSessionRef`, `OpenedPath`; has `SessionOrigin` and lifecycle state | Главная domain entity |
+| `ZelmaSession` | entity | Управляемая запись о Codex-сессии в `zellij pane` | Has `ZelmaSessionID`; references `ZellijSessionRef`, optional `ZellijTabRef`, `ZellijPaneRef`, `CodexSessionRef`, `OpenedPath`; has `SessionOrigin` and lifecycle state | Главная domain entity |
+| `ZelmaSessionID` | value object | Короткий positive integer identifier `zelma session` внутри repo-local registry | Belongs to exactly one `ZelmaSession` record in a `SessionRegistry` | Начинается с `1`; не является глобальным ID |
 | `ZellijSessionRef` | value object / external ref | Идентификатор runtime `zellij session` | Parent for `ZellijTabRef` and `ZellijPaneRef` | Не принадлежит `zelma`; приходит из `zellij` |
 | `ZellijTabRef` | value object / external ref | Идентификатор tab внутри `zellij session` | Groups `ZellijPaneRef` records when observed from zellij | Может отсутствовать в старых registry records |
 | `ZellijPaneRef` | value object / external ref | Идентификатор pane внутри `zellij session` | Belongs to `ZellijSessionRef`; may be located inside `ZellijTabRef`; hosts Codex runtime | Может стать stale после закрытия pane |
@@ -39,6 +40,8 @@ canonical_for:
 
 - `RepositoryWorkspace` owns exactly one active `.zelma/sessions.json`.
 - `SessionRegistry` contains zero or more `ZelmaSession` records.
+- `SessionRegistry` assigns each `ZelmaSession` one positive
+  `ZelmaSessionID`, unique inside that registry.
 - `ZelmaSession` references exactly one `ZellijSessionRef`.
 - `ZelmaSession` may store one `ZellijTabRef` and tab name when observed from
   `zellij list-panes`.
@@ -57,6 +60,7 @@ canonical_for:
 | --- | --- | --- | --- | --- |
 | `SessionRegistry` | Session Registry context | `zelma sessions create`, `zelma sessions detect`, future migrations | `zelma sessions list`, skills, diagnostics | Direct external edits are unsupported except manual recovery |
 | `ZelmaSession` | Session Registry context | CLI commands and migrations | CLI, skills, docs/tests | Must follow domain invariants |
+| `ZelmaSessionID` | Session Registry context | Session Registry normalization and mutating commands | CLI, skills, docs/tests | Repo-local identifier, not owned by zellij or Codex |
 | `ZellijSessionRef` | Zellij Integration context | `zellij` runtime; `zelma` records observed refs | CLI, skills | External fact, not owned by registry |
 | `ZellijPaneRef` | Zellij Integration context | `zellij` runtime; `zelma` records observed refs | CLI, skills | Must be revalidated before control actions |
 | `CodexSessionRef` | Codex Runtime context | Codex runtime; `zelma` records identified refs | CLI, skills | Identification strategy may evolve |

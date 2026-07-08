@@ -29,6 +29,7 @@ canonical_for:
 | `DR-06` | `OpenedPath` stored in registry MUST be normalized and absolute | `OpenedPath` | Relative paths become ambiguous across shells and skills | Domain decision |
 | `DR-07` | Any registry schema change MUST be versioned or migrated | `SessionRegistry` | Skills and older CLI versions need stable contracts | Product metric guardrail |
 | `DR-08` | A `DetectionCandidate` without required Codex identity MUST remain non-active until resolved | Detection lifecycle | Сохраняет смысл active `zelma session` | Domain decision |
+| `DR-09` | Every persisted `ZelmaSession` MUST have a positive repo-local numeric `id`, unique within `.zelma/sessions.json` | `SessionRegistry` | Пользователь и future commands должны ссылаться на короткий stable identifier | User request `2026-07-08` |
 
 ## Policies
 

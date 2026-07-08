@@ -22,6 +22,7 @@ canonical_for:
 | --- | --- | --- | --- |
 | `zelma` | CLI-утилита и набор Codex skills для управления Codex-сессиями в `zellij panes` | Product, CLI, skills | `zellij`, Codex CLI |
 | `zelma session` | Управляемая запись о Codex-сессии, запущенной в конкретном `zellij pane`, с привязкой к `zellij session`, `zellij pane`, `codex session` и opened path | Registry, CLI output, domain rules | `zellij session`, `codex session` |
+| `zelma session id` | Positive integer `id` записи `zelma session`, уникальный внутри repo-local `.zelma/sessions.json` и начинающийся с `1` | Registry, CLI output, future commands | `zellij session`, `codex session`, global database ID |
 | `session registry` | Repo-local JSON-файл `.zelma/sessions.json`, который хранит known `zelma sessions` | Persistence, list/create/detect | Codex session log, zellij layout |
 | `zellij session` | Runtime session терминального мультиплексора `zellij`, внутри которой существуют panes | Zellij adapter, session refs | `zelma session` |
 | `zellij pane` | Pane внутри `zellij session`, в котором может быть запущен Codex | Create/detect/list | Terminal tab, Codex session |

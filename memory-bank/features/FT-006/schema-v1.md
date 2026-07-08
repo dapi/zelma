@@ -34,6 +34,7 @@ feature scope and acceptance criteria remain in [brief.md](brief.md).
 | --- | --- | --- | --- |
 | `version` | integer | yes | Schema version. FT-006 supports only `1`. |
 | `sessions` | array | yes | Registry records for known `zelma sessions`. Empty is valid. |
+| `sessions[].id` | integer | yes | Positive repo-local `ZelmaSessionID`, unique within this registry. Old records without `id` are backfilled by the CLI. |
 | `sessions[].zellij_session` | string | yes | External `zellij session` reference. |
 | `sessions[].zellij_tab` | string | no | External `zellij tab` reference observed from `list-panes`, formatted as `tab_<id>`. |
 | `sessions[].zellij_tab_name` | string | no | Human-readable zellij tab name observed with the pane. |
@@ -48,6 +49,9 @@ feature scope and acceptance criteria remain in [brief.md](brief.md).
 - `version` must be `1`.
 - `sessions` must be present, and may be empty.
 - Session record fields must be present.
+- `id` must be a positive integer and unique within the registry.
+- Registry records created before `id` existed are accepted; the CLI assigns
+  positive IDs in memory and writes them on the next mutating registry update.
 - `zellij_session` and `zellij_pane` must be non-empty.
 - `zellij_tab` and `zellij_tab_name` are optional for backward compatibility
   with registry records created before tab metadata was stored.

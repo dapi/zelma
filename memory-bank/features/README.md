@@ -118,3 +118,5 @@ audience: humans_and_agents
   `CodexSessionRef` из `codex resume <uuid>` и wrapper-provided external UUID.
 - [FT-044: Detect Evidence Explain And Indexed Lookup](FT-044/README.md) —
   one-pass Codex evidence lookup и `sessions detect --explain`.
+- [FT-045: Numeric Zelma Session IDs](FT-045/README.md) — короткий repo-local
+  numeric `id` для каждой `zelma session`, начиная с `1`.

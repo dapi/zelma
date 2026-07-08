@@ -2,6 +2,7 @@
   "version": 1,
   "sessions": [
     {
+      "id": 1,
       "zellij_session": "zelma-main",
       "zellij_pane": "1",
       "codex_session": "codex-2026-07-07T10-00-00Z-a1b2",
