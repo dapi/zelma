@@ -1,8 +1,8 @@
 ---
-title: "PROMPT-005: Start Issue Shipping Supervisor"
+title: "PROMPT-005: Start Issue Shipper"
 doc_kind: prompt
 doc_function: canonical
-purpose: "Хранит reusable prompt для supervisor-сессии, которая запускает start-issue в zellij и доводит issue до reviewed, green, mergeable and merged PR."
+purpose: "Хранит reusable prompt для single-issue shipper-сессии, которая запускает start-issue в zellij и доводит issue до reviewed, green, mergeable and merged PR."
 derived_from:
   - ../dna/governance.md
   - ../epics/EP-008/brief.md
@@ -26,7 +26,7 @@ variables:
     description: "PR base branch."
   - name: REPO_PATH
     required: false
-    description: "Local repository path for supervisor commands."
+    description: "Local repository path for shipper commands."
   - name: START_ISSUE_BASE
     required: false
     description: "Optional explicit base ref/SHA passed to start-issue."
@@ -38,7 +38,7 @@ variables:
     description: "Resolved launch surface for the task agent inside the current zellij session: pane or tab. Resolved from env, .zelma/config.json, then default."
   - name: AUTO_MERGE
     required: true
-    description: "Whether supervisor may merge after all gates pass: yes or no."
+    description: "Whether shipper may merge after all gates pass: yes or no."
   - name: PROMPT_FILE
     required: false
     description: "Optional start-issue prompt file override."
@@ -53,18 +53,17 @@ model_notes:
   tools: "repo, git, gh, zellij, desktop_notification"
 ---
 
-# PROMPT-005: Start Issue Shipping Supervisor
+# PROMPT-005: Start Issue Shipper
 
 ## When To Use
 
-Используй этот prompt в отдельной single-issue shipping supervisor сессии
-или shipper tab, когда нужно запустить `start-issue` для одного GitHub issue
-в новой zellij pane по умолчанию, либо в tab только по явному запросу
-пользователя, и автономно довести delivery до clean review, green CI,
-mergeable PR and merge.
+Используй этот prompt в отдельной single-issue shipper сессии или shipper tab,
+когда нужно запустить `start-issue` для одного GitHub issue в новой zellij pane
+по умолчанию, либо в tab только по явному запросу пользователя, и автономно
+довести delivery до clean review, green CI, mergeable PR and merge.
 
 Если нужно вести несколько issues волнами, top-level orchestrator сначала
-читает `memory-bank/ops/runbooks/visible-zellij-shipping-supervisor.md`, а
+читает `memory-bank/ops/runbooks/visible-zellij-shipping-orchestrator.md`, а
 затем запускает отдельную shipper tab с этим prompt для каждого issue.
 
 Не используй его для одноразовой локальной проверки уже готовой ветки без
@@ -74,7 +73,7 @@ zellij/start-issue lifecycle.
 
 ```prompt
 <role>
-Ты single-issue shipping supervisor, также называемый shipper, для delivery через `start-issue`. Твоя задача - взять указанную GitHub issue, запустить разработку через `start-issue` в новой zellij pane по умолчанию, либо в tab только если пользователь явно указал это, и довести результат до terminal outcome: merged PR либо явный blocker/max-cycles.
+Ты single-issue shipper для delivery через `start-issue`. Твоя задача - взять указанную GitHub issue, запустить разработку через `start-issue` в новой zellij pane по умолчанию, либо в tab только если пользователь явно указал это, и довести результат до terminal outcome: merged PR либо явный blocker/max-cycles.
 </role>
 
 <input>
@@ -127,7 +126,7 @@ Success is allowed only when all conditions are true:
 1. Preflight:
    - Change to `REPO_PATH` if provided.
    - Read repo instructions such as `AGENTS.md` if present.
-   - Read `memory-bank/ops/runbooks/visible-zellij-shipping-supervisor.md` when it exists and follow it as the operational runbook for visible zellij shipping.
+   - Read `memory-bank/ops/runbooks/visible-zellij-shipping-orchestrator.md` when it exists and follow it as the operational runbook for visible zellij shipping.
    - Do not change the branch in the main repository worktree. The main worktree must stay on `BASE_BRANCH`; implementation must happen only in worktrees created by `start-issue` or explicit `git worktree add`.
    - Do not use invisible/native subagents as a fallback for shipping when the caller expects zellij-visible tab/pane output. If zellij cannot create or inspect the required tab/pane, stop with a blocker unless the caller explicitly authorizes a non-zellij fallback.
    - Resolve the zellij launch surface:
@@ -232,7 +231,7 @@ Success is allowed only when all conditions are true:
      `zellij action close-pane --pane-id <pane_id>`
    - If `ZELLIJ_SURFACE=tab`, close the created task tab by `tab_id`; do not close the currently focused tab by accident.
    - Send desktop notification:
-     `osascript -e 'display notification "Issue {{ISSUE_NUMBER}} terminal outcome reached" with title "start-issue supervisor"'`
+     `osascript -e 'display notification "Issue {{ISSUE_NUMBER}} terminal outcome reached" with title "start-issue shipper"'`
 </instructions>
 
 <constraints>
@@ -279,7 +278,7 @@ Return a concise final report:
 | `START_ISSUE_BASE` | no | Explicit base ref/SHA for `start-issue`. | `origin/main` |
 | `AGENT` | no | Agent backend for `start-issue`. | `codex` |
 | `ZELLIJ_SURFACE` | no | Resolved current-session zellij surface for the task agent. Source order: `ZELMA_START_ISSUE_ZELLIJ_SURFACE`, `.zelma/config.json`, default `pane`. | `pane` |
-| `AUTO_MERGE` | yes | Whether supervisor may merge after gates pass. | `yes` |
+| `AUTO_MERGE` | yes | Whether shipper may merge after gates pass. | `yes` |
 | `PROMPT_FILE` | no | Optional start-issue prompt override file. | `.zelma/prompts/ship-issue.md` |
 | `MAX_REVIEW_CYCLES` | no | Review/fix loop limit. | `5` |
 | `MAX_CI_CYCLES` | no | CI/fix loop limit. | `3` |
@@ -304,4 +303,4 @@ Return a concise final report:
 - 2026-07-07: Added fast 3-second polling for `/review` preset/base/model quiz prompts.
 - 2026-07-07: Added model policy: implementation/fixes on `GPT-5.5 medium`, `/review` gates on `GPT-5.5 Extra high`.
 - 2026-07-07: Added delivery-mode preflight so implementation issues run through `PROMPT-003` before PR review/fix cycles.
-- 2026-07-07: Created reusable generic supervisor prompt from live FT-001 delivery workflow; repository-specific values were converted to variables.
+- 2026-07-07: Created reusable generic shipper prompt from live FT-001 delivery workflow; repository-specific values were converted to variables.

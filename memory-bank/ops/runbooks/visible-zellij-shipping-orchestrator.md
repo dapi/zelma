@@ -1,5 +1,5 @@
 ---
-title: Visible Zellij Shipping Supervisor
+title: Visible Zellij Shipping Orchestrator
 doc_kind: ops
 doc_function: runbook
 purpose: Типовой алгоритм запуска issue shipping через видимые zellij tab/pane, git worktree и start-issue.
@@ -11,7 +11,7 @@ status: active
 audience: humans_and_agents
 ---
 
-# Visible Zellij Shipping Supervisor
+# Visible Zellij Shipping Orchestrator
 
 ## Summary
 
