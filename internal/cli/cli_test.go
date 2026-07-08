@@ -77,8 +77,8 @@ func TestAgentFirstHelpOrder(t *testing.T) {
 			assertBefore(t, output, "COMMAND MAP\n", "HUMAN NOTES\n")
 			assertBefore(t, output, "COMMAND MAP\n", "Usage:\n")
 			assertBefore(t, output, "OUTPUT CONVENTIONS\n", "HUMAN NOTES\n")
-			if !strings.Contains(output, "Status: partial") {
-				t.Fatalf("stdout = %q, want explicit partial status", output)
+			if !strings.Contains(output, "Status: implemented") {
+				t.Fatalf("stdout = %q, want explicit implemented status", output)
 			}
 		})
 	}
@@ -307,7 +307,7 @@ const rootHelpSnapshot = `COMMAND MAP
   zelma setup             Add .zelma to this repository .gitignore. Status: implemented.
   zelma sessions help     Show the sessions command map.
   zelma sessions list     List known zelma sessions. Status: implemented.
-  zelma sessions create   Resolve Codex launch contract. Status: partial.
+  zelma sessions create   Create and register a confirmed Codex pane. Status: implemented.
   zelma sessions detect   Detect existing Codex panes. Status: implemented.
 
 OUTPUT CONVENTIONS
@@ -317,7 +317,7 @@ OUTPUT CONVENTIONS
   sessions list: stdout, exit 0, table by default or schema v1 JSON with --json.
   sessions detect: stdout, exit 0, summary or JSON with --json.
   sessions create --dry-run: stdout, exit 0, launch contract text or JSON.
-  sessions create without --dry-run: stderr, exit 1 until zellij pane creation lands.
+  sessions create: stdout, exit 0, created/registered/skipped summary.
   machine-readable session data: use "zelma sessions list --json".
 
 RECOVERY HINTS
@@ -337,15 +337,15 @@ Usage:
 const sessionsHelpSnapshot = `COMMAND MAP
   zelma sessions help     Show this sessions command map.
   zelma sessions list     List known zelma sessions. Status: implemented.
-  zelma sessions create   Resolve Codex launch contract. Status: partial.
+  zelma sessions create   Create and register a confirmed Codex pane. Status: implemented.
   zelma sessions detect   Detect existing Codex panes. Status: implemented.
 
 OUTPUT CONVENTIONS
   help output: stdout, exit 0, plain text.
   list: stdout, exit 0, table by default or schema v1 JSON with --json.
   create --dry-run: stdout, exit 0, resolved Codex command/opened path.
+  create: stdout, exit 0, created/registered/skipped summary.
   detect: stdout, exit 0, added/unchanged/skipped summary or JSON with --json.
-  create without --dry-run: stderr, exit 1, zellij pane creation pending.
   sessions registry output: preserves zellij_session, zellij_pane,
   codex_session, opened_path and state fields.
 
@@ -423,6 +423,99 @@ func TestSessionsCreateMissingCodexDoesNotWriteRegistry(t *testing.T) {
 	}
 	if _, err := os.Stat(registry.RegistryPath(root)); !os.IsNotExist(err) {
 		t.Fatalf("registry path stat error = %v, want not exist", err)
+	}
+}
+
+func TestSessionsCreateRegistersConfirmedCandidateRecord(t *testing.T) {
+	root := newTestGitRepo(t)
+	paneRoot := resolvedPath(t, root)
+	fakeCodex := writeFakeCodex(t)
+	t.Setenv("ZELMA_CODEX_BIN", fakeCodex)
+	t.Setenv("ZELMA_ZELLIJ_BIN", writeFakeCreateZellij(t, "terminal_7", panesJSONWithID(7, paneRoot, fakeCodex+" --cd "+paneRoot, true)))
+	t.Chdir(root)
+
+	var stdout, stderr bytes.Buffer
+
+	code := Run(context.Background(), []string{"sessions", "create"}, &stdout, &stderr)
+
+	if code != 0 {
+		t.Fatalf("Run() code = %d, want 0; stderr = %q", code, stderr.String())
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("stderr = %q, want empty", stderr.String())
+	}
+	if stdout.String() != "created=1 registered=1 skipped=0\n" {
+		t.Fatalf("stdout = %q, want create summary", stdout.String())
+	}
+
+	got := readRegistry(t, root)
+	if len(got.Sessions) != 1 {
+		t.Fatalf("len(Sessions) = %d, want 1", len(got.Sessions))
+	}
+	want := registry.Session{
+		ZellijSession: "zelma-main",
+		ZellijPane:    "terminal_7",
+		CodexSession:  "",
+		OpenedPath:    paneRoot,
+		State:         registry.StateCandidate,
+	}
+	if got.Sessions[0] != want {
+		t.Fatalf("session = %+v, want %+v", got.Sessions[0], want)
+	}
+}
+
+func TestSessionsCreateUnconfirmedPaneDoesNotWriteRegistry(t *testing.T) {
+	root := newTestGitRepo(t)
+	paneRoot := resolvedPath(t, root)
+	fakeCodex := writeFakeCodex(t)
+	t.Setenv("ZELMA_CODEX_BIN", fakeCodex)
+	t.Setenv("ZELMA_ZELLIJ_BIN", writeFakeCreateZellij(t, "terminal_7", panesJSONWithID(7, paneRoot, "/bin/zsh", false)))
+	t.Chdir(root)
+
+	var stdout, stderr bytes.Buffer
+
+	code := Run(context.Background(), []string{"sessions", "create"}, &stdout, &stderr)
+
+	if code != 0 {
+		t.Fatalf("Run() code = %d, want 0; stderr = %q", code, stderr.String())
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("stderr = %q, want empty", stderr.String())
+	}
+	if stdout.String() != "created=1 registered=0 skipped=1\n" {
+		t.Fatalf("stdout = %q, want skipped summary", stdout.String())
+	}
+	if _, err := os.Stat(registry.RegistryPath(root)); !os.IsNotExist(err) {
+		t.Fatalf("registry path stat error = %v, want not exist", err)
+	}
+}
+
+func TestSessionsCreateJSONSummary(t *testing.T) {
+	root := newTestGitRepo(t)
+	paneRoot := resolvedPath(t, root)
+	fakeCodex := writeFakeCodex(t)
+	t.Setenv("ZELMA_CODEX_BIN", fakeCodex)
+	t.Setenv("ZELMA_ZELLIJ_BIN", writeFakeCreateZellij(t, "terminal_3", panesJSONWithID(3, paneRoot, fakeCodex+" --cd "+paneRoot, true)))
+	t.Chdir(root)
+
+	var stdout, stderr bytes.Buffer
+
+	code := Run(context.Background(), []string{"sessions", "create", "--json"}, &stdout, &stderr)
+
+	if code != 0 {
+		t.Fatalf("Run() code = %d, want 0; stderr = %q", code, stderr.String())
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("stderr = %q, want empty", stderr.String())
+	}
+	want := `{
+  "created": 1,
+  "registered": 1,
+  "skipped": 0
+}
+`
+	if stdout.String() != want {
+		t.Fatalf("stdout mismatch\nwant:\n%s\ngot:\n%s", want, stdout.String())
 	}
 }
 
@@ -901,10 +994,34 @@ exit 2
 	return path
 }
 
+func writeFakeCreateZellij(t *testing.T, paneID, panesJSON string) string {
+	t.Helper()
+
+	path := filepath.Join(t.TempDir(), "fake-zellij")
+	script := `#!/bin/sh
+if [ "$1" = "--session" ] && [ "$2" = "zelma-main" ] && [ "$3" = "run" ]; then
+  printf '%s\n' '` + paneID + `'
+  exit 0
+fi
+if [ "$1" = "--session" ] && [ "$2" = "zelma-main" ] && [ "$3" = "action" ] && [ "$4" = "list-panes" ]; then
+  cat <<'JSON'
+` + panesJSON + `
+JSON
+  exit 0
+fi
+printf 'unexpected fake zellij args: %s\n' "$*" >&2
+exit 2
+`
+	if err := os.WriteFile(path, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
 func writeFakeCodex(t *testing.T) string {
 	t.Helper()
 
-	path := filepath.Join(t.TempDir(), "fake-codex")
+	path := filepath.Join(t.TempDir(), "codex")
 	script := "#!/bin/sh\nexit 0\n"
 	if err := os.WriteFile(path, []byte(script), 0o755); err != nil {
 		t.Fatal(err)
@@ -914,14 +1031,20 @@ func writeFakeCodex(t *testing.T) string {
 
 func panesJSON(cwd string, codex bool) string {
 	command := "/bin/zsh"
-	title := "shell"
 	if codex {
 		command = "/usr/local/bin/codex --cd " + cwd
+	}
+	return panesJSONWithID(1, cwd, command, codex)
+}
+
+func panesJSONWithID(id int, cwd, command string, codex bool) string {
+	title := "shell"
+	if codex {
 		title = "codex"
 	}
 	return fmt.Sprintf(`[
   {
-    "id": 1,
+    "id": %d,
     "is_plugin": false,
     "title": %q,
     "is_focused": true,
@@ -934,7 +1057,7 @@ func panesJSON(cwd string, codex bool) string {
     "pane_command": %q,
     "pane_cwd": %q
   }
-]`, title, command, cwd)
+]`, id, title, command, cwd)
 }
 
 func readRegistry(t *testing.T, root string) registry.Registry {

@@ -42,6 +42,7 @@ contracts важны для CLI, registry и external binaries.
 | Setting | Env variable |
 | --- | --- |
 | zellij binary path override | `ZELMA_ZELLIJ_BIN` |
+| zellij session target override | `ZELMA_ZELLIJ_SESSION` |
 | codex binary path override | `ZELMA_CODEX_BIN` |
 | registry path override | `ZELMA_REGISTRY_PATH` |
 
@@ -60,6 +61,7 @@ Rules:
 | Variable | Description | Default | Owner |
 | --- | --- | --- | --- |
 | `ZELMA_ZELLIJ_BIN` | Optional path/name for zellij executable | `zellij` via `PATH` | `zellij-adapter` |
+| `ZELMA_ZELLIJ_SESSION` | Optional target session for `sessions create` pane creation | `zelma-main` | `cli` + `zellij-adapter` |
 | `ZELMA_CODEX_BIN` | Optional path/name for Codex executable | `codex` via `PATH` | `codex-adapter` |
 | `ZELMA_REGISTRY_PATH` | Optional registry file path for tests/recovery | `.zelma/sessions.json` | `registry` |
 

@@ -16,3 +16,6 @@ audience: humans_and_agents
 
 - [Brief](brief.md)
   Читать, когда нужно понять confirmation/reconciliation после create.
+- [Design](design.md)
+  Читать, когда нужно понять выбранный create confirmation и registry write
+  contract.
