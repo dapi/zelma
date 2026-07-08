@@ -111,6 +111,11 @@ func TestHelpRoutes(t *testing.T) {
 			wantOutput: []string{"Usage:", "zelma sessions detect"},
 		},
 		{
+			name:       "sessions focus",
+			args:       []string{"sessions", "focus", "--help"},
+			wantOutput: []string{"Usage:", "zelma sessions focus"},
+		},
+		{
 			name:       "sessions cleanup",
 			args:       []string{"sessions", "cleanup", "--help"},
 			wantOutput: []string{"Usage:", "zelma sessions cleanup"},
@@ -158,6 +163,11 @@ func TestCommandHelpSnapshots(t *testing.T) {
 			name: "sessions detect help",
 			args: []string{"sessions", "detect", "--help"},
 			want: sessionsDetectHelp,
+		},
+		{
+			name: "sessions focus help",
+			args: []string{"sessions", "focus", "--help"},
+			want: sessionsFocusHelp,
 		},
 		{
 			name: "sessions cleanup help",
@@ -319,6 +329,7 @@ const rootHelpSnapshot = `COMMAND MAP
   zelma sessions list     List known zelma sessions. Status: implemented.
   zelma sessions create   Create and register a confirmed Codex pane. Status: implemented.
   zelma sessions detect   Detect existing Codex panes. Status: implemented.
+  zelma sessions focus    Focus a known zellij pane by zelma session ID. Status: implemented.
   zelma sessions cleanup  Propose or confirm stale record cleanup. Status: implemented.
 
 OUTPUT CONVENTIONS
@@ -329,6 +340,7 @@ OUTPUT CONVENTIONS
   add --live to include live/unreachable zellij status without registry writes.
   sessions detect: stdout, exit 0, summary with active/candidate/stale counts,
   stale reason lines when found, or JSON with --json.
+  sessions focus: stdout, exit 0, focused summary or JSON with --json.
   sessions cleanup: stdout, exit 0, stale cleanup proposal by default; add
   --confirm to remove proposed stale records.
   sessions create --dry-run: stdout, exit 0, launch contract text or JSON.
@@ -355,6 +367,7 @@ const sessionsHelpSnapshot = `COMMAND MAP
   zelma sessions list     List known zelma sessions. Status: implemented.
   zelma sessions create   Create and register a confirmed Codex pane. Status: implemented.
   zelma sessions detect   Detect existing Codex panes. Status: implemented.
+  zelma sessions focus    Focus a known zellij pane by zelma session ID. Status: implemented.
   zelma sessions cleanup  Propose or confirm stale record cleanup. Status: implemented.
 
 OUTPUT CONVENTIONS
@@ -365,6 +378,7 @@ OUTPUT CONVENTIONS
   create: stdout, exit 0, created/registered/skipped summary.
   detect: stdout, exit 0, added/unchanged/skipped summary with
   active/candidate/stale counts, stale reasons when found, or JSON with --json.
+  focus: stdout, exit 0, focused summary or focused session JSON with --json.
   cleanup: stdout, exit 0, proposed/removed/kept summary with stale records;
   without --confirm, does not mutate registry.
   sessions registry output: preserves id, zellij_session, zellij_pane,
@@ -374,12 +388,14 @@ RECOVERY HINTS
   inventory task: inspect "zelma sessions list --help".
   managed create task: inspect "zelma sessions create --help".
   manual detect task: inspect "zelma sessions detect --help".
+  focus task: inspect "zelma sessions focus --help".
 
 HUMAN NOTES
   sessions list reads .zelma/sessions.json; --live checks current zellij panes
   without registry writes. detect inspects live zellij panes and only upserts
-  unresolved candidate records. cleanup removes stale records only after
-  explicit --confirm.
+  unresolved candidate records. focus switches zellij UI to a stored pane and
+  does not mutate registry. cleanup removes stale records only after explicit
+  --confirm.
 
 Usage:
   zelma sessions [command]
@@ -1377,6 +1393,153 @@ func TestSessionsDetectJSONSummary(t *testing.T) {
 	}
 }
 
+func TestSessionsFocusByIDRunsZellijFocusActions(t *testing.T) {
+	root := newTestGitRepo(t)
+	openedPath := resolvedPath(t, root)
+	writeRegistryFile(t, root, fmt.Sprintf(`{
+  "version": 1,
+  "sessions": [
+    {
+      "id": 1,
+      "zellij_session": "zelma-main",
+      "zellij_tab": "tab_1",
+      "zellij_pane": "terminal_1",
+      "codex_session": "",
+      "opened_path": %q,
+      "state": "candidate"
+    },
+    {
+      "id": 2,
+      "zellij_session": "zelma-main",
+      "zellij_tab": "tab_6",
+      "zellij_pane": "terminal_75",
+      "codex_session": "11111111-1111-4111-8111-111111111111",
+      "opened_path": %q,
+      "state": "active"
+    }
+  ]
+}
+`, openedPath, openedPath))
+	registryPath := registry.RegistryPath(root)
+	before := readFile(t, registryPath)
+	calls := filepath.Join(t.TempDir(), "zellij-calls.txt")
+	t.Setenv("ZELMA_ZELLIJ_BIN", writeFakeFocusZellij(t, calls))
+	t.Chdir(root)
+
+	var stdout, stderr bytes.Buffer
+
+	code := Run(context.Background(), []string{"sessions", "focus", "2"}, &stdout, &stderr)
+
+	if code != 0 {
+		t.Fatalf("Run() code = %d, want 0; stderr = %q", code, stderr.String())
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("stderr = %q, want empty", stderr.String())
+	}
+	wantStdout := "focused id=2 state=active zellij_session=zelma-main zellij_tab=tab_6 zellij_pane=terminal_75\n"
+	if stdout.String() != wantStdout {
+		t.Fatalf("stdout = %q, want %q", stdout.String(), wantStdout)
+	}
+	wantCalls := "--session zelma-main action go-to-tab-by-id 6\n" +
+		"--session zelma-main action focus-pane-id terminal_75\n"
+	if gotCalls := readFile(t, calls); gotCalls != wantCalls {
+		t.Fatalf("zellij calls = %q, want %q", gotCalls, wantCalls)
+	}
+	after := readFile(t, registryPath)
+	if after != before {
+		t.Fatalf("registry changed by focus\nbefore:\n%s\nafter:\n%s", before, after)
+	}
+}
+
+func TestSessionsFocusJSONOutput(t *testing.T) {
+	root := newTestGitRepo(t)
+	openedPath := resolvedPath(t, root)
+	writeRegistryFile(t, root, fmt.Sprintf(`{
+  "version": 1,
+  "sessions": [
+    {
+      "id": 2,
+      "zellij_session": "zelma-main",
+      "zellij_tab": "tab_6",
+      "zellij_pane": "terminal_75",
+      "codex_session": "11111111-1111-4111-8111-111111111111",
+      "opened_path": %q,
+      "state": "active"
+    }
+  ]
+}
+`, openedPath))
+	t.Setenv("ZELMA_ZELLIJ_BIN", writeFakeFocusZellij(t, filepath.Join(t.TempDir(), "zellij-calls.txt")))
+	t.Chdir(root)
+
+	var stdout, stderr bytes.Buffer
+
+	code := Run(context.Background(), []string{"sessions", "focus", "2", "--json"}, &stdout, &stderr)
+
+	if code != 0 {
+		t.Fatalf("Run() code = %d, want 0; stderr = %q", code, stderr.String())
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("stderr = %q, want empty", stderr.String())
+	}
+	want := fmt.Sprintf(`{
+  "id": 2,
+  "zellij_session": "zelma-main",
+  "zellij_tab": "tab_6",
+  "zellij_pane": "terminal_75",
+  "codex_session": "11111111-1111-4111-8111-111111111111",
+  "opened_path": %q,
+  "state": "active"
+}
+`, openedPath)
+	if stdout.String() != want {
+		t.Fatalf("stdout mismatch\nwant:\n%s\ngot:\n%s", want, stdout.String())
+	}
+}
+
+func TestSessionsFocusRejectsInvalidID(t *testing.T) {
+	root := newTestGitRepo(t)
+	t.Chdir(root)
+
+	var stdout, stderr bytes.Buffer
+
+	code := Run(context.Background(), []string{"sessions", "focus", "nope"}, &stdout, &stderr)
+
+	if code != 1 {
+		t.Fatalf("Run() code = %d, want 1", code)
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("stdout = %q, want empty", stdout.String())
+	}
+	if !strings.Contains(stderr.String(), `invalid session id "nope"`) {
+		t.Fatalf("stderr = %q, want invalid id diagnostic", stderr.String())
+	}
+}
+
+func TestSessionsFocusReportsMissingID(t *testing.T) {
+	root := newTestGitRepo(t)
+	writeRegistryFile(t, root, `{
+  "version": 1,
+  "sessions": []
+}
+`)
+	t.Chdir(root)
+
+	var stdout, stderr bytes.Buffer
+
+	code := Run(context.Background(), []string{"sessions", "focus", "99"}, &stdout, &stderr)
+
+	if code != 1 {
+		t.Fatalf("Run() code = %d, want 1", code)
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("stdout = %q, want empty", stdout.String())
+	}
+	if !strings.Contains(stderr.String(), "session id 99 not found") {
+		t.Fatalf("stderr = %q, want not-found diagnostic", stderr.String())
+	}
+}
+
 func TestSessionsCleanupProposalDoesNotMutateRegistry(t *testing.T) {
 	root := newTestGitRepo(t)
 	openedPath := resolvedPath(t, root)
@@ -1736,6 +1899,28 @@ func writeFakeZellijListSessionsFailure(t *testing.T) string {
 if [ "$1" = "list-sessions" ]; then
   printf 'zellij server temporarily unavailable\n' >&2
   exit 2
+fi
+printf 'unexpected fake zellij args: %s\n' "$*" >&2
+exit 2
+`
+	if err := os.WriteFile(path, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
+func writeFakeFocusZellij(t *testing.T, callsPath string) string {
+	t.Helper()
+
+	path := filepath.Join(t.TempDir(), "fake-zellij")
+	script := `#!/bin/sh
+if [ "$1" = "--session" ] && [ "$2" = "zelma-main" ] && [ "$3" = "action" ] && [ "$4" = "go-to-tab-by-id" ] && [ "$5" = "6" ]; then
+  printf '%s\n' "$*" >> '` + callsPath + `'
+  exit 0
+fi
+if [ "$1" = "--session" ] && [ "$2" = "zelma-main" ] && [ "$3" = "action" ] && [ "$4" = "focus-pane-id" ] && [ "$5" = "terminal_75" ]; then
+  printf '%s\n' "$*" >> '` + callsPath + `'
+  exit 0
 fi
 printf 'unexpected fake zellij args: %s\n' "$*" >&2
 exit 2

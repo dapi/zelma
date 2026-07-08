@@ -26,12 +26,12 @@ Skills должны помогать агентам управлять sessions,
 
 ### Результат
 
-Codex skills вызывают `zelma sessions list/create/detect` и интерпретируют
+Codex skills вызывают `zelma sessions list/create/detect/focus` и интерпретируют
 стабильный CLI contract.
 
 ### Объем Работ
 
-- `REQ-01` Создать wrappers для list/create/detect.
+- `REQ-01` Создать wrappers для list/create/detect/focus.
 - `REQ-02` Обрабатывать exit codes и diagnostics CLI.
 - `REQ-03` Не дублировать registry или zellij logic внутри skills.
 

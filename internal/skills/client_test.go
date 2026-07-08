@@ -155,6 +155,32 @@ func TestDetectSessionsInvokesZelmaCLI(t *testing.T) {
 	}
 }
 
+func TestFocusSessionInvokesZelmaCLI(t *testing.T) {
+	root := t.TempDir()
+	stdout := writeFile(t, root, "stdout.json", `{
+  "id": 2,
+  "zellij_session": "zelma-main",
+  "zellij_tab": "tab_6",
+  "zellij_pane": "terminal_75",
+  "codex_session": "11111111-1111-4111-8111-111111111111",
+  "opened_path": "/workspace/zelma",
+  "state": "active"
+}
+`)
+	calls := filepath.Join(root, "calls.txt")
+	client := fakeCLIClient(t, root, stdout, "", "0", calls)
+
+	got, err := client.FocusSession(context.Background(), 2)
+
+	if err != nil {
+		t.Fatalf("FocusSession() error = %v", err)
+	}
+	assertCall(t, calls, root, "sessions", "focus", "2", "--json")
+	if got.ID != 2 || got.ZellijPane != "terminal_75" || got.State != "active" {
+		t.Fatalf("FocusSession() = %+v, want focused active session 2", got)
+	}
+}
+
 func TestCommandErrorPreservesDiagnosticsAndRecovery(t *testing.T) {
 	root := t.TempDir()
 	stderr := writeFile(t, root, "stderr.txt", "zelma sessions list: registry_unsupported_version: unsupported schema version 2\n")

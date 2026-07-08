@@ -28,6 +28,8 @@
   уже запущен Codex, и регистрирует их в `.zelma/sessions.json`.
 - `zelma sessions list` — показывает известные `zelma sessions` для текущего
   репозитория.
+- `zelma sessions focus <id>` — переключает `zellij` на tab/pane известной
+  `zelma session`.
 
 `sessions create` покрывает controlled workflow, где `zelma` создает pane сама.
 `sessions detect` покрывает real-world workflow, где пользователь сначала

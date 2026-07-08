@@ -11,6 +11,7 @@ derived_from:
   - ../features/FT-027/brief.md
   - ../features/FT-028/brief.md
   - ../features/FT-029/brief.md
+  - ../features/FT-046/brief.md
 status: active
 audience: humans_and_agents
 ---
@@ -36,6 +37,7 @@ The skill should choose commands from the user's intent:
 | Create a managed Codex pane | `zelma sessions create [path] --json` | Controlled workflow that creates and registers a confirmed pane. |
 | Preview create inputs | `zelma sessions create [path] --dry-run --json` | Resolve Codex command and opened path without side effects. |
 | Register manually created Codex panes | `zelma sessions detect --json` | Detect live zellij panes and upsert candidate or active records. |
+| Focus a known session pane | `zelma sessions focus <id> --json` | Switch zellij UI to a registry-backed tab/pane without registry mutation. |
 | Review stale cleanup | `zelma sessions cleanup --json` | Propose stale records without mutation. |
 | Remove stale records after explicit user intent | `zelma sessions cleanup --confirm --json` | Mutating cleanup for records already marked `stale`. |
 
@@ -64,6 +66,7 @@ Output is schema v1 registry JSON:
   "version": 1,
   "sessions": [
     {
+      "id": 1,
       "zellij_session": "zelma-main",
       "zellij_tab": "tab_1",
       "zellij_tab_name": "work",
@@ -143,6 +146,26 @@ evidence diagnostics. The output adds optional `candidate_explanations` records
 with zellij identity, `opened_path`, `codex_session` when resolved, and
 `evidence_verdict` / `evidence_source` / `evidence_reason`. Default
 `--json` omits this field for compatibility.
+
+### `zelma sessions focus <id> --json`
+
+Reads the registry, finds the record by positive repo-local `id`, and sends
+zellij focus actions through `zelma`. This command changes zellij UI focus but
+does not mutate `.zelma/sessions.json`.
+
+The successful JSON object is the focused session record:
+
+```json
+{
+  "id": 2,
+  "zellij_session": "zelma-main",
+  "zellij_tab": "tab_6",
+  "zellij_pane": "terminal_75",
+  "codex_session": "11111111-1111-4111-8111-111111111111",
+  "opened_path": "/workspace/zelma",
+  "state": "active"
+}
+```
 
 ### `zelma sessions cleanup --json`
 
