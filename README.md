@@ -61,6 +61,87 @@ git push origin v0.1.0
 The release workflow builds Linux, macOS and Windows archives and publishes them
 to <https://github.com/dapi/zelma/releases> with `SHA256SUMS.txt`.
 
+## Installation
+
+Download a versioned binary from
+<https://github.com/dapi/zelma/releases>. Replace `v0.1.0` with the version you
+want to install.
+
+### macOS
+
+Apple Silicon:
+
+```bash
+version=v0.1.0
+curl -LO "https://github.com/dapi/zelma/releases/download/${version}/zelma_${version}_darwin_arm64.tar.gz"
+curl -LO "https://github.com/dapi/zelma/releases/download/${version}/SHA256SUMS.txt"
+shasum -a 256 -c SHA256SUMS.txt --ignore-missing
+tar -xzf "zelma_${version}_darwin_arm64.tar.gz"
+sudo install -m 0755 "zelma_${version}_darwin_arm64/zelma" /usr/local/bin/zelma
+zelma help
+```
+
+Intel:
+
+```bash
+version=v0.1.0
+curl -LO "https://github.com/dapi/zelma/releases/download/${version}/zelma_${version}_darwin_amd64.tar.gz"
+curl -LO "https://github.com/dapi/zelma/releases/download/${version}/SHA256SUMS.txt"
+shasum -a 256 -c SHA256SUMS.txt --ignore-missing
+tar -xzf "zelma_${version}_darwin_amd64.tar.gz"
+sudo install -m 0755 "zelma_${version}_darwin_amd64/zelma" /usr/local/bin/zelma
+zelma help
+```
+
+### Linux
+
+x86_64:
+
+```bash
+version=v0.1.0
+curl -LO "https://github.com/dapi/zelma/releases/download/${version}/zelma_${version}_linux_amd64.tar.gz"
+curl -LO "https://github.com/dapi/zelma/releases/download/${version}/SHA256SUMS.txt"
+sha256sum -c SHA256SUMS.txt --ignore-missing
+tar -xzf "zelma_${version}_linux_amd64.tar.gz"
+sudo install -m 0755 "zelma_${version}_linux_amd64/zelma" /usr/local/bin/zelma
+zelma help
+```
+
+ARM64:
+
+```bash
+version=v0.1.0
+curl -LO "https://github.com/dapi/zelma/releases/download/${version}/zelma_${version}_linux_arm64.tar.gz"
+curl -LO "https://github.com/dapi/zelma/releases/download/${version}/SHA256SUMS.txt"
+sha256sum -c SHA256SUMS.txt --ignore-missing
+tar -xzf "zelma_${version}_linux_arm64.tar.gz"
+sudo install -m 0755 "zelma_${version}_linux_arm64/zelma" /usr/local/bin/zelma
+zelma help
+```
+
+### Windows PowerShell
+
+x64:
+
+```powershell
+$version = "v0.1.0"
+Invoke-WebRequest "https://github.com/dapi/zelma/releases/download/$version/zelma_${version}_windows_amd64.zip" -OutFile "zelma.zip"
+Expand-Archive .\zelma.zip -DestinationPath .
+.\zelma_${version}_windows_amd64\zelma.exe help
+```
+
+ARM64:
+
+```powershell
+$version = "v0.1.0"
+Invoke-WebRequest "https://github.com/dapi/zelma/releases/download/$version/zelma_${version}_windows_arm64.zip" -OutFile "zelma.zip"
+Expand-Archive .\zelma.zip -DestinationPath .
+.\zelma_${version}_windows_arm64\zelma.exe help
+```
+
+Move `zelma.exe` into a directory listed in `PATH` if you want to run it from
+any terminal.
+
 ### Аудит ссылок и индексации `memory-bank`
 
 Скрипт [`scripts/check_memory_bank_index.py`](scripts/check_memory_bank_index.py) аудирует `memory-bank/` и проверяет:
