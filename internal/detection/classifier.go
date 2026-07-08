@@ -84,12 +84,7 @@ func paneCommandIdentifiesCodex(command *string) bool {
 	if command == nil {
 		return false
 	}
-	executable := CommandExecutable(*command)
-	if executable == "" {
-		return false
-	}
-	base := strings.ToLower(filepath.Base(executable))
-	return base == "codex" || base == "codex.exe"
+	return CodexCommandEntrypoint(*command) != ""
 }
 
 func commandReason(command *string) ReasonCode {
@@ -97,6 +92,27 @@ func commandReason(command *string) ReasonCode {
 		return ReasonMissingCommand
 	}
 	return ReasonCommandNotCodex
+}
+
+func CodexCommandEntrypoint(command string) string {
+	tokens := commandTokens(command)
+	if len(tokens) == 0 {
+		executable := CommandExecutable(command)
+		if isCodexExecutableToken(executable) {
+			return executable
+		}
+		return ""
+	}
+	if isCodexExecutableToken(tokens[0]) {
+		return tokens[0]
+	}
+	if isNodeExecutableToken(tokens[0]) {
+		entrypoint := nodeScriptEntrypoint(tokens[1:])
+		if isCodexExecutableToken(entrypoint) {
+			return entrypoint
+		}
+	}
+	return ""
 }
 
 func CommandExecutable(command string) string {
@@ -136,6 +152,101 @@ func CommandExecutable(command string) string {
 		builder.WriteRune('\\')
 	}
 	return builder.String()
+}
+
+func commandTokens(command string) []string {
+	var tokens []string
+	var builder strings.Builder
+	var quote rune
+	escaped := false
+
+	flush := func() {
+		if builder.Len() == 0 {
+			return
+		}
+		tokens = append(tokens, builder.String())
+		builder.Reset()
+	}
+
+	for _, r := range command {
+		if escaped {
+			builder.WriteRune(r)
+			escaped = false
+			continue
+		}
+		if r == '\\' {
+			escaped = true
+			continue
+		}
+		if quote != 0 {
+			if r == quote {
+				quote = 0
+				continue
+			}
+			builder.WriteRune(r)
+			continue
+		}
+		if r == '\'' || r == '"' {
+			quote = r
+			continue
+		}
+		if unicode.IsSpace(r) {
+			flush()
+			continue
+		}
+		builder.WriteRune(r)
+	}
+	if escaped {
+		builder.WriteRune('\\')
+	}
+	flush()
+	return tokens
+}
+
+func isCodexExecutableToken(token string) bool {
+	if token == "" {
+		return false
+	}
+	base := strings.ToLower(filepath.Base(token))
+	return base == "codex" || base == "codex.exe"
+}
+
+func isNodeExecutableToken(token string) bool {
+	base := strings.ToLower(filepath.Base(token))
+	return base == "node" || base == "node.exe"
+}
+
+func nodeScriptEntrypoint(tokens []string) string {
+	for i := 0; i < len(tokens); i++ {
+		token := tokens[i]
+		if token == "--" {
+			if i+1 < len(tokens) {
+				return tokens[i+1]
+			}
+			return ""
+		}
+		if token == "-e" || token == "--eval" || token == "-p" || token == "--print" {
+			return ""
+		}
+		if nodeOptionConsumesValue(token) {
+			i++
+			continue
+		}
+		if strings.HasPrefix(token, "-") {
+			continue
+		}
+		return token
+	}
+	return ""
+}
+
+func nodeOptionConsumesValue(token string) bool {
+	switch token {
+	case "-r", "--require", "--import", "--loader", "--experimental-loader", "--require-module":
+		return true
+	default:
+		return false
+	}
 }
 
 func classifyCWD(cwd *string, repoRoot string) (string, ReasonCode, bool) {

@@ -28,7 +28,7 @@ open JSONL records, parse UUIDs or promote registry records to `active`.
 
 | Source ID | Confidence | Status policy | Privacy boundary |
 | --- | --- | --- | --- |
-| `zellij_pane_command` | weak | usable through existing zellij adapter | executable token only; raw args excluded |
+| `zellij_pane_command` | weak | usable through existing zellij adapter | command entrypoint only; raw args excluded |
 | `zellij_pane_cwd` | weak | usable through existing zellij adapter | normalized cwd is allowed metadata |
 | `process_argv` | strong | not probed in FT-019 | full argv excluded; parser/correlation deferred to FT-020 |
 | `codex_home_env` | medium | present when `CODEX_HOME` is set | path only |

@@ -17,7 +17,7 @@ audience: humans_and_agents
 
 | Source | Confidence | FT-019 status | Safe use |
 | --- | --- | --- | --- |
-| `zellij_pane_command` | weak | usable | Establish Codex pane candidacy from executable token only. |
+| `zellij_pane_command` | weak | usable | Establish Codex pane candidacy from command entrypoint only. |
 | `zellij_pane_cwd` | weak | usable | Keep candidates equal to or inside the target repo root. |
 | `process_argv` | strong | not probed | Future direct `resume <uuid>` evidence after explicit correlation. |
 | `codex_home_env` | medium | present when `CODEX_HOME` is set | Locate a non-default Codex home path. |
