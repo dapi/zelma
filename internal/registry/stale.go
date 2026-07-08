@@ -28,6 +28,7 @@ type StaleCandidate struct {
 
 func MarkStaleCandidates(current Registry, snapshot RuntimeSnapshot) (Registry, []StaleCandidate) {
 	next := normalizeRegistry(current)
+	next.Sessions = append([]Session(nil), next.Sessions...)
 	if next.Version == 0 {
 		next.Version = SchemaVersion
 	}
