@@ -1,0 +1,47 @@
+FROM debian:bookworm-slim
+
+ARG TARGETARCH
+ARG ZELLIJ_VERSION=0.44.3
+ARG ZELLIJ_SHA256_AMD64=0f7c346788627f506c0a28296517768633cff24fc822a739f8264b640ecad751
+ARG ZELLIJ_SHA256_ARM64=15e6534d42644d66973d136c590c49739dcfd6a1a2a0d3d917973f16c81b45fb
+
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends \
+    bash \
+    ca-certificates \
+    curl \
+    git \
+    jq \
+    procps \
+    tar \
+    util-linux \
+  && rm -rf /var/lib/apt/lists/*
+
+RUN set -eux; \
+  arch="${TARGETARCH:-}"; \
+  if [ -z "$arch" ]; then \
+    case "$(uname -m)" in \
+      x86_64) arch="amd64" ;; \
+      aarch64) arch="arm64" ;; \
+      *) echo "unsupported machine architecture: $(uname -m)" >&2; exit 1 ;; \
+    esac; \
+  fi; \
+  case "$arch" in \
+    amd64) rust_target="x86_64-unknown-linux-musl"; sha256="$ZELLIJ_SHA256_AMD64" ;; \
+    arm64) rust_target="aarch64-unknown-linux-musl"; sha256="$ZELLIJ_SHA256_ARM64" ;; \
+    *) echo "unsupported Docker target architecture: $arch" >&2; exit 1 ;; \
+  esac; \
+  archive="/tmp/zellij.tar.gz"; \
+  curl -fsSL \
+    "https://github.com/zellij-org/zellij/releases/download/v${ZELLIJ_VERSION}/zellij-${rust_target}.tar.gz" \
+    -o "$archive"; \
+  echo "${sha256}  ${archive}" | sha256sum -c -; \
+  tar -xzf "$archive" -C /usr/local/bin zellij; \
+  chmod 0755 /usr/local/bin/zellij; \
+  rm -f "$archive"; \
+  zellij --version | grep -F "zellij ${ZELLIJ_VERSION}"
+
+RUN useradd --create-home --shell /bin/bash zelma
+
+USER zelma
+WORKDIR /test

@@ -25,20 +25,20 @@ audience: humans_and_agents
 
 ## Project Adaptation
 
-Runtime-код `zelma` пока не создан. Stack выбран: Go. Текущая обязательная
-проверка документационного слоя:
+Runtime-код `zelma` создан. Stack выбран: Go. Текущая обязательная проверка
+документационного слоя:
 
 ```bash
 python3 scripts/check_memory_bank_index.py
 ```
 
-После появления Go scaffold canonical local commands:
+Canonical local commands:
 
 - `go test ./...`;
 - `go vet ./...`;
 - `go test ./... -race` для shared state, registry locking и adapter code;
 - `go build ./cmd/zelma`;
-- targeted Docker e2e suite once `sessions create/detect/list` exist.
+- `make test-e2e` для focused Docker e2e against real `zellij`.
 
 Primary test framework: Go `testing` package unless a future ADR chooses
 otherwise.
@@ -55,16 +55,16 @@ otherwise.
 | `docker-zellij-e2e` | End-to-end checks against real `zellij` in a container | PRs that claim `sessions create/detect/list` live integration is done |
 
 `docker-zellij-e2e` is required for feature closure once a feature depends on
-real `zellij` pane creation, live pane discovery or command execution. Until the
-CLI exists, this suite is a documented target, not an active PR gate.
+real `zellij` pane creation, live pane discovery or command execution. The local
+target is `make test-e2e`.
 
 ## Docker Zellij E2E Target
 
-`zelma` should reuse the proven shape from `zellij-tab-status`: build the
-product binary outside Docker, then mount it into a small test image that
-contains pinned `zellij` and a runner script.
+`zelma` reuses the proven shape from `zellij-tab-status`: build the product
+binary outside Docker, then mount it into a small test image that contains
+pinned `zellij` and a runner script.
 
-Required design:
+Implemented design:
 
 - `Dockerfile.e2e` installs `zellij`, `util-linux` for `script`, `ca-certificates`
   and minimal test helpers. It must pin the `zellij` version and verify the
@@ -82,17 +82,16 @@ Required design:
   account, network access, user prompts or conversation transcripts.
 - Synthetic Codex fixtures may contain UUID, cwd, timestamp and CLI version
   metadata only. Do not include real prompts, responses or user session logs.
-- The runner should exercise the smallest real integration path needed by the
-  feature: `sessions create`, `sessions detect`, `sessions list` and JSON output
-  contracts when those commands exist.
+- The runner exercises the smallest real integration path: `sessions create`,
+  `sessions detect`, `sessions list --live` and JSON output contracts.
 - The e2e job must have an explicit timeout and must surface `zellij` start logs
   on failure.
 
-Expected CI flow:
+Expected CI/local flow:
 
 1. Build `zelma` on the host runner.
 2. Upload/download the binary artifact between jobs.
-3. Build `Dockerfile.e2e`.
+3. Build `Dockerfile.e2e` through `make test-e2e`.
 4. Run the container with read-only mounts for the binary, e2e scripts and
    synthetic fixtures.
 5. Fail the job on any test failure or leaked background `zellij` session.
