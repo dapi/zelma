@@ -84,7 +84,7 @@ func paneCommandIdentifiesCodex(command *string) bool {
 	if command == nil {
 		return false
 	}
-	executable := commandExecutable(*command)
+	executable := CommandExecutable(*command)
 	if executable == "" {
 		return false
 	}
@@ -99,7 +99,7 @@ func commandReason(command *string) ReasonCode {
 	return ReasonCommandNotCodex
 }
 
-func commandExecutable(command string) string {
+func CommandExecutable(command string) string {
 	command = strings.TrimLeftFunc(command, unicode.IsSpace)
 	if command == "" {
 		return ""
