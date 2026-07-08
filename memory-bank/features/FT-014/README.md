@@ -16,3 +16,5 @@ audience: humans_and_agents
 
 - [Brief](brief.md)
   Читать, когда нужно понять scope и verify для detect upsert.
+- [Design](design.md)
+  Читать, когда нужно понять выбранные matching, upsert и summary contracts.

@@ -301,6 +301,159 @@ func TestValidateAllowsNonActiveDuplicatePane(t *testing.T) {
 	}
 }
 
+func TestUpsertDetectedCandidatesAddsOnlyMissingPane(t *testing.T) {
+	current := Registry{Version: SchemaVersion, Sessions: []Session{}}
+	candidate := Session{
+		ZellijSession: "main",
+		ZellijPane:    "terminal_1",
+		OpenedPath:    "/workspace/zelma",
+		State:         StateCandidate,
+	}
+
+	first, firstSummary := UpsertDetectedCandidates(current, []Session{candidate})
+	if firstSummary != (DetectUpsertSummary{Added: 1}) {
+		t.Fatalf("first summary = %+v, want added=1", firstSummary)
+	}
+	if len(first.Sessions) != 1 {
+		t.Fatalf("len(first.Sessions) = %d, want 1", len(first.Sessions))
+	}
+	if first.Sessions[0] != candidate {
+		t.Fatalf("first session = %+v, want %+v", first.Sessions[0], candidate)
+	}
+
+	second, secondSummary := UpsertDetectedCandidates(first, []Session{candidate})
+	if secondSummary != (DetectUpsertSummary{Unchanged: 1}) {
+		t.Fatalf("second summary = %+v, want unchanged=1", secondSummary)
+	}
+	if len(second.Sessions) != 1 {
+		t.Fatalf("len(second.Sessions) = %d, want 1", len(second.Sessions))
+	}
+}
+
+func TestUpsertDetectedCandidatesPreservesMorePreciseExistingRecord(t *testing.T) {
+	active := Session{
+		ZellijSession: "main",
+		ZellijPane:    "terminal_1",
+		CodexSession:  "codex-a",
+		OpenedPath:    "/workspace/zelma",
+		State:         StateActive,
+	}
+	candidate := Session{
+		ZellijSession: "main",
+		ZellijPane:    "terminal_1",
+		OpenedPath:    "/workspace/zelma/nested",
+		State:         StateCandidate,
+	}
+
+	got, summary := UpsertDetectedCandidates(
+		Registry{Version: SchemaVersion, Sessions: []Session{active}},
+		[]Session{candidate},
+	)
+	if summary != (DetectUpsertSummary{Unchanged: 1}) {
+		t.Fatalf("summary = %+v, want unchanged=1", summary)
+	}
+	if len(got.Sessions) != 1 || got.Sessions[0] != active {
+		t.Fatalf("sessions = %+v, want preserved active record", got.Sessions)
+	}
+}
+
+func TestUpsertDetectedCandidatesAppendsWhenOnlyHistoricalRecordMatchesPane(t *testing.T) {
+	closed := Session{
+		ZellijSession: "main",
+		ZellijPane:    "terminal_1",
+		CodexSession:  "codex-closed",
+		OpenedPath:    "/workspace/old",
+		State:         StateClosed,
+	}
+	candidate := Session{
+		ZellijSession: "main",
+		ZellijPane:    "terminal_1",
+		OpenedPath:    "/workspace/zelma",
+		State:         StateCandidate,
+	}
+
+	got, summary := UpsertDetectedCandidates(
+		Registry{Version: SchemaVersion, Sessions: []Session{closed}},
+		[]Session{candidate},
+	)
+	if summary != (DetectUpsertSummary{Added: 1}) {
+		t.Fatalf("summary = %+v, want added=1", summary)
+	}
+	if len(got.Sessions) != 2 {
+		t.Fatalf("len(Sessions) = %d, want 2", len(got.Sessions))
+	}
+	if got.Sessions[0] != closed || got.Sessions[1] != candidate {
+		t.Fatalf("sessions = %+v, want closed record preserved and candidate appended", got.Sessions)
+	}
+}
+
+func TestUpsertDetectedCandidatesMatchesActiveBeforeCandidateDuplicate(t *testing.T) {
+	active := Session{
+		ZellijSession: "main",
+		ZellijPane:    "terminal_1",
+		CodexSession:  "codex-active",
+		OpenedPath:    "/workspace/zelma",
+		State:         StateActive,
+	}
+	existingCandidate := Session{
+		ZellijSession: "main",
+		ZellijPane:    "terminal_1",
+		OpenedPath:    "",
+		State:         StateCandidate,
+	}
+	detected := existingCandidate
+	detected.OpenedPath = "/workspace/zelma/nested"
+
+	got, summary := UpsertDetectedCandidates(
+		Registry{Version: SchemaVersion, Sessions: []Session{existingCandidate, active}},
+		[]Session{detected},
+	)
+	if summary != (DetectUpsertSummary{Unchanged: 1}) {
+		t.Fatalf("summary = %+v, want unchanged=1", summary)
+	}
+	if got.Sessions[0] != existingCandidate || got.Sessions[1] != active {
+		t.Fatalf("sessions = %+v, want active to block candidate enrichment", got.Sessions)
+	}
+}
+
+func TestUpsertDetectedCandidatesFillsMissingCandidateEvidence(t *testing.T) {
+	existing := Session{
+		ZellijSession: "main",
+		ZellijPane:    "terminal_1",
+		State:         StateCandidate,
+	}
+	candidate := Session{
+		ZellijSession: "main",
+		ZellijPane:    "terminal_1",
+		OpenedPath:    "/workspace/zelma",
+		State:         StateCandidate,
+	}
+
+	got, summary := UpsertDetectedCandidates(
+		Registry{Version: SchemaVersion, Sessions: []Session{existing}},
+		[]Session{candidate},
+	)
+	if summary != (DetectUpsertSummary{Unchanged: 1}) {
+		t.Fatalf("summary = %+v, want unchanged=1", summary)
+	}
+	if got.Sessions[0].OpenedPath != candidate.OpenedPath {
+		t.Fatalf("opened path = %q, want filled %q", got.Sessions[0].OpenedPath, candidate.OpenedPath)
+	}
+}
+
+func TestUpsertDetectedCandidatesSkipsInvalidCandidateKey(t *testing.T) {
+	got, summary := UpsertDetectedCandidates(
+		Registry{Version: SchemaVersion, Sessions: []Session{}},
+		[]Session{{ZellijSession: "main", State: StateCandidate}},
+	)
+	if summary != (DetectUpsertSummary{Skipped: 1}) {
+		t.Fatalf("summary = %+v, want skipped=1", summary)
+	}
+	if len(got.Sessions) != 0 {
+		t.Fatalf("Sessions = %+v, want none", got.Sessions)
+	}
+}
+
 func TestWriteFileCreatesAtomicRegistryFile(t *testing.T) {
 	path := RegistryPath(t.TempDir())
 	registry := validRegistry("/workspace/zelma")
