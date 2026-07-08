@@ -983,9 +983,10 @@ func TestSessionsListAutoDetectsBeforeTableOutput(t *testing.T) {
 	if stderr.Len() != 0 {
 		t.Fatalf("stderr = %q, want empty", stderr.String())
 	}
+	output := stdout.String()
 	for _, want := range []string{"ID", "active", "zelma-main", "tab_1", "terminal_1", sessionID, paneRoot} {
-		if !strings.Contains(stdout.String(), want) {
-			t.Fatalf("stdout = %q, want substring %q", stdout.String(), want)
+		if !strings.Contains(output, want) {
+			t.Fatalf("stdout = %q, want substring %q", output, want)
 		}
 	}
 	if _, err := os.Stat(autoDetectCachePath(root)); err != nil {
