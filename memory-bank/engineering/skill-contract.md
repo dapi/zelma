@@ -138,6 +138,12 @@ When existing active records are proven missing by a successful live inventory,
 the output may include `stale_candidates` with reason codes. Those records are
 marked stale; removal is a separate cleanup command.
 
+Use `zelma sessions detect --json --explain` when the agent needs per-candidate
+evidence diagnostics. The output adds optional `candidate_explanations` records
+with zellij identity, `opened_path`, `codex_session` when resolved, and
+`evidence_verdict` / `evidence_source` / `evidence_reason`. Default
+`--json` omits this field for compatibility.
+
 ### `zelma sessions cleanup --json`
 
 Reads the registry and proposes cleanup for records whose state is already
