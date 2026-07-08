@@ -122,6 +122,25 @@ Success is allowed only when all conditions are true:
 10. The task zellij surface was closed only after terminal outcome.
 </definition_of_done>
 
+<acceptance_criteria>
+The single-issue shipper work is accepted only when all applicable criteria are true:
+1. Implementation ran in a separate `git worktree`; the main repository worktree stayed on `BASE_BRANCH`.
+2. PR exists against the correct base branch and contains only in-scope changes for `ISSUE_NUMBER`.
+3. For implementation issues, the diff includes the required code/tests/docs or other observable product behavior; docs-only completion is rejected unless the issue is explicitly `feature_pack_only`.
+4. Relevant local checks were run and recorded, or an explicit blocker explains why they could not run.
+5. Fresh `/review` ran on `GPT-5.5 Extra high` against the latest head commit.
+6. All critical/high/important review findings were fixed or escalated as blockers.
+7. After every fix commit/push, another fresh `/review` ran against the new head commit.
+8. The final review on the latest `headRefOid` has no critical/high/important findings.
+9. GitHub checks are present and green; absent checks are not accepted as green.
+10. PR is open, non-draft, mergeable, clean and conflict-free before merge.
+11. If `AUTO_MERGE=yes`, PR was merged and the merge commit was verified.
+12. The GitHub issue is closed by PR automation or explicit issue close with PR/commit evidence.
+13. The task zellij pane is closed only after terminal outcome.
+14. The shipper tab/pane is closed only after the final report is visible.
+15. Final report includes terminal status, issue number, PR URL, last head SHA, merge SHA if any, review cycle count, CI status, mergeability status, checks run and blockers/human gates if any.
+</acceptance_criteria>
+
 <instructions>
 1. Preflight:
    - Change to `REPO_PATH` if provided.

@@ -110,6 +110,31 @@ audience: humans_and_agents
 - PR merge допустим только при clean review, green CI, open non-draft PR,
   `MERGEABLE/CLEAN`.
 
+## Shipper Acceptance Criteria
+
+Работа single-issue shipper принимается только если:
+
+1. Implementation выполнялась в отдельном `git worktree`; основной
+   `~/code/zelma` оставался на `main`.
+2. PR создан против правильной base branch и содержит только in-scope изменения.
+3. Для implementation issue есть runtime/code/test/docs изменения по acceptance;
+   docs-only результат не принимается, если issue не `feature_pack_only`.
+4. Релевантные локальные проверки запущены и зафиксированы.
+5. Fresh `/review` выполнен на `GPT-5.5 Extra high` по последнему `headRefOid`.
+6. Все `critical/high/important` review findings исправлены или явно вынесены в
+   blocker/human gate.
+7. После каждого fix commit/push выполнен новый fresh `/review`.
+8. Последний review чистый для актуального head.
+9. GitHub checks присутствуют и green; отсутствующие checks не считаются green.
+10. PR non-draft, mergeable, clean и без conflicts.
+11. Если `AUTO_MERGE=yes`, PR merged и merge commit verified.
+12. Issue закрыт через PR automation или explicit close с PR/commit evidence.
+13. Task pane закрыта только после terminal outcome.
+14. Shipper tab/pane закрывается только после финального отчета.
+15. Финальный отчет содержит terminal status, issue, PR URL, last head SHA,
+    merge SHA если есть, review cycles, CI status, mergeability, checks и
+    blockers/human gates.
+
 ## Parallel Waves
 
 1. Стартуй только независимые issues из текущей волны.
