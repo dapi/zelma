@@ -16,3 +16,9 @@ audience: humans_and_agents
 
 - [Brief](brief.md)
   Читать, когда нужно понять scope discovery Codex metadata sources.
+- [Design](design.md)
+  Читать, когда нужен selected design runtime inventory без parser scope.
+- [Metadata Source Inventory](source-inventory.md)
+  Читать, когда нужен список source IDs, confidence и safe use.
+- [Metadata Privacy Boundary](privacy-boundary.md)
+  Читать, когда нужно проверить excluded private content.
