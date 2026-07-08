@@ -2,6 +2,7 @@ package codex
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -21,6 +22,7 @@ const (
 	CodexSessionRefSourceSessionMetaRecord       CodexSessionRefSource = "session_meta_record"
 	CodexSessionRefSourceArgvResume              CodexSessionRefSource = "argv_resume"
 	CodexSessionRefSourceArgvExternalSessionUUID CodexSessionRefSource = "argv_external_session_uuid"
+	CodexSessionRefSourcePIDCorrelatedProcess    CodexSessionRefSource = "pid_correlated_process"
 )
 
 type SessionEvidenceVerdict string
@@ -142,5 +144,81 @@ func insufficient(reason string) SessionEvidenceResult {
 	return SessionEvidenceResult{
 		Verdict: SessionEvidenceInsufficient,
 		Reason:  reason,
+	}
+}
+
+type PaneProcessEvidenceInput struct {
+	ZellijSession string
+	ZellijPane    string
+	OpenedPath    string
+	PanePID       *int
+}
+
+type PaneProcessEvidenceResolver interface {
+	FindSessionEvidenceForPaneProcess(ctx context.Context, input PaneProcessEvidenceInput) SessionEvidenceResult
+}
+
+type UnsupportedPaneProcessEvidenceResolver struct {
+	Reason string
+}
+
+func (resolver UnsupportedPaneProcessEvidenceResolver) FindSessionEvidenceForPaneProcess(context.Context, PaneProcessEvidenceInput) SessionEvidenceResult {
+	reason := strings.TrimSpace(resolver.Reason)
+	if reason == "" {
+		reason = "PID fallback unsupported by current adapter"
+	}
+	return insufficient(reason)
+}
+
+type ProcessObservation struct {
+	PID         int
+	PanePID     int
+	Live        bool
+	CommandLine string
+}
+
+type ProcessSnapshotEvidenceResolver struct {
+	Processes []ProcessObservation
+}
+
+func (resolver ProcessSnapshotEvidenceResolver) FindSessionEvidenceForPaneProcess(_ context.Context, input PaneProcessEvidenceInput) SessionEvidenceResult {
+	if input.PanePID == nil {
+		return insufficient("PID fallback skipped: zellij pane PID unavailable")
+	}
+
+	stale := 0
+	var matches []CodexSessionRef
+	for _, process := range resolver.Processes {
+		if process.PanePID != *input.PanePID {
+			continue
+		}
+		if !process.Live {
+			stale++
+			continue
+		}
+		evidence := FindCommandSessionEvidence(process.CommandLine)
+		if evidence.Verdict != SessionEvidenceResolved || evidence.Ref == nil {
+			continue
+		}
+		ref := *evidence.Ref
+		ref.Source = CodexSessionRefSourcePIDCorrelatedProcess
+		ref.SessionFile = ""
+		ref.Metadata = CodexSessionMetaFields{}
+		matches = append(matches, ref)
+	}
+
+	switch len(matches) {
+	case 0:
+		if stale > 0 {
+			return insufficient("PID fallback found only stale Codex process candidates")
+		}
+		return insufficient("PID fallback found no live Codex process with safe session UUID")
+	case 1:
+		return SessionEvidenceResult{
+			Verdict: SessionEvidenceResolved,
+			Ref:     &matches[0],
+		}
+	default:
+		return insufficient("PID fallback found multiple live Codex process candidates")
 	}
 }

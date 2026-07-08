@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/dapi/zelma/internal/codex"
 	"github.com/dapi/zelma/internal/registry"
 	"github.com/dapi/zelma/internal/zellij"
 )
@@ -14,10 +15,11 @@ type Inventory interface {
 }
 
 type Result struct {
-	Candidates   []registry.Session
-	Skipped      int
-	LiveSessions []string
-	LivePanes    []registry.PaneRef
+	Candidates            []registry.Session
+	ProcessEvidenceInputs []codex.PaneProcessEvidenceInput
+	Skipped               int
+	LiveSessions          []string
+	LivePanes             []registry.PaneRef
 }
 
 func DetectCandidates(ctx context.Context, repoRoot string, inventory Inventory) (Result, error) {
@@ -49,6 +51,7 @@ func DetectCandidates(ctx context.Context, repoRoot string, inventory Inventory)
 				continue
 			}
 			result.Candidates = append(result.Candidates, candidate)
+			result.ProcessEvidenceInputs = append(result.ProcessEvidenceInputs, processEvidenceInput(candidate, pane))
 		}
 	}
 	return result, nil
@@ -73,4 +76,13 @@ func candidateFromPane(repoRoot, zellijSession string, pane zellij.Pane) (regist
 
 func ZellijTabRef(pane zellij.Pane) string {
 	return fmt.Sprintf("tab_%d", pane.TabID)
+}
+
+func processEvidenceInput(candidate registry.Session, pane zellij.Pane) codex.PaneProcessEvidenceInput {
+	return codex.PaneProcessEvidenceInput{
+		ZellijSession: candidate.ZellijSession,
+		ZellijPane:    candidate.ZellijPane,
+		OpenedPath:    candidate.OpenedPath,
+		PanePID:       pane.ProcessID,
+	}
 }

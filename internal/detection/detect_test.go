@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/dapi/zelma/internal/codex"
 	"github.com/dapi/zelma/internal/registry"
 	"github.com/dapi/zelma/internal/zellij"
 )
@@ -41,6 +42,13 @@ func TestDetectCandidatesReturnsCodexPaneCandidate(t *testing.T) {
 				State:         registry.StateCandidate,
 			},
 		},
+		ProcessEvidenceInputs: []codex.PaneProcessEvidenceInput{
+			{
+				ZellijSession: "zelma-main",
+				ZellijPane:    "terminal_1",
+				OpenedPath:    root,
+			},
+		},
 		Skipped:      1,
 		LiveSessions: []string{"zelma-main"},
 		LivePanes: []registry.PaneRef{
@@ -50,6 +58,34 @@ func TestDetectCandidatesReturnsCodexPaneCandidate(t *testing.T) {
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("DetectCandidates() = %+v, want %+v", got, want)
+	}
+}
+
+func TestDetectCandidatesCarriesPanePIDOnlyAsProcessEvidenceInput(t *testing.T) {
+	root := filepath.Clean(t.TempDir())
+	command := "/usr/local/bin/codex --cd " + root
+	pane := terminalPane(1, command, root)
+	pid := 4242
+	pane.ProcessID = &pid
+	inventory := fakeInventory{
+		sessions: []zellij.Session{{Name: "zelma-main"}},
+		panes: map[string][]zellij.Pane{
+			"zelma-main": {pane},
+		},
+	}
+
+	got, err := DetectCandidates(context.Background(), root, inventory)
+	if err != nil {
+		t.Fatalf("DetectCandidates() error = %v, want nil", err)
+	}
+	if len(got.Candidates) != 1 || len(got.ProcessEvidenceInputs) != 1 {
+		t.Fatalf("DetectCandidates() = %+v, want one candidate and one process input", got)
+	}
+	if got.ProcessEvidenceInputs[0].PanePID == nil || *got.ProcessEvidenceInputs[0].PanePID != pid {
+		t.Fatalf("ProcessEvidenceInputs = %+v, want pane PID %d", got.ProcessEvidenceInputs, pid)
+	}
+	if got.Candidates[0].CodexSession != "" || got.Candidates[0].State != registry.StateCandidate {
+		t.Fatalf("candidate = %+v, want unresolved candidate without persisted PID", got.Candidates[0])
 	}
 }
 
