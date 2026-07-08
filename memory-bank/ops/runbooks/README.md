@@ -15,8 +15,8 @@ audience: humans_and_agents
 
 ## Доступные Runbooks
 
-- [Visible Zellij Shipping Orchestrator](visible-zellij-shipping-orchestrator.md) —
-  типовой алгоритм запуска orchestrator/shipper/start-issue через видимые zellij
+- [Visible Zellij Shipping Dispatcher](visible-zellij-shipping-dispatcher.md) —
+  типовой алгоритм запуска dispatcher/shipper/start-issue через видимые zellij
   tab/pane без изменения ветки в основном worktree.
 
 Runbook должен отвечать на вопросы:

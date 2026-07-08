@@ -62,8 +62,8 @@ model_notes:
 по умолчанию, либо в tab только по явному запросу пользователя, и автономно
 довести delivery до clean review, green CI, mergeable PR and merge.
 
-Если нужно вести несколько issues волнами, top-level orchestrator сначала
-читает `memory-bank/ops/runbooks/visible-zellij-shipping-orchestrator.md`, а
+Если нужно вести несколько issues волнами, dispatcher сначала
+читает `memory-bank/ops/runbooks/visible-zellij-shipping-dispatcher.md`, а
 затем запускает отдельную shipper tab с этим prompt для каждого issue.
 
 Не используй его для одноразовой локальной проверки уже готовой ветки без
@@ -126,7 +126,7 @@ Success is allowed only when all conditions are true:
 1. Preflight:
    - Change to `REPO_PATH` if provided.
    - Read repo instructions such as `AGENTS.md` if present.
-   - Read `memory-bank/ops/runbooks/visible-zellij-shipping-orchestrator.md` when it exists and follow it as the operational runbook for visible zellij shipping.
+   - Read `memory-bank/ops/runbooks/visible-zellij-shipping-dispatcher.md` when it exists and follow it as the operational runbook for visible zellij shipping.
    - Do not change the branch in the main repository worktree. The main worktree must stay on `BASE_BRANCH`; implementation must happen only in worktrees created by `start-issue` or explicit `git worktree add`.
    - Do not use invisible/native subagents as a fallback for shipping when the caller expects zellij-visible tab/pane output. If zellij cannot create or inspect the required tab/pane, stop with a blocker unless the caller explicitly authorizes a non-zellij fallback.
    - Resolve the zellij launch surface:

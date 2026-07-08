@@ -1,5 +1,5 @@
 ---
-title: Visible Zellij Shipping Orchestrator
+title: Visible Zellij Shipping Dispatcher
 doc_kind: ops
 doc_function: runbook
 purpose: Типовой алгоритм запуска issue shipping через видимые zellij tab/pane, git worktree и start-issue.
@@ -11,7 +11,7 @@ status: active
 audience: humans_and_agents
 ---
 
-# Visible Zellij Shipping Orchestrator
+# Visible Zellij Shipping Dispatcher
 
 ## Summary
 
@@ -20,8 +20,8 @@ audience: humans_and_agents
 
 Иерархия процесса:
 
-1. Top-level orchestrator остается координатором волны и не реализует issue сам.
-2. Top-level orchestrator запускает отдельного single-issue shipper в новой
+1. Dispatcher остается координатором волны и не реализует issue сам.
+2. Dispatcher запускает отдельного single-issue shipper в новой
    zellij tab или pane.
 3. Single-issue shipper работает по `PROMPT-005` и внутри своей zellij surface
    запускает `start-issue`.
@@ -68,7 +68,7 @@ audience: humans_and_agents
 
 ## Launch One Issue
 
-1. Top-level orchestrator создает видимую zellij tab для single-issue shipper:
+1. Dispatcher создает видимую zellij tab для single-issue shipper:
 
    ```bash
    zellij action new-tab --name shipper-<issue> --cwd ~/code/zelma -- \
@@ -100,7 +100,7 @@ audience: humans_and_agents
 
 ## Observe And Gate
 
-- Top-level orchestrator poll-ит shipper/task panes не реже одного раза в минуту.
+- Dispatcher poll-ит shipper/task panes не реже одного раза в минуту.
 - Single-issue shipper не начинает review, если implementation issue завершился docs-only
   или без runtime/test изменений, требуемых acceptance.
 - `/review` запускается на `GPT-5.5 Extra high`.
@@ -113,7 +113,7 @@ audience: humans_and_agents
 ## Parallel Waves
 
 1. Стартуй только независимые issues из текущей волны.
-2. Для каждого issue top-level orchestrator создает отдельную shipper tab.
+2. Для каждого issue dispatcher создает отдельную shipper tab.
 3. Между стартами shipper tabs выдерживай паузу 15 секунд.
 4. После merge каждого PR:
    - закрывай task pane после terminal outcome;
