@@ -38,3 +38,21 @@ jobs:
 
       - name: Build
         run: go build ./cmd/zelma
+
+  docker-zellij-e2e:
+    name: Docker Zellij E2E
+    runs-on: ubuntu-latest
+    needs: go
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Run Docker zellij e2e
+        run: make test-e2e
