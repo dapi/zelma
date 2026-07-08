@@ -355,15 +355,15 @@ func newSessionsListCommand(stdout io.Writer) *cobra.Command {
 			}
 			if liveOutput {
 				client := zellij.New(zellij.WithBinary(os.Getenv("ZELMA_ZELLIJ_BIN")))
+				if !jsonOutput && !allOutput {
+					reg = filterRegistryByState(reg, registry.StateActive)
+				}
 				liveReg, err := live.Reconcile(cmd.Context(), reg, client)
 				if err != nil {
 					return fmt.Errorf("%s: %w", cmd.CommandPath(), err)
 				}
 				if jsonOutput {
 					return writeLiveSessionsJSON(stdout, liveReg)
-				}
-				if !allOutput {
-					liveReg = filterLiveRegistryByState(liveReg, registry.StateActive)
 				}
 				return writeLiveSessionsTable(stdout, liveReg)
 			}
@@ -1048,17 +1048,4 @@ func writeLiveSessionsTable(stdout io.Writer, reg live.Registry) error {
 		}
 	}
 	return tw.Flush()
-}
-
-func filterLiveRegistryByState(reg live.Registry, state registry.State) live.Registry {
-	filtered := live.Registry{
-		Version:  reg.Version,
-		Sessions: make([]live.Session, 0, len(reg.Sessions)),
-	}
-	for _, session := range reg.Sessions {
-		if session.State == state {
-			filtered.Sessions = append(filtered.Sessions, session)
-		}
-	}
-	return filtered
 }
