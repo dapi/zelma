@@ -16,3 +16,5 @@ audience: humans_and_agents
 
 - [Brief](brief.md)
   Читать, когда нужно понять parser scope для Codex session evidence.
+- [Design](design.md)
+  Читать, когда нужен selected design privacy-safe parser contract.
