@@ -65,6 +65,8 @@ Output is schema v1 registry JSON:
   "sessions": [
     {
       "zellij_session": "zelma-main",
+      "zellij_tab": "tab_1",
+      "zellij_tab_name": "work",
       "zellij_pane": "terminal_7",
       "codex_session": "11111111-1111-4111-8111-111111111111",
       "opened_path": "/workspace/zelma",

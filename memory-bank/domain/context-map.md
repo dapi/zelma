@@ -41,8 +41,8 @@ canonical_for:
 
 ## Shared Kernel / Published Language
 
-- `SK-01` Shared value objects: `ZellijSessionRef`, `ZellijPaneRef`,
-  `CodexSessionRef`, `OpenedPath`, `SessionOrigin`.
+- `SK-01` Shared value objects: `ZellijSessionRef`, `ZellijTabRef`,
+  `ZellijPaneRef`, `CodexSessionRef`, `OpenedPath`, `SessionOrigin`.
 - `SK-02` Shared states: `candidate`, `active`, `stale`, `closed`, `archived`.
 - `PL-01` Published CLI language uses `zelma session`, `zellij session`,
   `zellij pane`, `codex session`, `opened path`.

@@ -83,6 +83,8 @@ type Registry struct {
 
 type Session struct {
 	ZellijSession string `json:"zellij_session"`
+	ZellijTab     string `json:"zellij_tab,omitempty"`
+	ZellijTabName string `json:"zellij_tab_name,omitempty"`
 	ZellijPane    string `json:"zellij_pane"`
 	CodexSession  string `json:"codex_session"`
 	OpenedPath    string `json:"opened_path"`
@@ -395,6 +397,8 @@ func (raw registryJSON) registry() (Registry, error) {
 
 type sessionJSON struct {
 	ZellijSession *string `json:"zellij_session"`
+	ZellijTab     *string `json:"zellij_tab"`
+	ZellijTabName *string `json:"zellij_tab_name"`
 	ZellijPane    *string `json:"zellij_pane"`
 	CodexSession  *string `json:"codex_session"`
 	OpenedPath    *string `json:"opened_path"`
@@ -420,11 +424,20 @@ func (raw sessionJSON) session(index int) (Session, error) {
 
 	return Session{
 		ZellijSession: *raw.ZellijSession,
+		ZellijTab:     optionalString(raw.ZellijTab),
+		ZellijTabName: optionalString(raw.ZellijTabName),
 		ZellijPane:    *raw.ZellijPane,
 		CodexSession:  *raw.CodexSession,
 		OpenedPath:    *raw.OpenedPath,
 		State:         *raw.State,
 	}, nil
+}
+
+func optionalString(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return *value
 }
 
 func conflicts(first, second Session) bool {

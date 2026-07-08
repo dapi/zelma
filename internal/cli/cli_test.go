@@ -213,7 +213,7 @@ func TestOutputAndErrorStreamContract(t *testing.T) {
 			args:       []string{"sessions", "list"},
 			arrange:    chdirToEmptyGitRepo,
 			wantCode:   0,
-			wantStdout: "STATE  ZELLIJ_SESSION  ZELLIJ_PANE  CODEX_SESSION  OPENED_PATH\n",
+			wantStdout: "STATE  ZELLIJ_SESSION  ZELLIJ_TAB  ZELLIJ_PANE  CODEX_SESSION  OPENED_PATH\n",
 			wantStderr: "",
 		},
 		{
@@ -486,6 +486,8 @@ func TestSessionsCreateRegistersConfirmedCandidateRecord(t *testing.T) {
 	}
 	want := registry.Session{
 		ZellijSession: "zelma-main",
+		ZellijTab:     "tab_1",
+		ZellijTabName: "work",
 		ZellijPane:    "terminal_7",
 		CodexSession:  "",
 		OpenedPath:    paneRoot,
@@ -702,7 +704,7 @@ func TestSessionsListEmptyRegistrySucceeds(t *testing.T) {
 	if stderr.Len() != 0 {
 		t.Fatalf("stderr = %q, want empty", stderr.String())
 	}
-	want := "STATE  ZELLIJ_SESSION  ZELLIJ_PANE  CODEX_SESSION  OPENED_PATH\n"
+	want := "STATE  ZELLIJ_SESSION  ZELLIJ_TAB  ZELLIJ_PANE  CODEX_SESSION  OPENED_PATH\n"
 	if stdout.String() != want {
 		t.Fatalf("stdout mismatch\nwant:\n%s\ngot:\n%s", want, stdout.String())
 	}
@@ -811,9 +813,9 @@ func TestSessionsListTableOutput(t *testing.T) {
 	if stderr.Len() != 0 {
 		t.Fatalf("stderr = %q, want empty", stderr.String())
 	}
-	want := "STATE   ZELLIJ_SESSION   ZELLIJ_PANE  CODEX_SESSION  OPENED_PATH\n" +
-		"active  zelma-main       1            codex-a        /workspace/zelma\n" +
-		"closed  feature-issue-6  3            codex-b        /workspace/zelma/memory-bank/features/FT-006\n"
+	want := "STATE   ZELLIJ_SESSION   ZELLIJ_TAB  ZELLIJ_PANE  CODEX_SESSION  OPENED_PATH\n" +
+		"active  zelma-main                   1            codex-a        /workspace/zelma\n" +
+		"closed  feature-issue-6              3            codex-b        /workspace/zelma/memory-bank/features/FT-006\n"
 	if stdout.String() != want {
 		t.Fatalf("stdout mismatch\nwant:\n%s\ngot:\n%s", want, stdout.String())
 	}
@@ -864,10 +866,10 @@ func TestSessionsListLiveTableOutput(t *testing.T) {
 	if stderr.Len() != 0 {
 		t.Fatalf("stderr = %q, want empty", stderr.String())
 	}
-	want := "STATE   LIVE_STATUS  ZELLIJ_SESSION   ZELLIJ_PANE  CODEX_SESSION          OPENED_PATH\n" +
-		"active  live         zelma-main       terminal_1   codex-live             " + paneRoot + "\n" +
-		"active  unreachable  zelma-main       terminal_2   codex-missing-pane     " + paneRoot + "\n" +
-		"active  unreachable  missing-session  terminal_1   codex-missing-session  " + paneRoot + "\n"
+	want := "STATE   LIVE_STATUS  ZELLIJ_SESSION   ZELLIJ_TAB  ZELLIJ_PANE  CODEX_SESSION          OPENED_PATH\n" +
+		"active  live         zelma-main                   terminal_1   codex-live             " + paneRoot + "\n" +
+		"active  unreachable  zelma-main                   terminal_2   codex-missing-pane     " + paneRoot + "\n" +
+		"active  unreachable  missing-session              terminal_1   codex-missing-session  " + paneRoot + "\n"
 	if stdout.String() != want {
 		t.Fatalf("stdout mismatch\nwant:\n%s\ngot:\n%s", want, stdout.String())
 	}
@@ -966,6 +968,8 @@ func TestSessionsDetectAddsCandidateRecord(t *testing.T) {
 	}
 	want := registry.Session{
 		ZellijSession: "zelma-main",
+		ZellijTab:     "tab_1",
+		ZellijTabName: "work",
 		ZellijPane:    "terminal_1",
 		CodexSession:  "",
 		OpenedPath:    paneRoot,

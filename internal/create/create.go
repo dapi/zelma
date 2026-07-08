@@ -101,6 +101,8 @@ func ConfirmPane(openedPath, launchBinary string, ref zellij.PaneRef, panes []ze
 
 		return registry.Session{
 			ZellijSession: ref.Session,
+			ZellijTab:     detection.ZellijTabRef(pane),
+			ZellijTabName: pane.TabName,
 			ZellijPane:    ref.PaneID.String(),
 			CodexSession:  "",
 			OpenedPath:    openedPath,

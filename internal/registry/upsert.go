@@ -52,6 +52,7 @@ func UpsertDetectedCandidates(current Registry, candidates []Session) (Registry,
 }
 
 func mergeDetectedCandidate(existing, candidate Session) Session {
+	existing = mergeDetectedZellijLocation(existing, candidate)
 	if existing.State == StateCandidate && candidate.State == StateActive {
 		return candidate
 	}
@@ -65,6 +66,16 @@ func mergeDetectedCandidate(existing, candidate Session) Session {
 		existing.OpenedPath = candidate.OpenedPath
 	}
 	return applyDetectedStateRules(existing)
+}
+
+func mergeDetectedZellijLocation(existing, candidate Session) Session {
+	if candidate.ZellijTab != "" {
+		existing.ZellijTab = candidate.ZellijTab
+	}
+	if candidate.ZellijTabName != "" {
+		existing.ZellijTabName = candidate.ZellijTabName
+	}
+	return existing
 }
 
 func applyDetectedStateRules(session Session) Session {

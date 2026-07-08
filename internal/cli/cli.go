@@ -722,15 +722,16 @@ func writeCreateLaunchContractJSON(stdout io.Writer, contract codex.LaunchContra
 
 func writeSessionsTable(stdout io.Writer, reg registry.Registry) error {
 	tw := tabwriter.NewWriter(stdout, 0, 0, 2, ' ', 0)
-	if _, err := fmt.Fprintln(tw, "STATE\tZELLIJ_SESSION\tZELLIJ_PANE\tCODEX_SESSION\tOPENED_PATH"); err != nil {
+	if _, err := fmt.Fprintln(tw, "STATE\tZELLIJ_SESSION\tZELLIJ_TAB\tZELLIJ_PANE\tCODEX_SESSION\tOPENED_PATH"); err != nil {
 		return err
 	}
 	for _, session := range reg.Sessions {
 		if _, err := fmt.Fprintf(
 			tw,
-			"%s\t%s\t%s\t%s\t%s\n",
+			"%s\t%s\t%s\t%s\t%s\t%s\n",
 			session.State,
 			session.ZellijSession,
+			session.ZellijTab,
 			session.ZellijPane,
 			session.CodexSession,
 			session.OpenedPath,
@@ -743,16 +744,17 @@ func writeSessionsTable(stdout io.Writer, reg registry.Registry) error {
 
 func writeLiveSessionsTable(stdout io.Writer, reg live.Registry) error {
 	tw := tabwriter.NewWriter(stdout, 0, 0, 2, ' ', 0)
-	if _, err := fmt.Fprintln(tw, "STATE\tLIVE_STATUS\tZELLIJ_SESSION\tZELLIJ_PANE\tCODEX_SESSION\tOPENED_PATH"); err != nil {
+	if _, err := fmt.Fprintln(tw, "STATE\tLIVE_STATUS\tZELLIJ_SESSION\tZELLIJ_TAB\tZELLIJ_PANE\tCODEX_SESSION\tOPENED_PATH"); err != nil {
 		return err
 	}
 	for _, session := range reg.Sessions {
 		if _, err := fmt.Fprintf(
 			tw,
-			"%s\t%s\t%s\t%s\t%s\t%s\n",
+			"%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
 			session.State,
 			session.LiveStatus,
 			session.ZellijSession,
+			session.ZellijTab,
 			session.ZellijPane,
 			session.CodexSession,
 			session.OpenedPath,
