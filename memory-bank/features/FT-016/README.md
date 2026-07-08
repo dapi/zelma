@@ -16,3 +16,5 @@ audience: humans_and_agents
 
 - [Brief](brief.md)
   Читать, когда нужно понять scope создания zellij pane.
+- [Design](design.md)
+  Читать, когда нужен selected adapter contract для `zellij run`.
