@@ -9,6 +9,7 @@ import (
 	"os"
 	"text/tabwriter"
 
+	"github.com/dapi/zelma/internal/codex"
 	"github.com/dapi/zelma/internal/detection"
 	"github.com/dapi/zelma/internal/registry"
 	"github.com/dapi/zelma/internal/repo"
@@ -53,7 +54,7 @@ func NewRootCommand(stdout, stderr io.Writer) *cobra.Command {
 	}
 	sessions.AddCommand(
 		newSessionsListCommand(stdout),
-		newStubCommand("create", "Create a zelma session."),
+		newSessionsCreateCommand(stdout),
 		newSessionsDetectCommand(stdout),
 	)
 	root.AddCommand(sessions)
@@ -71,25 +72,14 @@ func renderHelp(cmd *cobra.Command, args []string) {
 		fmt.Fprint(cmd.OutOrStdout(), sessionsHelp)
 	case "zelma sessions list":
 		fmt.Fprint(cmd.OutOrStdout(), sessionsListHelp)
+	case "zelma sessions create":
+		fmt.Fprint(cmd.OutOrStdout(), sessionsCreateHelp)
 	case "zelma sessions detect":
 		fmt.Fprint(cmd.OutOrStdout(), sessionsDetectHelp)
 	case "zelma help":
 		fmt.Fprint(cmd.OutOrStdout(), helpCommandHelp)
 	default:
-		if isStubCommand(cmd) {
-			fmt.Fprintf(cmd.OutOrStdout(), stubCommandHelp, cmd.CommandPath(), cmd.Short)
-			return
-		}
 		fmt.Fprintf(cmd.OutOrStdout(), "Usage:\n  %s\n", cmd.CommandPath())
-	}
-}
-
-func isStubCommand(cmd *cobra.Command) bool {
-	switch cmd.CommandPath() {
-	case "zelma sessions create":
-		return true
-	default:
-		return false
 	}
 }
 
@@ -98,7 +88,7 @@ const rootHelp = `COMMAND MAP
   zelma setup             Add .zelma to this repository .gitignore. Status: implemented.
   zelma sessions help     Show the sessions command map.
   zelma sessions list     List known zelma sessions. Status: implemented.
-  zelma sessions create   Create a zelma session. Status: stub.
+  zelma sessions create   Resolve Codex launch contract. Status: partial.
   zelma sessions detect   Detect existing Codex panes. Status: implemented.
 
 OUTPUT CONVENTIONS
@@ -107,7 +97,8 @@ OUTPUT CONVENTIONS
   setup unchanged: stdout, exit 0, "already configured: <path> contains .zelma".
   sessions list: stdout, exit 0, table by default or schema v1 JSON with --json.
   sessions detect: stdout, exit 0, summary or JSON with --json.
-  stub commands: stderr, exit 1, "<command> is not implemented yet".
+  sessions create --dry-run: stdout, exit 0, launch contract text or JSON.
+  sessions create without --dry-run: stderr, exit 1 until zellij pane creation lands.
   machine-readable session data: use "zelma sessions list --json".
 
 RECOVERY HINTS
@@ -150,14 +141,15 @@ Usage:
 const sessionsHelp = `COMMAND MAP
   zelma sessions help     Show this sessions command map.
   zelma sessions list     List known zelma sessions. Status: implemented.
-  zelma sessions create   Create a zelma session. Status: stub.
+  zelma sessions create   Resolve Codex launch contract. Status: partial.
   zelma sessions detect   Detect existing Codex panes. Status: implemented.
 
 OUTPUT CONVENTIONS
   help output: stdout, exit 0, plain text.
   list: stdout, exit 0, table by default or schema v1 JSON with --json.
+  create --dry-run: stdout, exit 0, resolved Codex command/opened path.
   detect: stdout, exit 0, added/unchanged/skipped summary or JSON with --json.
-  create: stderr, exit 1, "zelma sessions create is not implemented yet".
+  create without --dry-run: stderr, exit 1, zellij pane creation pending.
   sessions registry output: preserves zellij_session, zellij_pane,
   codex_session, opened_path and state fields.
 
@@ -188,6 +180,28 @@ Notes:
   Does not create, detect, mutate or live-check zellij panes.
 `
 
+const sessionsCreateHelp = `Usage:
+  zelma sessions create [path] [--dry-run] [--json]
+
+Status:
+  partial: resolves and validates the Codex launch contract. zellij pane
+  creation and registry writes are owned by later create features.
+
+Output:
+  --dry-run: launch contract text.
+  --dry-run --json: launch contract JSON.
+
+Contract:
+  default opened path: repository root.
+  explicit path: existing directory equal to or inside the repository root.
+  command: resolved Codex executable with "--cd <opened_path>".
+  working directory: opened_path.
+
+Notes:
+  Does not create zellij panes, parse Codex session identity or write
+  .zelma/sessions.json.
+`
+
 const sessionsDetectHelp = `Usage:
   zelma sessions detect [--json]
 
@@ -211,16 +225,6 @@ Status:
 
 Description:
   Show help for zelma or a subcommand.
-`
-
-const stubCommandHelp = `Usage:
-  %s
-
-Status:
-  stub: not implemented yet.
-
-Description:
-  %s
 `
 
 func newSetupCommand(stdout io.Writer) *cobra.Command {
@@ -266,6 +270,59 @@ func newSessionsListCommand(stdout io.Writer) *cobra.Command {
 		},
 	}
 	cmd.Flags().BoolVar(&jsonOutput, "json", false, "Print schema v1 JSON.")
+	return cmd
+}
+
+func newSessionsCreateCommand(stdout io.Writer) *cobra.Command {
+	var dryRun bool
+	var jsonOutput bool
+
+	cmd := &cobra.Command{
+		Use:   "create [path]",
+		Short: "Create a zelma session.",
+		Args:  cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			root, err := repo.ResolveRoot("")
+			if err != nil {
+				return errors.New(repo.Diagnostic(cmd.CommandPath(), err))
+			}
+
+			requestedPath := ""
+			if len(args) == 1 {
+				requestedPath = args[0]
+			}
+			openedPath, err := codex.ResolveOpenedPath(root.Path, requestedPath)
+			if err != nil {
+				return fmt.Errorf("%s: %w", cmd.CommandPath(), err)
+			}
+
+			contract, err := codex.PrepareLaunchContract(codex.LaunchRequest{
+				Binary:     os.Getenv("ZELMA_CODEX_BIN"),
+				OpenedPath: openedPath,
+			})
+			if err != nil {
+				return fmt.Errorf("%s: %w", cmd.CommandPath(), err)
+			}
+
+			if dryRun {
+				if jsonOutput {
+					return writeCreateLaunchContractJSON(stdout, contract)
+				}
+				_, err = fmt.Fprintf(
+					stdout,
+					"opened_path=%s\nworking_directory=%s\ncommand=%s\n",
+					contract.OpenedPath,
+					contract.WorkingDirectory,
+					contract.CommandLine(),
+				)
+				return err
+			}
+
+			return fmt.Errorf("%s: zellij pane creation is not implemented yet; launch contract ready for %s; run with --dry-run to inspect it", cmd.CommandPath(), contract.OpenedPath)
+		},
+	}
+	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Print the resolved Codex launch contract without creating a pane.")
+	cmd.Flags().BoolVar(&jsonOutput, "json", false, "Print launch contract JSON with --dry-run.")
 	return cmd
 }
 
@@ -346,6 +403,28 @@ func writeDetectSummaryJSON(stdout io.Writer, summary registry.DetectUpsertSumma
 	return err
 }
 
+type createLaunchContractJSON struct {
+	OpenedPath       string   `json:"opened_path"`
+	WorkingDirectory string   `json:"working_directory"`
+	Binary           string   `json:"binary"`
+	Args             []string `json:"args"`
+}
+
+func writeCreateLaunchContractJSON(stdout io.Writer, contract codex.LaunchContract) error {
+	output := createLaunchContractJSON{
+		OpenedPath:       contract.OpenedPath,
+		WorkingDirectory: contract.WorkingDirectory,
+		Binary:           contract.Binary,
+		Args:             contract.Args,
+	}
+	data, err := json.MarshalIndent(output, "", "  ")
+	if err != nil {
+		return fmt.Errorf("encode create launch contract JSON: %w", err)
+	}
+	_, err = fmt.Fprintf(stdout, "%s\n", data)
+	return err
+}
+
 func writeSessionsTable(stdout io.Writer, reg registry.Registry) error {
 	tw := tabwriter.NewWriter(stdout, 0, 0, 2, ' ', 0)
 	if _, err := fmt.Fprintln(tw, "STATE\tZELLIJ_SESSION\tZELLIJ_PANE\tCODEX_SESSION\tOPENED_PATH"); err != nil {
@@ -365,14 +444,4 @@ func writeSessionsTable(stdout io.Writer, reg registry.Registry) error {
 		}
 	}
 	return tw.Flush()
-}
-
-func newStubCommand(use, short string) *cobra.Command {
-	return &cobra.Command{
-		Use:   use,
-		Short: short,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return fmt.Errorf("%s is not implemented yet", cmd.CommandPath())
-		},
-	}
 }
