@@ -16,3 +16,6 @@ audience: humans_and_agents
 
 - [Brief](brief.md)
   Читать, когда нужно понять classifier scope и границы ложных совпадений.
+- [Design](design.md)
+  Читать, когда нужно понять выбранную conservative classification policy и
+  reason codes.
