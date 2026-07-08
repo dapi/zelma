@@ -26,8 +26,8 @@
   сохраняет запись о сессии в `.zelma/sessions.json`.
 - `zelma sessions detect` — находит вручную созданные `zellij panes`, в которых
   уже запущен Codex, и регистрирует их в `.zelma/sessions.json`.
-- `zelma sessions list` — показывает известные `zelma sessions` для текущего
-  репозитория.
+- `zelma sessions list` — показывает активные `zelma sessions` для текущего
+  репозитория; `--all` добавляет stale и другие non-active записи.
 - `zelma sessions focus <id>` — переключает `zellij` на tab/pane известной
   `zelma session`.
 
