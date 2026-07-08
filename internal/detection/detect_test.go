@@ -39,7 +39,12 @@ func TestDetectCandidatesReturnsCodexPaneCandidate(t *testing.T) {
 				State:         registry.StateCandidate,
 			},
 		},
-		Skipped: 1,
+		Skipped:      1,
+		LiveSessions: []string{"zelma-main"},
+		LivePanes: []registry.PaneRef{
+			{ZellijSession: "zelma-main", ZellijPane: "terminal_1"},
+			{ZellijSession: "zelma-main", ZellijPane: "terminal_2"},
+		},
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("DetectCandidates() = %+v, want %+v", got, want)
@@ -71,6 +76,14 @@ func TestDetectCandidatesSkipsPartialOrUnsafePaneEvidence(t *testing.T) {
 	}
 	if got.Skipped != 4 {
 		t.Fatalf("Skipped = %d, want 4", got.Skipped)
+	}
+	wantLivePanes := []registry.PaneRef{
+		{ZellijSession: "zelma-main", ZellijPane: "terminal_1"},
+		{ZellijSession: "zelma-main", ZellijPane: "terminal_2"},
+		{ZellijSession: "zelma-main", ZellijPane: "plugin_3"},
+	}
+	if !reflect.DeepEqual(got.LivePanes, wantLivePanes) {
+		t.Fatalf("LivePanes = %+v, want non-exited panes %+v", got.LivePanes, wantLivePanes)
 	}
 }
 

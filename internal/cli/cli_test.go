@@ -211,7 +211,7 @@ func TestOutputAndErrorStreamContract(t *testing.T) {
 			args:       []string{"sessions", "detect"},
 			arrange:    chdirToRepoWithFakeCodexPane,
 			wantCode:   0,
-			wantStdout: "added=1 unchanged=0 skipped=0 active=0 candidate=1\n",
+			wantStdout: "added=1 unchanged=0 skipped=0 active=0 candidate=1 stale=0\n",
 			wantStderr: "",
 		},
 	}
@@ -316,8 +316,8 @@ OUTPUT CONVENTIONS
   setup unchanged: stdout, exit 0, "already configured: <path> contains .zelma".
   sessions list: stdout, exit 0, table by default or schema v1 JSON with --json;
   add --live to include live/unreachable zellij status without registry writes.
-  sessions detect: stdout, exit 0, summary with active/candidate counts or JSON
-  with --json.
+  sessions detect: stdout, exit 0, summary with active/candidate/stale counts,
+  stale reason lines when found, or JSON with --json.
   sessions create --dry-run: stdout, exit 0, launch contract text or JSON.
   sessions create: stdout, exit 0, created/registered/skipped summary.
   machine-readable session data: use "zelma sessions list --json".
@@ -349,7 +349,7 @@ OUTPUT CONVENTIONS
   create --dry-run: stdout, exit 0, resolved Codex command/opened path.
   create: stdout, exit 0, created/registered/skipped summary.
   detect: stdout, exit 0, added/unchanged/skipped summary with
-  active/candidate counts or JSON with --json.
+  active/candidate/stale counts, stale reasons when found, or JSON with --json.
   sessions registry output: preserves zellij_session, zellij_pane,
   codex_session, opened_path and state fields.
 
@@ -938,7 +938,7 @@ func TestSessionsDetectAddsCandidateRecord(t *testing.T) {
 	if stderr.Len() != 0 {
 		t.Fatalf("stderr = %q, want empty", stderr.String())
 	}
-	if stdout.String() != "added=1 unchanged=0 skipped=0 active=0 candidate=1\n" {
+	if stdout.String() != "added=1 unchanged=0 skipped=0 active=0 candidate=1 stale=0\n" {
 		t.Fatalf("stdout = %q, want added summary", stdout.String())
 	}
 
@@ -975,7 +975,7 @@ func TestSessionsDetectPromotesFullEvidenceToActive(t *testing.T) {
 	if stderr.Len() != 0 {
 		t.Fatalf("stderr = %q, want empty", stderr.String())
 	}
-	if stdout.String() != "added=1 unchanged=0 skipped=0 active=1 candidate=0\n" {
+	if stdout.String() != "added=1 unchanged=0 skipped=0 active=1 candidate=0 stale=0\n" {
 		t.Fatalf("stdout = %q, want active summary", stdout.String())
 	}
 
@@ -1008,7 +1008,7 @@ func TestSessionsDetectRepeatedRunIsIdempotent(t *testing.T) {
 	if secondStderr.Len() != 0 {
 		t.Fatalf("second stderr = %q, want empty", secondStderr.String())
 	}
-	if secondStdout.String() != "added=0 unchanged=1 skipped=0 active=0 candidate=1\n" {
+	if secondStdout.String() != "added=0 unchanged=1 skipped=0 active=0 candidate=1 stale=0\n" {
 		t.Fatalf("second stdout = %q, want unchanged summary", secondStdout.String())
 	}
 	got := readRegistry(t, root)
@@ -1042,7 +1042,7 @@ func TestSessionsDetectPreservesExistingActiveRecord(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("Run() code = %d, want 0; stderr = %q", code, stderr.String())
 	}
-	if stdout.String() != "added=0 unchanged=1 skipped=0 active=1 candidate=0\n" {
+	if stdout.String() != "added=0 unchanged=1 skipped=0 active=1 candidate=0 stale=0\n" {
 		t.Fatalf("stdout = %q, want unchanged summary", stdout.String())
 	}
 	got := readRegistry(t, root)
@@ -1079,7 +1079,7 @@ func TestSessionsDetectAppendsCandidateWhenClosedRecordReusesPaneKey(t *testing.
 	if code != 0 {
 		t.Fatalf("Run() code = %d, want 0; stderr = %q", code, stderr.String())
 	}
-	if stdout.String() != "added=1 unchanged=0 skipped=0 active=0 candidate=1\n" {
+	if stdout.String() != "added=1 unchanged=0 skipped=0 active=0 candidate=1 stale=0\n" {
 		t.Fatalf("stdout = %q, want added summary", stdout.String())
 	}
 	got := readRegistry(t, root)
@@ -1088,6 +1088,94 @@ func TestSessionsDetectAppendsCandidateWhenClosedRecordReusesPaneKey(t *testing.
 	}
 	if got.Sessions[0].State != registry.StateClosed || got.Sessions[1].State != registry.StateCandidate {
 		t.Fatalf("sessions = %+v, want closed record plus new candidate", got.Sessions)
+	}
+}
+
+func TestSessionsDetectMarksMissingPaneStaleWithReason(t *testing.T) {
+	root := newTestGitRepo(t)
+	writeRegistryFile(t, root, fmt.Sprintf(`{
+  "version": 1,
+  "sessions": [
+    {
+      "zellij_session": "zelma-main",
+      "zellij_pane": "terminal_9",
+      "codex_session": "11111111-1111-4111-8111-111111111111",
+      "opened_path": %q,
+      "state": "active"
+    }
+  ]
+}
+`, resolvedPath(t, root)))
+	t.Setenv("ZELMA_ZELLIJ_BIN", writeFakeZellij(t, panesJSON(resolvedPath(t, root), false)))
+	t.Chdir(root)
+
+	var stdout, stderr bytes.Buffer
+
+	code := Run(context.Background(), []string{"sessions", "detect", "--json"}, &stdout, &stderr)
+
+	if code != 0 {
+		t.Fatalf("Run() code = %d, want 0; stderr = %q", code, stderr.String())
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("stderr = %q, want empty", stderr.String())
+	}
+
+	var got struct {
+		registry.DetectUpsertSummary
+		StaleCandidates []registry.StaleCandidate `json:"stale_candidates"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &got); err != nil {
+		t.Fatalf("decode stdout JSON: %v; stdout = %q", err, stdout.String())
+	}
+	if got.Stale != 1 || len(got.StaleCandidates) != 1 {
+		t.Fatalf("summary = %+v stale_candidates=%+v, want one stale candidate", got.DetectUpsertSummary, got.StaleCandidates)
+	}
+	if got.StaleCandidates[0].Reason != registry.StaleReasonMissingPane {
+		t.Fatalf("reason = %q, want %q", got.StaleCandidates[0].Reason, registry.StaleReasonMissingPane)
+	}
+
+	reg := readRegistry(t, root)
+	if reg.Sessions[0].State != registry.StateStale {
+		t.Fatalf("state = %q, want stale", reg.Sessions[0].State)
+	}
+}
+
+func TestSessionsDetectZellijFailureDoesNotMarkRegistryStale(t *testing.T) {
+	root := newTestGitRepo(t)
+	openedPath := resolvedPath(t, root)
+	writeRegistryFile(t, root, fmt.Sprintf(`{
+  "version": 1,
+  "sessions": [
+    {
+      "zellij_session": "zelma-main",
+      "zellij_pane": "terminal_9",
+      "codex_session": "11111111-1111-4111-8111-111111111111",
+      "opened_path": %q,
+      "state": "active"
+    }
+  ]
+}
+`, openedPath))
+	t.Setenv("ZELMA_ZELLIJ_BIN", writeFakeZellijListSessionsFailure(t))
+	t.Chdir(root)
+
+	var stdout, stderr bytes.Buffer
+
+	code := Run(context.Background(), []string{"sessions", "detect"}, &stdout, &stderr)
+
+	if code != 1 {
+		t.Fatalf("Run() code = %d, want 1", code)
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("stdout = %q, want empty", stdout.String())
+	}
+	if !strings.Contains(stderr.String(), "zellij_command_failed") {
+		t.Fatalf("stderr = %q, want zellij command failure", stderr.String())
+	}
+
+	reg := readRegistry(t, root)
+	if reg.Sessions[0].State != registry.StateActive {
+		t.Fatalf("state = %q, want active preserved", reg.Sessions[0].State)
 	}
 }
 
@@ -1111,7 +1199,8 @@ func TestSessionsDetectJSONSummary(t *testing.T) {
   "unchanged": 0,
   "skipped": 1,
   "active": 0,
-  "candidate": 0
+  "candidate": 0,
+  "stale": 0
 }
 `
 	if stdout.String() != want {
@@ -1284,6 +1373,24 @@ if [ "$1" = "--session" ] && [ "$2" = "zelma-main" ]; then
 ` + panesJSON + `
 JSON
   exit 0
+fi
+printf 'unexpected fake zellij args: %s\n' "$*" >&2
+exit 2
+`
+	if err := os.WriteFile(path, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
+func writeFakeZellijListSessionsFailure(t *testing.T) string {
+	t.Helper()
+
+	path := filepath.Join(t.TempDir(), "fake-zellij")
+	script := `#!/bin/sh
+if [ "$1" = "list-sessions" ]; then
+  printf 'zellij server temporarily unavailable\n' >&2
+  exit 2
 fi
 printf 'unexpected fake zellij args: %s\n' "$*" >&2
 exit 2

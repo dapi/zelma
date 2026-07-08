@@ -100,8 +100,8 @@ OUTPUT CONVENTIONS
   setup unchanged: stdout, exit 0, "already configured: <path> contains .zelma".
   sessions list: stdout, exit 0, table by default or schema v1 JSON with --json;
   add --live to include live/unreachable zellij status without registry writes.
-  sessions detect: stdout, exit 0, summary with active/candidate counts or JSON
-  with --json.
+  sessions detect: stdout, exit 0, summary with active/candidate/stale counts,
+  stale reason lines when found, or JSON with --json.
   sessions create --dry-run: stdout, exit 0, launch contract text or JSON.
   sessions create: stdout, exit 0, created/registered/skipped summary.
   machine-readable session data: use "zelma sessions list --json".
@@ -156,7 +156,7 @@ OUTPUT CONVENTIONS
   create --dry-run: stdout, exit 0, resolved Codex command/opened path.
   create: stdout, exit 0, created/registered/skipped summary.
   detect: stdout, exit 0, added/unchanged/skipped summary with
-  active/candidate counts or JSON with --json.
+  active/candidate/stale counts, stale reasons when found, or JSON with --json.
   sessions registry output: preserves zellij_session, zellij_pane,
   codex_session, opened_path and state fields.
 
@@ -223,14 +223,15 @@ Status:
   implemented: reads zellij panes and upserts candidate registry records.
 
 Output:
-  default: added/unchanged/skipped summary with active/candidate counts.
-  --json: stable summary object with added, unchanged, skipped, active and
-  candidate counts.
+  default: added/unchanged/skipped summary with active/candidate/stale counts.
+  --json: stable summary object with added, unchanged, skipped, active,
+  candidate and stale counts plus stale_candidates reason codes when found.
 
 Notes:
   Promotes detected panes to active only when Codex session evidence resolves
-  unambiguously; otherwise writes visible candidate records. Does not create
-  panes or delete stale records.
+  unambiguously; otherwise writes visible candidate records. Marks active
+  records stale only after successful live zellij inventory proves the zellij
+  session or pane is missing. Does not create panes or delete stale records.
 `
 
 const helpCommandHelp = `Usage:
@@ -408,9 +409,17 @@ func newSessionsDetectCommand(stdout io.Writer) *cobra.Command {
 
 			path := registry.RegistryPath(root.Path)
 			var summary registry.DetectUpsertSummary
+			var staleCandidates []registry.StaleCandidate
 			err = registry.UpdateFile(path, func(current registry.Registry) (registry.Registry, error) {
 				next, upsertSummary := registry.UpsertDetectedCandidates(current, candidates)
+				var currentStaleCandidates []registry.StaleCandidate
+				next, currentStaleCandidates = registry.MarkStaleCandidates(next, registry.RuntimeSnapshot{
+					ZellijSessions: detected.LiveSessions,
+					Panes:          detected.LivePanes,
+				})
 				upsertSummary.Skipped += detected.Skipped
+				upsertSummary.Stale = len(currentStaleCandidates)
+				staleCandidates = currentStaleCandidates
 				summary = upsertSummary
 				return next, nil
 			})
@@ -419,14 +428,32 @@ func newSessionsDetectCommand(stdout io.Writer) *cobra.Command {
 			}
 
 			if jsonOutput {
-				return writeDetectSummaryJSON(stdout, summary)
+				return writeDetectSummaryJSON(stdout, summary, staleCandidates)
 			}
-			_, err = fmt.Fprintf(stdout, "added=%d unchanged=%d skipped=%d active=%d candidate=%d\n", summary.Added, summary.Unchanged, summary.Skipped, summary.Active, summary.Candidate)
-			return err
+			if _, err = fmt.Fprintf(stdout, "added=%d unchanged=%d skipped=%d active=%d candidate=%d stale=%d\n", summary.Added, summary.Unchanged, summary.Skipped, summary.Active, summary.Candidate, summary.Stale); err != nil {
+				return err
+			}
+			return writeStaleCandidateLines(stdout, staleCandidates)
 		},
 	}
 	cmd.Flags().BoolVar(&jsonOutput, "json", false, "Print detect summary JSON.")
 	return cmd
+}
+
+func writeStaleCandidateLines(stdout io.Writer, candidates []registry.StaleCandidate) error {
+	for _, candidate := range candidates {
+		if _, err := fmt.Fprintf(
+			stdout,
+			"stale zellij_session=%s zellij_pane=%s previous_state=%s reason=%s\n",
+			candidate.ZellijSession,
+			candidate.ZellijPane,
+			candidate.PreviousState,
+			candidate.Reason,
+		); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func readCurrentRegistry(command string) (registry.Registry, error) {
@@ -464,13 +491,22 @@ func writeLiveSessionsJSON(stdout io.Writer, reg live.Registry) error {
 	return err
 }
 
-func writeDetectSummaryJSON(stdout io.Writer, summary registry.DetectUpsertSummary) error {
-	data, err := json.MarshalIndent(summary, "", "  ")
+func writeDetectSummaryJSON(stdout io.Writer, summary registry.DetectUpsertSummary, staleCandidates []registry.StaleCandidate) error {
+	output := detectSummaryJSON{
+		DetectUpsertSummary: summary,
+		StaleCandidates:     staleCandidates,
+	}
+	data, err := json.MarshalIndent(output, "", "  ")
 	if err != nil {
 		return fmt.Errorf("encode detect summary JSON: %w", err)
 	}
 	_, err = fmt.Fprintf(stdout, "%s\n", data)
 	return err
+}
+
+type detectSummaryJSON struct {
+	registry.DetectUpsertSummary
+	StaleCandidates []registry.StaleCandidate `json:"stale_candidates,omitempty"`
 }
 
 func writeCreateSummaryJSON(stdout io.Writer, summary create.Summary) error {

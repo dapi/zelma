@@ -93,6 +93,41 @@ func TestReconcilePreservesRegistryRecords(t *testing.T) {
 	}
 }
 
+func TestReconcileMarksExitedPaneUnreachable(t *testing.T) {
+	inventory := &fakeInventory{
+		sessions: []zellij.Session{{Name: "zelma-main"}},
+		panes: map[string][]zellij.Pane{
+			"zelma-main": {
+				{
+					ID:     zellij.PaneID{Kind: zellij.PaneKindTerminal, Number: 1},
+					Exited: true,
+				},
+			},
+		},
+	}
+	reg := registry.Registry{
+		Version: registry.SchemaVersion,
+		Sessions: []registry.Session{
+			{
+				ZellijSession: "zelma-main",
+				ZellijPane:    "terminal_1",
+				CodexSession:  "codex-exited",
+				OpenedPath:    "/workspace/zelma",
+				State:         registry.StateActive,
+			},
+		},
+	}
+
+	got, err := Reconcile(context.Background(), reg, inventory)
+
+	if err != nil {
+		t.Fatalf("Reconcile() error = %v, want nil", err)
+	}
+	if got.Sessions[0].LiveStatus != StatusUnreachable {
+		t.Fatalf("live status = %q, want unreachable for exited pane", got.Sessions[0].LiveStatus)
+	}
+}
+
 func TestReconcileReturnsInventoryErrors(t *testing.T) {
 	wantErr := errors.New("boom")
 	_, err := Reconcile(context.Background(), registry.Registry{}, &fakeInventory{listSessionsErr: wantErr})
