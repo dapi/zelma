@@ -16,3 +16,5 @@ audience: humans_and_agents
 
 - [Brief](brief.md)
   Читать, когда нужно понять scope wrappers для Codex skills.
+- [Design](design.md)
+  Читать, когда нужно понять выбранный thin-wrapper contract поверх `zelma` CLI.
