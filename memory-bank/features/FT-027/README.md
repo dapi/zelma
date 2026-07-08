@@ -16,3 +16,6 @@ audience: humans_and_agents
 
 - [Brief](brief.md)
   Читать, когда нужно понять scope live view для listed sessions.
+- [Design](design.md)
+  Читать, когда нужно понять выбранный read-only contract и live status
+  semantics.

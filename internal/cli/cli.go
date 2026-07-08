@@ -13,6 +13,7 @@ import (
 	"github.com/dapi/zelma/internal/codex"
 	"github.com/dapi/zelma/internal/create"
 	"github.com/dapi/zelma/internal/detection"
+	"github.com/dapi/zelma/internal/live"
 	"github.com/dapi/zelma/internal/registry"
 	"github.com/dapi/zelma/internal/repo"
 	"github.com/dapi/zelma/internal/setup"
@@ -97,7 +98,8 @@ OUTPUT CONVENTIONS
   help output: stdout, exit 0, plain text.
   setup changed: stdout, exit 0, "changed: added .zelma to <path>".
   setup unchanged: stdout, exit 0, "already configured: <path> contains .zelma".
-  sessions list: stdout, exit 0, table by default or schema v1 JSON with --json.
+  sessions list: stdout, exit 0, table by default or schema v1 JSON with --json;
+  add --live to include live/unreachable zellij status without registry writes.
   sessions detect: stdout, exit 0, summary with active/candidate counts or JSON
   with --json.
   sessions create --dry-run: stdout, exit 0, launch contract text or JSON.
@@ -111,8 +113,8 @@ RECOVERY HINTS
 
 HUMAN NOTES
   zelma manages Codex sessions in zellij panes. sessions list reads the
-  repository-local registry only; setup configures repository-local ignore
-  rules.
+  repository-local registry; --live additionally checks current zellij state
+  without mutating registry. setup configures repository-local ignore rules.
 
 Usage:
   zelma [command]
@@ -149,7 +151,8 @@ const sessionsHelp = `COMMAND MAP
 
 OUTPUT CONVENTIONS
   help output: stdout, exit 0, plain text.
-  list: stdout, exit 0, table by default or schema v1 JSON with --json.
+  list: stdout, exit 0, table by default or schema v1 JSON with --json; add
+  --live to include live/unreachable zellij status without registry writes.
   create --dry-run: stdout, exit 0, resolved Codex command/opened path.
   create: stdout, exit 0, created/registered/skipped summary.
   detect: stdout, exit 0, added/unchanged/skipped summary with
@@ -163,25 +166,29 @@ RECOVERY HINTS
   manual detect task: inspect "zelma sessions detect --help".
 
 HUMAN NOTES
-  sessions list reads .zelma/sessions.json without live zellij checks. detect
-  inspects live zellij panes and only upserts unresolved candidate records.
+  sessions list reads .zelma/sessions.json; --live checks current zellij panes
+  without registry writes. detect inspects live zellij panes and only upserts
+  unresolved candidate records.
 
 Usage:
   zelma sessions [command]
 `
 
 const sessionsListHelp = `Usage:
-  zelma sessions list [--json]
+  zelma sessions list [--json] [--live]
 
 Status:
-  implemented: reads the repository-local sessions registry.
+  implemented: reads the repository-local sessions registry; --live reconciles
+  records with current zellij panes.
 
 Output:
   default: tabular human-readable session inventory.
   --json: schema v1 JSON object with version and sessions.
+  --live: adds live_status values: live or unreachable.
 
 Notes:
-  Does not create, detect, mutate or live-check zellij panes.
+  Does not create, detect or mutate registry records. Without --live, does not
+  contact zellij.
 `
 
 const sessionsCreateHelp = `Usage:
@@ -262,6 +269,7 @@ func newSetupCommand(stdout io.Writer) *cobra.Command {
 
 func newSessionsListCommand(stdout io.Writer) *cobra.Command {
 	var jsonOutput bool
+	var liveOutput bool
 
 	cmd := &cobra.Command{
 		Use:   "list",
@@ -272,6 +280,17 @@ func newSessionsListCommand(stdout io.Writer) *cobra.Command {
 			if err != nil {
 				return err
 			}
+			if liveOutput {
+				client := zellij.New(zellij.WithBinary(os.Getenv("ZELMA_ZELLIJ_BIN")))
+				liveReg, err := live.Reconcile(cmd.Context(), reg, client)
+				if err != nil {
+					return fmt.Errorf("%s: %w", cmd.CommandPath(), err)
+				}
+				if jsonOutput {
+					return writeLiveSessionsJSON(stdout, liveReg)
+				}
+				return writeLiveSessionsTable(stdout, liveReg)
+			}
 			if jsonOutput {
 				return writeSessionsJSON(stdout, reg)
 			}
@@ -279,6 +298,7 @@ func newSessionsListCommand(stdout io.Writer) *cobra.Command {
 		},
 	}
 	cmd.Flags().BoolVar(&jsonOutput, "json", false, "Print schema v1 JSON.")
+	cmd.Flags().BoolVar(&liveOutput, "live", false, "Include live zellij pane status without mutating the registry.")
 	return cmd
 }
 
@@ -435,6 +455,15 @@ func writeSessionsJSON(stdout io.Writer, reg registry.Registry) error {
 	return err
 }
 
+func writeLiveSessionsJSON(stdout io.Writer, reg live.Registry) error {
+	data, err := json.MarshalIndent(reg, "", "  ")
+	if err != nil {
+		return fmt.Errorf("encode live sessions JSON: %w", err)
+	}
+	_, err = fmt.Fprintf(stdout, "%s\n", data)
+	return err
+}
+
 func writeDetectSummaryJSON(stdout io.Writer, summary registry.DetectUpsertSummary) error {
 	data, err := json.MarshalIndent(summary, "", "  ")
 	if err != nil {
@@ -514,6 +543,28 @@ func writeSessionsTable(stdout io.Writer, reg registry.Registry) error {
 			tw,
 			"%s\t%s\t%s\t%s\t%s\n",
 			session.State,
+			session.ZellijSession,
+			session.ZellijPane,
+			session.CodexSession,
+			session.OpenedPath,
+		); err != nil {
+			return err
+		}
+	}
+	return tw.Flush()
+}
+
+func writeLiveSessionsTable(stdout io.Writer, reg live.Registry) error {
+	tw := tabwriter.NewWriter(stdout, 0, 0, 2, ' ', 0)
+	if _, err := fmt.Fprintln(tw, "STATE\tLIVE_STATUS\tZELLIJ_SESSION\tZELLIJ_PANE\tCODEX_SESSION\tOPENED_PATH"); err != nil {
+		return err
+	}
+	for _, session := range reg.Sessions {
+		if _, err := fmt.Fprintf(
+			tw,
+			"%s\t%s\t%s\t%s\t%s\t%s\n",
+			session.State,
+			session.LiveStatus,
 			session.ZellijSession,
 			session.ZellijPane,
 			session.CodexSession,
