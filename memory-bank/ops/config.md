@@ -25,6 +25,7 @@ contracts важны для CLI, registry и external binaries.
 ```text
 <repo-root>/
 └── .zelma/
+    ├── config.json
     └── sessions.json
 ```
 
@@ -33,9 +34,36 @@ contracts важны для CLI, registry и external binaries.
 1. Registry schema belongs to the future Go `registry` package.
 2. Registry default path is `.zelma/sessions.json` under detected repo root.
 3. External binary paths default to `PATH` lookup.
-4. Environment overrides are allowed only after they are documented here and
+4. Repo-local non-secret configuration lives in `.zelma/config.json` only after
+   its schema keys are documented here.
+5. Environment overrides are allowed only after they are documented here and
    covered by tests.
-5. No secrets are required for MVP.
+6. No secrets are required for MVP.
+
+### Repo-Local Config
+
+`.zelma/config.json` is optional. A missing file means all repo-local settings use
+their documented defaults.
+
+Initial schema:
+
+```json
+{
+  "start_issue": {
+    "zellij_surface": "pane"
+  }
+}
+```
+
+Resolution order for values that support both env and repo-local config:
+
+1. documented `ZELMA_*` environment variable;
+2. `.zelma/config.json`;
+3. documented default.
+
+`start_issue.zellij_surface` controls where the autonomous issue shipping
+supervisor launches the task agent inside the current zellij session. Allowed
+values are `pane` and `tab`. The default is `pane`.
 
 ## Naming Convention For Env Vars
 
@@ -45,6 +73,7 @@ contracts важны для CLI, registry и external binaries.
 | zellij session target override | `ZELMA_ZELLIJ_SESSION` |
 | codex binary path override | `ZELMA_CODEX_BIN` |
 | registry path override | `ZELMA_REGISTRY_PATH` |
+| start-issue zellij launch surface override | `ZELMA_START_ISSUE_ZELLIJ_SURFACE` |
 
 Rules:
 
@@ -64,6 +93,7 @@ Rules:
 | `ZELMA_ZELLIJ_SESSION` | Optional target session for `sessions create` pane creation | `zelma-main` | `cli` + `zellij-adapter` |
 | `ZELMA_CODEX_BIN` | Optional path/name for Codex executable | `codex` via `PATH` | `codex-adapter` |
 | `ZELMA_REGISTRY_PATH` | Optional registry file path for tests/recovery | `.zelma/sessions.json` | `registry` |
+| `ZELMA_START_ISSUE_ZELLIJ_SURFACE` | Optional supervisor launch surface override; allowed values: `pane`, `tab` | `.zelma/config.json` `start_issue.zellij_surface`, then `pane` | supervisor CLI |
 
 ## Secrets
 

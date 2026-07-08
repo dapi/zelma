@@ -44,6 +44,9 @@ mergeable PR и зеленый CI, пушит in-scope fixes через испо
   строку внутри supervisor.
 - `EP-008-REQ-03` Поддерживать project-local override prompt через `.zelma`,
   например `.zelma/prompts/ship-issue.md`, и явный `--prompt-file`.
+- `EP-008-REQ-03A` Поддерживать repo-local launch surface config через
+  `.zelma/config.json` с приоритетом `ZELMA_START_ISSUE_ZELLIJ_SURFACE`, затем
+  config, затем default `pane`.
 - `EP-008-REQ-04` Наблюдать за pane через zellij API/CLI, снимать screen
   snapshots, определять завершение фаз и отправлять команды в pane.
 - `EP-008-REQ-05` Автоматически запускать `/review` после implementation phase и

@@ -35,7 +35,7 @@ variables:
     description: "Agent backend passed to start-issue."
   - name: ZELLIJ_SURFACE
     required: false
-    description: "Where to launch the task agent inside the current zellij session: pane or tab. Defaults to pane."
+    description: "Resolved launch surface for the task agent inside the current zellij session: pane or tab. Resolved from env, .zelma/config.json, then default."
   - name: AUTO_MERGE
     required: true
     description: "Whether supervisor may merge after all gates pass: yes or no."
@@ -90,8 +90,8 @@ MAX_CI_CYCLES: {{MAX_CI_CYCLES}}
 - If `REPO_PATH` is empty, use the current working directory.
 - If `START_ISSUE_BASE` is empty, use `BASE_BRANCH`.
 - If `AGENT` is empty, use the project/default `start-issue` agent.
-- If `ZELLIJ_SURFACE` is empty, use `pane`.
-- `ZELLIJ_SURFACE` may be only `pane` or `tab`; do not choose `tab` unless the caller explicitly requested it.
+- Resolve `ZELLIJ_SURFACE` from `ZELMA_START_ISSUE_ZELLIJ_SURFACE`, then `.zelma/config.json` key `start_issue.zellij_surface`, then `pane`.
+- `ZELLIJ_SURFACE` may be only `pane` or `tab`; do not choose `tab` unless env or repo-local config explicitly requested it.
 - If `MAX_REVIEW_CYCLES` is empty, use 5.
 - If `MAX_CI_CYCLES` is empty, use 3.
 - `AUTO_MERGE` must be explicit: `yes` or `no`.
@@ -122,6 +122,11 @@ Success is allowed only when all conditions are true:
 1. Preflight:
    - Change to `REPO_PATH` if provided.
    - Read repo instructions such as `AGENTS.md` if present.
+   - Resolve the zellij launch surface:
+     - if `ZELMA_START_ISSUE_ZELLIJ_SURFACE` is set, use it;
+     - otherwise, if `.zelma/config.json` exists and contains `start_issue.zellij_surface`, use it;
+     - otherwise, use `pane`;
+     - stop with a configuration error if the resolved value is not `pane` or `tab`.
    - Verify GitHub auth and issue visibility:
      - `gh auth status`
      - `gh issue view {{ISSUE_NUMBER}} --repo {{OWNER_REPO}}`
@@ -137,7 +142,7 @@ Success is allowed only when all conditions are true:
 
 2. Запусти start-issue в выбранной zellij surface:
    - Default to a new zellij pane named `issue-{{ISSUE_NUMBER}}`.
-   - Use a new zellij tab only when `ZELLIJ_SURFACE=tab` was explicitly provided by the caller.
+   - Use a new zellij tab only when the resolved `ZELLIJ_SURFACE=tab` came from `ZELMA_START_ISSUE_ZELLIJ_SURFACE` or `.zelma/config.json`.
    - Do not create a separate zellij session for the issue.
    - Run `start-issue {{ISSUE_NUMBER}} --repo {{OWNER_REPO}} --base <START_ISSUE_BASE or BASE_BRANCH>`.
    - Add `--agent {{AGENT}}` only if `AGENT` is provided.
@@ -232,7 +237,7 @@ Success is allowed only when all conditions are true:
 - Do not fix unrelated findings.
 - Do not treat feature-pack review/improve output as completion for an issue whose acceptance requires implementation behavior.
 - Do not close the task zellij surface before terminal outcome.
-- Do not launch the task in a new tab unless `ZELLIJ_SURFACE=tab` was explicitly provided.
+- Do not launch the task in a new tab unless the resolved `ZELLIJ_SURFACE=tab` came from `ZELMA_START_ISSUE_ZELLIJ_SURFACE` or `.zelma/config.json`.
 - Do not launch the task in a separate zellij session.
 - Do not overwrite unrelated local changes.
 - If a prompt override is used, report the selected prompt source.
@@ -264,7 +269,7 @@ Return a concise final report:
 | `REPO_PATH` | no | Local repository path. | `/Users/me/code/project` |
 | `START_ISSUE_BASE` | no | Explicit base ref/SHA for `start-issue`. | `origin/main` |
 | `AGENT` | no | Agent backend for `start-issue`. | `codex` |
-| `ZELLIJ_SURFACE` | no | Current-session zellij surface for the task agent. Defaults to `pane`; `tab` requires explicit caller choice. | `pane` |
+| `ZELLIJ_SURFACE` | no | Resolved current-session zellij surface for the task agent. Source order: `ZELMA_START_ISSUE_ZELLIJ_SURFACE`, `.zelma/config.json`, default `pane`. | `pane` |
 | `AUTO_MERGE` | yes | Whether supervisor may merge after gates pass. | `yes` |
 | `PROMPT_FILE` | no | Optional start-issue prompt override file. | `.zelma/prompts/ship-issue.md` |
 | `MAX_REVIEW_CYCLES` | no | Review/fix loop limit. | `5` |
@@ -280,10 +285,11 @@ Return a concise final report:
 | Review model policy | Prompt requires `GPT-5.5 Extra high` for `/review` and medium for implementation/fixes. | drafted |
 | Review quiz polling | Prompt polls `/review` quiz/menu after 3 seconds and answers prompts quickly before returning to normal polling. | drafted |
 | Codex prompt-file compatibility | Prompt avoids passing markdown/frontmatter prompt files to Codex through `start-issue --prompt-file` unless compatibility is verified. | drafted |
-| Zellij surface default | Prompt defaults to pane, allows tab only by explicit caller input and forbids separate per-issue zellij sessions. | drafted |
+| Zellij surface resolution | Prompt resolves surface from env, then `.zelma/config.json`, then default pane; tab requires explicit env/config choice and separate per-issue zellij sessions are forbidden. | drafted |
 
 ## Change Notes
 
+- 2026-07-08: Added env and `.zelma/config.json` resolution for zellij launch surface with env > config > default precedence.
 - 2026-07-08: Made zellij launch surface explicit: default pane, optional tab only by caller request, no separate per-issue zellij session.
 - 2026-07-07: Added prompt-file compatibility guard and recovery for Codex launch usage failures.
 - 2026-07-07: Added fast 3-second polling for `/review` preset/base/model quiz prompts.
