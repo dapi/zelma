@@ -357,6 +357,65 @@ func TestUpsertDetectedCandidatesPreservesMorePreciseExistingRecord(t *testing.T
 	}
 }
 
+func TestUpsertDetectedCandidatesAppendsWhenOnlyHistoricalRecordMatchesPane(t *testing.T) {
+	closed := Session{
+		ZellijSession: "main",
+		ZellijPane:    "terminal_1",
+		CodexSession:  "codex-closed",
+		OpenedPath:    "/workspace/old",
+		State:         StateClosed,
+	}
+	candidate := Session{
+		ZellijSession: "main",
+		ZellijPane:    "terminal_1",
+		OpenedPath:    "/workspace/zelma",
+		State:         StateCandidate,
+	}
+
+	got, summary := UpsertDetectedCandidates(
+		Registry{Version: SchemaVersion, Sessions: []Session{closed}},
+		[]Session{candidate},
+	)
+	if summary != (DetectUpsertSummary{Added: 1}) {
+		t.Fatalf("summary = %+v, want added=1", summary)
+	}
+	if len(got.Sessions) != 2 {
+		t.Fatalf("len(Sessions) = %d, want 2", len(got.Sessions))
+	}
+	if got.Sessions[0] != closed || got.Sessions[1] != candidate {
+		t.Fatalf("sessions = %+v, want closed record preserved and candidate appended", got.Sessions)
+	}
+}
+
+func TestUpsertDetectedCandidatesMatchesActiveBeforeCandidateDuplicate(t *testing.T) {
+	active := Session{
+		ZellijSession: "main",
+		ZellijPane:    "terminal_1",
+		CodexSession:  "codex-active",
+		OpenedPath:    "/workspace/zelma",
+		State:         StateActive,
+	}
+	existingCandidate := Session{
+		ZellijSession: "main",
+		ZellijPane:    "terminal_1",
+		OpenedPath:    "",
+		State:         StateCandidate,
+	}
+	detected := existingCandidate
+	detected.OpenedPath = "/workspace/zelma/nested"
+
+	got, summary := UpsertDetectedCandidates(
+		Registry{Version: SchemaVersion, Sessions: []Session{existingCandidate, active}},
+		[]Session{detected},
+	)
+	if summary != (DetectUpsertSummary{Unchanged: 1}) {
+		t.Fatalf("summary = %+v, want unchanged=1", summary)
+	}
+	if got.Sessions[0] != existingCandidate || got.Sessions[1] != active {
+		t.Fatalf("sessions = %+v, want active to block candidate enrichment", got.Sessions)
+	}
+}
+
 func TestUpsertDetectedCandidatesFillsMissingCandidateEvidence(t *testing.T) {
 	existing := Session{
 		ZellijSession: "main",

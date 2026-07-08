@@ -14,8 +14,11 @@ func UpsertDetectedCandidates(current Registry, candidates []Session) (Registry,
 
 	byPane := map[string]int{}
 	for i, session := range next.Sessions {
+		if !matchesDetectedCandidate(session.State) {
+			continue
+		}
 		key := paneKey(session.ZellijSession, session.ZellijPane)
-		if _, exists := byPane[key]; !exists {
+		if existing, exists := byPane[key]; !exists || detectMatchRank(session.State) < detectMatchRank(next.Sessions[existing].State) {
 			byPane[key] = i
 		}
 	}
@@ -52,6 +55,17 @@ func mergeDetectedCandidate(existing, candidate Session) Session {
 		existing.OpenedPath = candidate.OpenedPath
 	}
 	return existing
+}
+
+func matchesDetectedCandidate(state State) bool {
+	return state == StateActive || state == StateCandidate
+}
+
+func detectMatchRank(state State) int {
+	if state == StateActive {
+		return 0
+	}
+	return 1
 }
 
 func paneKey(zellijSession, zellijPane string) string {

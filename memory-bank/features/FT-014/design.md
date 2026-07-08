@@ -18,9 +18,9 @@ audience: humans_and_agents
 ## Selected Design
 
 `zelma sessions detect` remains conservative. It reads live zellij sessions and
-panes through `internal/zellij`, converts only Codex-like terminal panes in the
-current repo into unresolved `candidate` records through `internal/detection`,
-then writes through `internal/registry`.
+panes through `internal/zellij`, classifies panes through the FT-013
+`internal/detection.ClassifyPane` contract, converts `candidate` verdicts into
+unresolved registry records, then writes through `internal/registry`.
 
 The command does not create panes, remove stale records or promote unresolved
 candidates to `active`.
@@ -33,7 +33,8 @@ The registry match key is `(zellij_session, zellij_pane)`.
 | --- | --- |
 | No existing record for the pane key | Append one `candidate` record. |
 | Existing candidate record | Fill only missing candidate evidence, such as empty `opened_path`. |
-| Existing active/stale/closed/archived record | Preserve the existing record unchanged. |
+| Existing active record | Preserve the existing record unchanged and do not append a duplicate candidate. |
+| Existing stale/closed/archived record only | Preserve the historical record and append a new `candidate` record. |
 | Detected pane lacks Codex command or repo-local cwd evidence | Skip it. |
 
 Existing non-empty `codex_session` and `opened_path` values are never overwritten

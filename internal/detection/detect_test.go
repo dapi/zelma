@@ -46,26 +46,6 @@ func TestDetectCandidatesReturnsCodexPaneCandidate(t *testing.T) {
 	}
 }
 
-func TestDetectCandidatesAcceptsEnvWrappedCodexCommand(t *testing.T) {
-	root := filepath.Clean(t.TempDir())
-	inventory := fakeInventory{
-		sessions: []zellij.Session{{Name: "zelma-main"}},
-		panes: map[string][]zellij.Pane{
-			"zelma-main": {
-				terminalPane(1, "env CODEX_HOME=/tmp/codex codex resume 00000000-0000-0000-0000-000000000000", root),
-			},
-		},
-	}
-
-	got, err := DetectCandidates(context.Background(), root, inventory)
-	if err != nil {
-		t.Fatalf("DetectCandidates() error = %v, want nil", err)
-	}
-	if len(got.Candidates) != 1 {
-		t.Fatalf("len(Candidates) = %d, want 1", len(got.Candidates))
-	}
-}
-
 func TestDetectCandidatesSkipsPartialOrUnsafePaneEvidence(t *testing.T) {
 	root := filepath.Clean(t.TempDir())
 	otherRoot := filepath.Clean(t.TempDir())

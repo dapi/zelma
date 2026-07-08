@@ -262,7 +262,7 @@ func chdirToRepoWithFakeCodexPane(t *testing.T) {
 	t.Helper()
 
 	root := newTestGitRepo(t)
-	t.Setenv("ZELMA_ZELLIJ_BIN", writeFakeZellij(t, panesJSON(root, true)))
+	t.Setenv("ZELMA_ZELLIJ_BIN", writeFakeZellij(t, panesJSON(resolvedPath(t, root), true)))
 	t.Chdir(root)
 }
 
@@ -544,7 +544,8 @@ func TestSessionsListTableOutput(t *testing.T) {
 
 func TestSessionsDetectAddsCandidateRecord(t *testing.T) {
 	root := newTestGitRepo(t)
-	t.Setenv("ZELMA_ZELLIJ_BIN", writeFakeZellij(t, panesJSON(root, true)))
+	paneRoot := resolvedPath(t, root)
+	t.Setenv("ZELMA_ZELLIJ_BIN", writeFakeZellij(t, panesJSON(paneRoot, true)))
 	t.Chdir(root)
 
 	var stdout, stderr bytes.Buffer
@@ -569,7 +570,7 @@ func TestSessionsDetectAddsCandidateRecord(t *testing.T) {
 		ZellijSession: "zelma-main",
 		ZellijPane:    "terminal_1",
 		CodexSession:  "",
-		OpenedPath:    root,
+		OpenedPath:    paneRoot,
 		State:         registry.StateCandidate,
 	}
 	if got.Sessions[0] != want {
@@ -579,7 +580,7 @@ func TestSessionsDetectAddsCandidateRecord(t *testing.T) {
 
 func TestSessionsDetectRepeatedRunIsIdempotent(t *testing.T) {
 	root := newTestGitRepo(t)
-	t.Setenv("ZELMA_ZELLIJ_BIN", writeFakeZellij(t, panesJSON(root, true)))
+	t.Setenv("ZELMA_ZELLIJ_BIN", writeFakeZellij(t, panesJSON(resolvedPath(t, root), true)))
 	t.Chdir(root)
 
 	var firstStdout, firstStderr bytes.Buffer
@@ -621,7 +622,7 @@ func TestSessionsDetectPreservesExistingActiveRecord(t *testing.T) {
   ]
 }
 `, root))
-	t.Setenv("ZELMA_ZELLIJ_BIN", writeFakeZellij(t, panesJSON(filepath.Join(root, "nested"), true)))
+	t.Setenv("ZELMA_ZELLIJ_BIN", writeFakeZellij(t, panesJSON(filepath.Join(resolvedPath(t, root), "nested"), true)))
 	t.Chdir(root)
 
 	var stdout, stderr bytes.Buffer
@@ -643,9 +644,46 @@ func TestSessionsDetectPreservesExistingActiveRecord(t *testing.T) {
 	}
 }
 
+func TestSessionsDetectAppendsCandidateWhenClosedRecordReusesPaneKey(t *testing.T) {
+	root := newTestGitRepo(t)
+	writeRegistryFile(t, root, fmt.Sprintf(`{
+  "version": 1,
+  "sessions": [
+    {
+      "zellij_session": "zelma-main",
+      "zellij_pane": "terminal_1",
+      "codex_session": "codex-closed",
+      "opened_path": %q,
+      "state": "closed"
+    }
+  ]
+}
+`, root))
+	t.Setenv("ZELMA_ZELLIJ_BIN", writeFakeZellij(t, panesJSON(resolvedPath(t, root), true)))
+	t.Chdir(root)
+
+	var stdout, stderr bytes.Buffer
+
+	code := Run(context.Background(), []string{"sessions", "detect"}, &stdout, &stderr)
+
+	if code != 0 {
+		t.Fatalf("Run() code = %d, want 0; stderr = %q", code, stderr.String())
+	}
+	if stdout.String() != "added=1 unchanged=0 skipped=0\n" {
+		t.Fatalf("stdout = %q, want added summary", stdout.String())
+	}
+	got := readRegistry(t, root)
+	if len(got.Sessions) != 2 {
+		t.Fatalf("len(Sessions) = %d, want 2", len(got.Sessions))
+	}
+	if got.Sessions[0].State != registry.StateClosed || got.Sessions[1].State != registry.StateCandidate {
+		t.Fatalf("sessions = %+v, want closed record plus new candidate", got.Sessions)
+	}
+}
+
 func TestSessionsDetectJSONSummary(t *testing.T) {
 	root := newTestGitRepo(t)
-	t.Setenv("ZELMA_ZELLIJ_BIN", writeFakeZellij(t, panesJSON(root, false)))
+	t.Setenv("ZELMA_ZELLIJ_BIN", writeFakeZellij(t, panesJSON(resolvedPath(t, root), false)))
 	t.Chdir(root)
 
 	var stdout, stderr bytes.Buffer
@@ -876,6 +914,16 @@ func readRegistry(t *testing.T, root string) registry.Registry {
 		t.Fatal(err)
 	}
 	return reg
+}
+
+func resolvedPath(t *testing.T, path string) string {
+	t.Helper()
+
+	resolved, err := filepath.EvalSymlinks(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return filepath.Clean(resolved)
 }
 
 func assertFileContent(t *testing.T, path, want string) {
