@@ -6,7 +6,7 @@ purpose: "Навигация по package фичи для privacy-safe fixtures 
 derived_from:
   - ../../dna/governance.md
   - brief.md
-status: draft
+status: active
 audience: humans_and_agents
 ---
 
@@ -16,3 +16,5 @@ audience: humans_and_agents
 
 - [Brief](brief.md)
   Читать, когда нужно понять fixture policy для Codex evidence.
+- `internal/codex/testdata/evidence/`
+  Synthetic/redacted fixture corpus for Codex evidence tests.
