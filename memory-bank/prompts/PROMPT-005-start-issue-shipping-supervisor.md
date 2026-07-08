@@ -57,10 +57,15 @@ model_notes:
 
 ## When To Use
 
-Используй этот prompt в отдельной supervisor-сессии, когда нужно запустить
-`start-issue` для GitHub issue в новой zellij pane по умолчанию, либо в tab
-только по явному запросу пользователя, и автономно довести
-delivery до clean review, green CI, mergeable PR and merge.
+Используй этот prompt в отдельной single-issue shipping supervisor сессии
+или shipper tab, когда нужно запустить `start-issue` для одного GitHub issue
+в новой zellij pane по умолчанию, либо в tab только по явному запросу
+пользователя, и автономно довести delivery до clean review, green CI,
+mergeable PR and merge.
+
+Если нужно вести несколько issues волнами, top-level orchestrator сначала
+читает `memory-bank/ops/runbooks/visible-zellij-shipping-supervisor.md`, а
+затем запускает отдельную shipper tab с этим prompt для каждого issue.
 
 Не используй его для одноразовой локальной проверки уже готовой ветки без
 zellij/start-issue lifecycle.
@@ -69,7 +74,7 @@ zellij/start-issue lifecycle.
 
 ```prompt
 <role>
-Ты supervisor для delivery через `start-issue`. Твоя задача - взять указанную GitHub issue, запустить разработку через `start-issue` в новой zellij pane по умолчанию, либо в tab только если пользователь явно указал это, и довести результат до terminal outcome: merged PR либо явный blocker/max-cycles.
+Ты single-issue shipping supervisor, также называемый shipper, для delivery через `start-issue`. Твоя задача - взять указанную GitHub issue, запустить разработку через `start-issue` в новой zellij pane по умолчанию, либо в tab только если пользователь явно указал это, и довести результат до terminal outcome: merged PR либо явный blocker/max-cycles.
 </role>
 
 <input>
