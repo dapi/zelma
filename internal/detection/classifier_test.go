@@ -175,6 +175,40 @@ func TestClassifyPaneAcceptsNodeCodexEntrypoint(t *testing.T) {
 	}
 }
 
+func TestClassifyPaneExtractsResumeSessionID(t *testing.T) {
+	pane := zellij.Pane{
+		ID:          zellij.PaneID{Kind: zellij.PaneKindTerminal, Number: 75},
+		PaneCommand: stringPtr("codex --dangerously-bypass-approvals-and-sandbox --search resume 019f3d81-b070-7a91-9a6f-9f50f1cba355"),
+		PaneCWD:     stringPtr("/workspace/zelma"),
+	}
+
+	got := ClassifyPane(pane, "/workspace/zelma")
+
+	if got.Verdict != VerdictCandidate {
+		t.Fatalf("Verdict = %q, want %q; reasons = %#v", got.Verdict, VerdictCandidate, got.Reasons)
+	}
+	if got.CodexSession != "019f3d81-b070-7a91-9a6f-9f50f1cba355" {
+		t.Fatalf("CodexSession = %q, want resume UUID", got.CodexSession)
+	}
+}
+
+func TestClassifyPaneExtractsExternalSessionUUID(t *testing.T) {
+	pane := zellij.Pane{
+		ID:          zellij.PaneID{Kind: zellij.PaneKindTerminal, Number: 75},
+		PaneCommand: stringPtr(`node /Users/danil/.local/share/mise/installs/node/25.9.0/bin/codex --search -c "developer_instructions='External session UUID: 019f3d81-b070-7a91-9a6f-9f50f1cba355. Metadata only.'"`),
+		PaneCWD:     stringPtr("/workspace/zelma"),
+	}
+
+	got := ClassifyPane(pane, "/workspace/zelma")
+
+	if got.Verdict != VerdictCandidate {
+		t.Fatalf("Verdict = %q, want %q; reasons = %#v", got.Verdict, VerdictCandidate, got.Reasons)
+	}
+	if got.CodexSession != "019f3d81-b070-7a91-9a6f-9f50f1cba355" {
+		t.Fatalf("CodexSession = %q, want external UUID", got.CodexSession)
+	}
+}
+
 func TestCodexCommandEntrypointHandlesNodeOptions(t *testing.T) {
 	command := `node --require ./register.js --inspect "/opt/openai/bin/codex" --search -c developer_instructions='External session UUID: test'`
 

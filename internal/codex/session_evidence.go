@@ -18,7 +18,9 @@ var uuidPattern = regexp.MustCompile(`(?i)^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[
 type CodexSessionRefSource string
 
 const (
-	CodexSessionRefSourceSessionMetaRecord CodexSessionRefSource = "session_meta_record"
+	CodexSessionRefSourceSessionMetaRecord       CodexSessionRefSource = "session_meta_record"
+	CodexSessionRefSourceArgvResume              CodexSessionRefSource = "argv_resume"
+	CodexSessionRefSourceArgvExternalSessionUUID CodexSessionRefSource = "argv_external_session_uuid"
 )
 
 type SessionEvidenceVerdict string

@@ -62,7 +62,7 @@ func candidateFromPane(repoRoot, zellijSession string, pane zellij.Pane) (regist
 		ZellijTab:     ZellijTabRef(pane),
 		ZellijTabName: pane.TabName,
 		ZellijPane:    pane.ID.String(),
-		CodexSession:  "",
+		CodexSession:  classification.CodexSession,
 		OpenedPath:    classification.OpenedPath,
 		State:         registry.StateCandidate,
 	}, true

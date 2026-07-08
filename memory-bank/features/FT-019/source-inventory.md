@@ -19,7 +19,7 @@ audience: humans_and_agents
 | --- | --- | --- | --- |
 | `zellij_pane_command` | weak | usable | Establish Codex pane candidacy from command entrypoint only. |
 | `zellij_pane_cwd` | weak | usable | Keep candidates equal to or inside the target repo root. |
-| `process_argv` | strong | not probed | Future direct `resume <uuid>` evidence after explicit correlation. |
+| `process_argv` | strong | not probed | Future direct `resume <uuid>` or wrapper-provided external UUID evidence after explicit correlation. |
 | `codex_home_env` | medium | present when `CODEX_HOME` is set | Locate a non-default Codex home path. |
 | `codex_home_default` | medium | fallback | Locate default `~/.codex` when `CODEX_HOME` is unset. |
 | `session_log_directory` | medium | present/missing | Observe `<codex home>/sessions` and count `.jsonl` files only. |
@@ -27,8 +27,9 @@ audience: humans_and_agents
 
 ## Confidence Notes
 
-- `process_argv` is strong only for a correlated `codex resume <uuid>` process.
-  FT-019 does not probe it because raw argv can contain user prompt text.
+- `process_argv` is strong only for a correlated `codex resume <uuid>` process
+  or explicit wrapper-provided external UUID. FT-019 does not probe it because
+  raw argv can contain user prompt text.
 - `session_meta_record` is medium until FT-020 proves parser behavior and
   matching rules. A file with matching cwd is not enough by itself to create an
   active registry record.

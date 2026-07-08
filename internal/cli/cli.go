@@ -678,6 +678,9 @@ func withSessionEvidenceAll(sessions []registry.Session) []registry.Session {
 }
 
 func withSessionEvidence(session registry.Session) registry.Session {
+	if session.CodexSession != "" {
+		return session
+	}
 	evidence, err := codex.FindSessionEvidenceForOpenedPath(session.OpenedPath, codex.MetadataDiscoveryOptions{
 		Env: map[string]string{
 			"CODEX_HOME": os.Getenv("CODEX_HOME"),

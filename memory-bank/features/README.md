@@ -114,3 +114,5 @@ audience: humans_and_agents
   `setup`, `.gitignore`, `list` и `detect` для fresh repo.
 - [FT-042: Agent Dashboard Status Backend](FT-042/README.md) — milestone-2
   status backend для dashboard/agent UI поверх session registry и zellij state.
+- [FT-043: Command Arg Codex Session Evidence](FT-043/README.md) — извлечение
+  `CodexSessionRef` из `codex resume <uuid>` и wrapper-provided external UUID.

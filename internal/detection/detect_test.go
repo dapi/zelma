@@ -53,6 +53,30 @@ func TestDetectCandidatesReturnsCodexPaneCandidate(t *testing.T) {
 	}
 }
 
+func TestDetectCandidatesUsesResumeSessionID(t *testing.T) {
+	root := filepath.Clean(t.TempDir())
+	command := "/usr/local/bin/codex resume 019f3d81-b070-7a91-9a6f-9f50f1cba355 --cd " + root
+	inventory := fakeInventory{
+		sessions: []zellij.Session{{Name: "zelma-main"}},
+		panes: map[string][]zellij.Pane{
+			"zelma-main": {
+				terminalPane(1, command, root),
+			},
+		},
+	}
+
+	got, err := DetectCandidates(context.Background(), root, inventory)
+	if err != nil {
+		t.Fatalf("DetectCandidates() error = %v, want nil", err)
+	}
+	if len(got.Candidates) != 1 {
+		t.Fatalf("len(Candidates) = %d, want 1", len(got.Candidates))
+	}
+	if got.Candidates[0].CodexSession != "019f3d81-b070-7a91-9a6f-9f50f1cba355" {
+		t.Fatalf("CodexSession = %q, want resume UUID", got.Candidates[0].CodexSession)
+	}
+}
+
 func TestDetectCandidatesSkipsPartialOrUnsafePaneEvidence(t *testing.T) {
 	root := filepath.Clean(t.TempDir())
 	otherRoot := filepath.Clean(t.TempDir())
