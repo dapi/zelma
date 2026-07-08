@@ -23,9 +23,10 @@ canonical_for:
 | --- | --- | --- | --- | --- |
 | `RepositoryWorkspace` | aggregate | Repo root, в котором существует `.zelma/` и локальный `session registry` | Owns one `SessionRegistry`; contains many `ZelmaSession` records | Определяется из текущего пути запуска CLI |
 | `SessionRegistry` | aggregate | `.zelma/sessions.json` как repo-local source of truth для known sessions | Belongs to `RepositoryWorkspace`; stores `ZelmaSession` records | Должен иметь versioned schema |
-| `ZelmaSession` | entity | Управляемая запись о Codex-сессии в `zellij pane` | References `ZellijSessionRef`, `ZellijPaneRef`, `CodexSessionRef`, `OpenedPath`; has `SessionOrigin` and lifecycle state | Главная domain entity |
-| `ZellijSessionRef` | value object / external ref | Идентификатор runtime `zellij session` | Parent for `ZellijPaneRef` | Не принадлежит `zelma`; приходит из `zellij` |
-| `ZellijPaneRef` | value object / external ref | Идентификатор pane внутри `zellij session` | Belongs to `ZellijSessionRef`; hosts Codex runtime | Может стать stale после закрытия pane |
+| `ZelmaSession` | entity | Управляемая запись о Codex-сессии в `zellij pane` | References `ZellijSessionRef`, optional `ZellijTabRef`, `ZellijPaneRef`, `CodexSessionRef`, `OpenedPath`; has `SessionOrigin` and lifecycle state | Главная domain entity |
+| `ZellijSessionRef` | value object / external ref | Идентификатор runtime `zellij session` | Parent for `ZellijTabRef` and `ZellijPaneRef` | Не принадлежит `zelma`; приходит из `zellij` |
+| `ZellijTabRef` | value object / external ref | Идентификатор tab внутри `zellij session` | Groups `ZellijPaneRef` records when observed from zellij | Может отсутствовать в старых registry records |
+| `ZellijPaneRef` | value object / external ref | Идентификатор pane внутри `zellij session` | Belongs to `ZellijSessionRef`; may be located inside `ZellijTabRef`; hosts Codex runtime | Может стать stale после закрытия pane |
 | `CodexSessionRef` | value object / external ref | Идентификатор или ссылка на Codex session | Runs inside `ZellijPaneRef`; belongs to `ZelmaSession` record | Способ получения уточняется в implementation/ADR |
 | `OpenedPath` | value object | Нормализованный абсолютный путь, открытый в pane | Used to bind session to repo/worktree context | Не должен быть относительным в registry |
 | `SessionOrigin` | value object | Способ регистрации: `create` или `detect` | Attribute of `ZelmaSession` | Не равен lifecycle state |
@@ -39,6 +40,8 @@ canonical_for:
 - `RepositoryWorkspace` owns exactly one active `.zelma/sessions.json`.
 - `SessionRegistry` contains zero or more `ZelmaSession` records.
 - `ZelmaSession` references exactly one `ZellijSessionRef`.
+- `ZelmaSession` may store one `ZellijTabRef` and tab name when observed from
+  `zellij list-panes`.
 - `ZelmaSession` references exactly one `ZellijPaneRef` inside that
   `ZellijSessionRef`.
 - `ZelmaSession` references exactly one `CodexSessionRef` when it is `active`.

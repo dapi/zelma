@@ -35,6 +35,8 @@ feature scope and acceptance criteria remain in [brief.md](brief.md).
 | `version` | integer | yes | Schema version. FT-006 supports only `1`. |
 | `sessions` | array | yes | Registry records for known `zelma sessions`. Empty is valid. |
 | `sessions[].zellij_session` | string | yes | External `zellij session` reference. |
+| `sessions[].zellij_tab` | string | no | External `zellij tab` reference observed from `list-panes`, formatted as `tab_<id>`. |
+| `sessions[].zellij_tab_name` | string | no | Human-readable zellij tab name observed with the pane. |
 | `sessions[].zellij_pane` | string | yes | External `zellij pane` reference inside the zellij session. |
 | `sessions[].codex_session` | string | yes | Codex session reference known to `zelma`. |
 | `sessions[].opened_path` | string | yes | Normalized absolute path opened in the pane. |
@@ -47,6 +49,8 @@ feature scope and acceptance criteria remain in [brief.md](brief.md).
 - `sessions` must be present, and may be empty.
 - Session record fields must be present.
 - `zellij_session` and `zellij_pane` must be non-empty.
+- `zellij_tab` and `zellij_tab_name` are optional for backward compatibility
+  with registry records created before tab metadata was stored.
 - `codex_session` and `opened_path` must be non-empty for
   `active`, `stale`, `closed` and `archived` records.
 - `candidate` records may keep `codex_session` or `opened_path` empty because

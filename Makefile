@@ -4,7 +4,14 @@ E2E_GOARCH ?= $(E2E_TARGETARCH)
 E2E_ZELMA_BIN ?= $(CURDIR)/bin/zelma-e2e-linux-$(E2E_GOARCH)
 E2E_FAKE_CODEX_BIN ?= $(CURDIR)/bin/fake-codex-e2e-linux-$(E2E_GOARCH)
 
-.PHONY: test test-e2e docker-zellij-e2e e2e-image clean-e2e
+.DEFAULT_GOAL := all
+
+.PHONY: all build test test-e2e docker-zellij-e2e e2e-image clean-e2e
+
+all: build test
+
+build:
+	go build -o ./zelma ./cmd/zelma
 
 test:
 	go test ./...

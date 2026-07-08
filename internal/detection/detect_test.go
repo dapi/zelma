@@ -33,6 +33,8 @@ func TestDetectCandidatesReturnsCodexPaneCandidate(t *testing.T) {
 		Candidates: []registry.Session{
 			{
 				ZellijSession: "zelma-main",
+				ZellijTab:     "tab_1",
+				ZellijTabName: "work",
 				ZellijPane:    "terminal_1",
 				CodexSession:  "",
 				OpenedPath:    root,
@@ -126,6 +128,8 @@ func (inventory fakeInventory) ListPanes(_ context.Context, session string) ([]z
 func terminalPane(id int, command, cwd string) zellij.Pane {
 	return zellij.Pane{
 		ID:          zellij.PaneID{Kind: zellij.PaneKindTerminal, Number: id},
+		TabID:       1,
+		TabName:     "work",
 		PaneCommand: strPtr(command),
 		PaneCWD:     strPtr(cwd),
 	}
@@ -134,6 +138,8 @@ func terminalPane(id int, command, cwd string) zellij.Pane {
 func terminalPaneWithoutCWD(id int, command string) zellij.Pane {
 	return zellij.Pane{
 		ID:          zellij.PaneID{Kind: zellij.PaneKindTerminal, Number: id},
+		TabID:       1,
+		TabName:     "work",
 		PaneCommand: strPtr(command),
 	}
 }

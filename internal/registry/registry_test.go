@@ -441,6 +441,34 @@ func TestUpsertDetectedCandidatesFillsMissingCandidateEvidence(t *testing.T) {
 	}
 }
 
+func TestUpsertDetectedCandidatesFillsObservedTabMetadata(t *testing.T) {
+	existing := Session{
+		ZellijSession: "main",
+		ZellijPane:    "terminal_1",
+		OpenedPath:    "/workspace/zelma",
+		State:         StateCandidate,
+	}
+	candidate := Session{
+		ZellijSession: "main",
+		ZellijTab:     "tab_3",
+		ZellijTabName: "agents",
+		ZellijPane:    "terminal_1",
+		OpenedPath:    "/workspace/zelma",
+		State:         StateCandidate,
+	}
+
+	got, summary := UpsertDetectedCandidates(
+		Registry{Version: SchemaVersion, Sessions: []Session{existing}},
+		[]Session{candidate},
+	)
+	if summary != (DetectUpsertSummary{Unchanged: 1, Candidate: 1}) {
+		t.Fatalf("summary = %+v, want unchanged=1", summary)
+	}
+	if got.Sessions[0].ZellijTab != candidate.ZellijTab || got.Sessions[0].ZellijTabName != candidate.ZellijTabName {
+		t.Fatalf("tab metadata = %q/%q, want %q/%q", got.Sessions[0].ZellijTab, got.Sessions[0].ZellijTabName, candidate.ZellijTab, candidate.ZellijTabName)
+	}
+}
+
 func TestUpsertDetectedCandidatesPromotesFullEvidenceToActive(t *testing.T) {
 	detected := Session{
 		ZellijSession: "main",

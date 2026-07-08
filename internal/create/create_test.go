@@ -47,6 +47,8 @@ func TestLaunchAndConfirmReturnsCandidateForConfirmedCodexPane(t *testing.T) {
 	}
 	wantCandidate := registry.Session{
 		ZellijSession: "zelma-main",
+		ZellijTab:     "tab_1",
+		ZellijTabName: "work",
 		ZellijPane:    "terminal_7",
 		CodexSession:  "",
 		OpenedPath:    root,
@@ -317,6 +319,8 @@ func (runtime *fakeRuntime) ListPanes(_ context.Context, session string) ([]zell
 func terminalPane(id int, command, cwd string) zellij.Pane {
 	return zellij.Pane{
 		ID:          zellij.PaneID{Kind: zellij.PaneKindTerminal, Number: id},
+		TabID:       1,
+		TabName:     "work",
 		PaneCommand: strPtr(command),
 		PaneCWD:     strPtr(cwd),
 	}

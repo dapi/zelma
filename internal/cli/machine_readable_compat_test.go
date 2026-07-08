@@ -415,6 +415,8 @@ func parseSkillSetupResult(t *testing.T, data []byte) {
 
 type skillSession struct {
 	ZellijSession string `json:"zellij_session"`
+	ZellijTab     string `json:"zellij_tab,omitempty"`
+	ZellijTabName string `json:"zellij_tab_name,omitempty"`
 	ZellijPane    string `json:"zellij_pane"`
 	CodexSession  string `json:"codex_session"`
 	OpenedPath    string `json:"opened_path"`
@@ -428,6 +430,8 @@ type skillLiveSession struct {
 
 type skillStaleRecord struct {
 	ZellijSession string `json:"zellij_session"`
+	ZellijTab     string `json:"zellij_tab,omitempty"`
+	ZellijTabName string `json:"zellij_tab_name,omitempty"`
 	ZellijPane    string `json:"zellij_pane"`
 	CodexSession  string `json:"codex_session"`
 	OpenedPath    string `json:"opened_path"`

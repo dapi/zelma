@@ -2,6 +2,7 @@ package detection
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/dapi/zelma/internal/registry"
 	"github.com/dapi/zelma/internal/zellij"
@@ -58,9 +59,15 @@ func candidateFromPane(repoRoot, zellijSession string, pane zellij.Pane) (regist
 
 	return registry.Session{
 		ZellijSession: zellijSession,
+		ZellijTab:     ZellijTabRef(pane),
+		ZellijTabName: pane.TabName,
 		ZellijPane:    pane.ID.String(),
 		CodexSession:  "",
 		OpenedPath:    classification.OpenedPath,
 		State:         registry.StateCandidate,
 	}, true
+}
+
+func ZellijTabRef(pane zellij.Pane) string {
+	return fmt.Sprintf("tab_%d", pane.TabID)
 }
