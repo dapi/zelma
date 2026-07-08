@@ -178,6 +178,28 @@ func TestCommandErrorPreservesDiagnosticsAndRecovery(t *testing.T) {
 	assertCall(t, calls, root, "sessions", "list", "--json")
 }
 
+func TestListSessionsRejectsUnsupportedSchemaVersion(t *testing.T) {
+	root := t.TempDir()
+	stdout := writeFile(t, root, "stdout.json", `{
+  "version": 2,
+  "sessions": []
+}
+`)
+	calls := filepath.Join(root, "calls.txt")
+	client := fakeCLIClient(t, root, stdout, "", "0", calls)
+
+	_, err := client.ListSessions(context.Background(), ListOptions{})
+
+	var contractErr *ContractError
+	if !errors.As(err, &contractErr) {
+		t.Fatalf("ListSessions() error = %T, want ContractError", err)
+	}
+	if !strings.Contains(contractErr.Error(), "schema version 2") {
+		t.Fatalf("ContractError = %v, want schema version diagnostic", contractErr)
+	}
+	assertCall(t, calls, root, "sessions", "list", "--json")
+}
+
 func TestCreatePartialFailureSuggestsDetectRecovery(t *testing.T) {
 	root := t.TempDir()
 	stderr := writeFile(t, root, "stderr.txt", "zelma sessions create: create session: create_pane_unconfirmed: created pane could not be confirmed; recovery: run zelma sessions detect --json\n")

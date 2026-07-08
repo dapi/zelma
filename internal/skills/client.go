@@ -12,7 +12,10 @@ import (
 	"strings"
 )
 
-const DefaultZelmaBinary = "zelma"
+const (
+	DefaultZelmaBinary    = "zelma"
+	SessionsSchemaVersion = 1
+)
 
 type Client struct {
 	Binary  string
@@ -144,6 +147,26 @@ func (err *DecodeError) Unwrap() error {
 	return err.Err
 }
 
+type ContractError struct {
+	Command []string
+	Stdout  string
+	Err     error
+}
+
+func (err *ContractError) Error() string {
+	if err == nil {
+		return ""
+	}
+	return fmt.Sprintf("validate %s JSON contract: %v", strings.Join(err.Command, " "), err.Err)
+}
+
+func (err *ContractError) Unwrap() error {
+	if err == nil {
+		return nil
+	}
+	return err.Err
+}
+
 func (client Client) ListSessions(ctx context.Context, options ListOptions) (SessionsList, error) {
 	args := []string{"sessions", "list"}
 	if options.Live {
@@ -195,7 +218,27 @@ func runJSON[T any](ctx context.Context, client Client, args []string) (T, error
 			Err:     err,
 		}
 	}
+	if validator, ok := any(output).(contractValidator); ok {
+		if err := validator.validateContract(); err != nil {
+			return output, &ContractError{
+				Command: command,
+				Stdout:  string(result.Stdout),
+				Err:     err,
+			}
+		}
+	}
 	return output, nil
+}
+
+type contractValidator interface {
+	validateContract() error
+}
+
+func (output SessionsList) validateContract() error {
+	if output.Version != SessionsSchemaVersion {
+		return fmt.Errorf("unsupported sessions list schema version %d", output.Version)
+	}
+	return nil
 }
 
 func (client Client) binary() string {
