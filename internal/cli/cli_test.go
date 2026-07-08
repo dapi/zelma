@@ -418,6 +418,15 @@ func TestSessionsCreateMissingCodexDoesNotWriteRegistry(t *testing.T) {
 	if !strings.Contains(stderr.String(), "codex_missing_binary") {
 		t.Fatalf("stderr = %q, want missing Codex diagnostic", stderr.String())
 	}
+	if !strings.Contains(stderr.String(), "create_codex_missing_binary") {
+		t.Fatalf("stderr = %q, want create reason code", stderr.String())
+	}
+	if !strings.Contains(stderr.String(), "retryable=false") {
+		t.Fatalf("stderr = %q, want non-retryable classification", stderr.String())
+	}
+	if !strings.Contains(stderr.String(), "command:") || !strings.Contains(stderr.String(), "--cd") {
+		t.Fatalf("stderr = %q, want original Codex command detail", stderr.String())
+	}
 	if !strings.Contains(stderr.String(), "ZELMA_CODEX_BIN") {
 		t.Fatalf("stderr = %q, want env override hint", stderr.String())
 	}
@@ -501,17 +510,92 @@ func TestSessionsCreateUnconfirmedPaneDoesNotWriteRegistry(t *testing.T) {
 
 	code := Run(context.Background(), []string{"sessions", "create"}, &stdout, &stderr)
 
-	if code != 0 {
-		t.Fatalf("Run() code = %d, want 0; stderr = %q", code, stderr.String())
+	if code != 1 {
+		t.Fatalf("Run() code = %d, want 1", code)
 	}
-	if stderr.Len() != 0 {
-		t.Fatalf("stderr = %q, want empty", stderr.String())
+	if stdout.Len() != 0 {
+		t.Fatalf("stdout = %q, want empty", stdout.String())
 	}
-	if stdout.String() != "created=1 registered=0 skipped=1\n" {
-		t.Fatalf("stdout = %q, want skipped summary", stdout.String())
+	for _, want := range []string{
+		"create_pane_unconfirmed",
+		"retryable=false",
+		"summary: created=1 registered=0 skipped=1",
+		"zelma sessions detect",
+		"inspect zellij",
+	} {
+		if !strings.Contains(stderr.String(), want) {
+			t.Fatalf("stderr = %q, want substring %q", stderr.String(), want)
+		}
 	}
 	if _, err := os.Stat(registry.RegistryPath(root)); !os.IsNotExist(err) {
 		t.Fatalf("registry path stat error = %v, want not exist", err)
+	}
+}
+
+func TestSessionsCreateRunFailureReportsRetryableDiagnostic(t *testing.T) {
+	root := newTestGitRepo(t)
+	fakeCodex := writeFakeCodex(t)
+	t.Setenv("ZELMA_CODEX_BIN", fakeCodex)
+	t.Setenv("ZELMA_ZELLIJ_BIN", writeFakeCreateZellijRunFailure(t))
+	t.Chdir(root)
+
+	var stdout, stderr bytes.Buffer
+
+	code := Run(context.Background(), []string{"sessions", "create"}, &stdout, &stderr)
+
+	if code != 1 {
+		t.Fatalf("Run() code = %d, want 1", code)
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("stdout = %q, want empty", stdout.String())
+	}
+	for _, want := range []string{
+		"create_pane_launch_failed",
+		"cause=zellij_command_failed",
+		"retryable=true",
+		"then retry",
+		"did not write registry state",
+	} {
+		if !strings.Contains(stderr.String(), want) {
+			t.Fatalf("stderr = %q, want substring %q", stderr.String(), want)
+		}
+	}
+	if _, err := os.Stat(registry.RegistryPath(root)); !os.IsNotExist(err) {
+		t.Fatalf("registry path stat error = %v, want not exist", err)
+	}
+}
+
+func TestSessionsCreateRegistryWriteFailureReportsRecoveryHint(t *testing.T) {
+	root := newTestGitRepo(t)
+	paneRoot := resolvedPath(t, root)
+	fakeCodex := writeFakeCodex(t)
+	t.Setenv("ZELMA_CODEX_BIN", fakeCodex)
+	t.Setenv("ZELMA_ZELLIJ_BIN", writeFakeCreateZellij(t, "terminal_7", panesJSONWithID(7, paneRoot, fakeCodex+" --cd "+paneRoot, true)))
+	if err := os.MkdirAll(registry.RegistryPath(root), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(root)
+
+	var stdout, stderr bytes.Buffer
+
+	code := Run(context.Background(), []string{"sessions", "create"}, &stdout, &stderr)
+
+	if code != 1 {
+		t.Fatalf("Run() code = %d, want 1", code)
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("stdout = %q, want empty", stdout.String())
+	}
+	for _, want := range []string{
+		"create_registry_write_failed",
+		"retryable=false",
+		"summary: created=1 registered=0 skipped=0",
+		"zelma sessions detect",
+		"filesystem permissions",
+	} {
+		if !strings.Contains(stderr.String(), want) {
+			t.Fatalf("stderr = %q, want substring %q", stderr.String(), want)
+		}
 	}
 }
 
@@ -1033,6 +1117,24 @@ if [ "$1" = "--session" ] && [ "$2" = "zelma-main" ] && [ "$3" = "action" ] && [
 ` + panesJSON + `
 JSON
   exit 0
+fi
+printf 'unexpected fake zellij args: %s\n' "$*" >&2
+exit 2
+`
+	if err := os.WriteFile(path, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
+func writeFakeCreateZellijRunFailure(t *testing.T) string {
+	t.Helper()
+
+	path := filepath.Join(t.TempDir(), "fake-zellij")
+	script := `#!/bin/sh
+if [ "$1" = "--session" ] && [ "$2" = "zelma-main" ] && [ "$3" = "run" ]; then
+  printf 'session temporarily unavailable\n' >&2
+  exit 2
 fi
 printf 'unexpected fake zellij args: %s\n' "$*" >&2
 exit 2
