@@ -11,7 +11,7 @@ derived_from:
   - ../features/FT-027/brief.md
   - ../features/FT-028/brief.md
   - ../features/FT-029/brief.md
-  - ../features/FT-046/brief.md
+  - ../features/FT-047/brief.md
 status: active
 audience: humans_and_agents
 ---
