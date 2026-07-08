@@ -1124,6 +1124,7 @@ func newTestGitRepo(t *testing.T) string {
 	t.Helper()
 
 	root := t.TempDir()
+	t.Setenv("CODEX_HOME", filepath.Join(root, "codex-home"))
 	if err := os.Mkdir(filepath.Join(root, ".git"), 0o755); err != nil {
 		t.Fatal(err)
 	}
