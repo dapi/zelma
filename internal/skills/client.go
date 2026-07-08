@@ -92,10 +92,10 @@ type StaleCandidate struct {
 }
 
 type Recovery struct {
-	Action      RecoveryAction
-	ReasonCode  string
-	Message     string
-	NextCommand []string
+	Action      RecoveryAction `json:"action,omitempty"`
+	ReasonCode  string         `json:"reason_code,omitempty"`
+	Message     string         `json:"message,omitempty"`
+	NextCommand []string       `json:"next_command,omitempty"`
 }
 
 type CommandError struct {

@@ -2,6 +2,7 @@ package skills
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -219,6 +220,30 @@ func TestCreatePartialFailureSuggestsDetectRecovery(t *testing.T) {
 		t.Fatalf("Recovery = %+v, want detect for create_pane_unconfirmed", commandErr.Recovery)
 	}
 	assertRecoveryCommand(t, commandErr.Recovery, DefaultZelmaBinary, "sessions", "detect", "--json")
+}
+
+func TestRecoveryJSONUsesAgentContractFields(t *testing.T) {
+	data, err := json.Marshal(Recovery{
+		Action:      RecoveryActionDetect,
+		ReasonCode:  "create_pane_unconfirmed",
+		Message:     "reconcile through detect",
+		NextCommand: []string{DefaultZelmaBinary, "sessions", "detect", "--json"},
+	})
+	if err != nil {
+		t.Fatalf("Marshal(Recovery) error = %v", err)
+	}
+
+	got := string(data)
+	for _, want := range []string{`"action"`, `"reason_code"`, `"message"`, `"next_command"`} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("Recovery JSON = %s, want field %s", got, want)
+		}
+	}
+	for _, unwanted := range []string{`"Action"`, `"ReasonCode"`, `"NextCommand"`} {
+		if strings.Contains(got, unwanted) {
+			t.Fatalf("Recovery JSON = %s, must not expose Go field %s", got, unwanted)
+		}
+	}
 }
 
 func TestRepoNotReadyErrorSuggestsSetup(t *testing.T) {
