@@ -314,7 +314,8 @@ OUTPUT CONVENTIONS
   help output: stdout, exit 0, plain text.
   setup changed: stdout, exit 0, "changed: added .zelma to <path>".
   setup unchanged: stdout, exit 0, "already configured: <path> contains .zelma".
-  sessions list: stdout, exit 0, table by default or schema v1 JSON with --json.
+  sessions list: stdout, exit 0, table by default or schema v1 JSON with --json;
+  add --live to include live/unreachable zellij status without registry writes.
   sessions detect: stdout, exit 0, summary with active/candidate counts or JSON
   with --json.
   sessions create --dry-run: stdout, exit 0, launch contract text or JSON.
@@ -328,8 +329,8 @@ RECOVERY HINTS
 
 HUMAN NOTES
   zelma manages Codex sessions in zellij panes. sessions list reads the
-  repository-local registry only; setup configures repository-local ignore
-  rules.
+  repository-local registry; --live additionally checks current zellij state
+  without mutating registry. setup configures repository-local ignore rules.
 
 Usage:
   zelma [command]
@@ -343,7 +344,8 @@ const sessionsHelpSnapshot = `COMMAND MAP
 
 OUTPUT CONVENTIONS
   help output: stdout, exit 0, plain text.
-  list: stdout, exit 0, table by default or schema v1 JSON with --json.
+  list: stdout, exit 0, table by default or schema v1 JSON with --json; add
+  --live to include live/unreachable zellij status without registry writes.
   create --dry-run: stdout, exit 0, resolved Codex command/opened path.
   create: stdout, exit 0, created/registered/skipped summary.
   detect: stdout, exit 0, added/unchanged/skipped summary with
@@ -357,8 +359,9 @@ RECOVERY HINTS
   manual detect task: inspect "zelma sessions detect --help".
 
 HUMAN NOTES
-  sessions list reads .zelma/sessions.json without live zellij checks. detect
-  inspects live zellij panes and only upserts unresolved candidate records.
+  sessions list reads .zelma/sessions.json; --live checks current zellij panes
+  without registry writes. detect inspects live zellij panes and only upserts
+  unresolved candidate records.
 
 Usage:
   zelma sessions [command]
@@ -793,6 +796,127 @@ func TestSessionsListTableOutput(t *testing.T) {
 	want := "STATE   ZELLIJ_SESSION   ZELLIJ_PANE  CODEX_SESSION  OPENED_PATH\n" +
 		"active  zelma-main       1            codex-a        /workspace/zelma\n" +
 		"closed  feature-issue-6  3            codex-b        /workspace/zelma/memory-bank/features/FT-006\n"
+	if stdout.String() != want {
+		t.Fatalf("stdout mismatch\nwant:\n%s\ngot:\n%s", want, stdout.String())
+	}
+}
+
+func TestSessionsListLiveTableOutput(t *testing.T) {
+	root := newTestGitRepo(t)
+	paneRoot := resolvedPath(t, root)
+	writeRegistryFile(t, root, fmt.Sprintf(`{
+  "version": 1,
+  "sessions": [
+    {
+      "zellij_session": "zelma-main",
+      "zellij_pane": "terminal_1",
+      "codex_session": "codex-live",
+      "opened_path": %q,
+      "state": "active"
+    },
+    {
+      "zellij_session": "zelma-main",
+      "zellij_pane": "terminal_2",
+      "codex_session": "codex-missing-pane",
+      "opened_path": %q,
+      "state": "active"
+    },
+    {
+      "zellij_session": "missing-session",
+      "zellij_pane": "terminal_1",
+      "codex_session": "codex-missing-session",
+      "opened_path": %q,
+      "state": "active"
+    }
+  ]
+}
+`, paneRoot, paneRoot, paneRoot))
+	registryPath := registry.RegistryPath(root)
+	before := readFile(t, registryPath)
+	t.Setenv("ZELMA_ZELLIJ_BIN", writeFakeZellij(t, panesJSON(paneRoot, true)))
+	t.Chdir(root)
+
+	var stdout, stderr bytes.Buffer
+
+	code := Run(context.Background(), []string{"sessions", "list", "--live"}, &stdout, &stderr)
+
+	if code != 0 {
+		t.Fatalf("Run() code = %d, want 0; stderr = %q", code, stderr.String())
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("stderr = %q, want empty", stderr.String())
+	}
+	want := "STATE   LIVE_STATUS  ZELLIJ_SESSION   ZELLIJ_PANE  CODEX_SESSION          OPENED_PATH\n" +
+		"active  live         zelma-main       terminal_1   codex-live             " + paneRoot + "\n" +
+		"active  unreachable  zelma-main       terminal_2   codex-missing-pane     " + paneRoot + "\n" +
+		"active  unreachable  missing-session  terminal_1   codex-missing-session  " + paneRoot + "\n"
+	if stdout.String() != want {
+		t.Fatalf("stdout mismatch\nwant:\n%s\ngot:\n%s", want, stdout.String())
+	}
+	after := readFile(t, registryPath)
+	if after != before {
+		t.Fatalf("registry changed by list --live\nbefore:\n%s\nafter:\n%s", before, after)
+	}
+}
+
+func TestSessionsListLiveJSONOutput(t *testing.T) {
+	root := newTestGitRepo(t)
+	paneRoot := resolvedPath(t, root)
+	writeRegistryFile(t, root, fmt.Sprintf(`{
+  "version": 1,
+  "sessions": [
+    {
+      "zellij_session": "zelma-main",
+      "zellij_pane": "terminal_1",
+      "codex_session": "",
+      "opened_path": %q,
+      "state": "candidate"
+    },
+    {
+      "zellij_session": "zelma-main",
+      "zellij_pane": "terminal_2",
+      "codex_session": "",
+      "opened_path": %q,
+      "state": "candidate"
+    }
+  ]
+}
+`, paneRoot, paneRoot))
+	t.Setenv("ZELMA_ZELLIJ_BIN", writeFakeZellij(t, panesJSON(paneRoot, true)))
+	t.Chdir(root)
+
+	var stdout, stderr bytes.Buffer
+
+	code := Run(context.Background(), []string{"sessions", "list", "--live", "--json"}, &stdout, &stderr)
+
+	if code != 0 {
+		t.Fatalf("Run() code = %d, want 0; stderr = %q", code, stderr.String())
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("stderr = %q, want empty", stderr.String())
+	}
+	want := fmt.Sprintf(`{
+  "version": 1,
+  "sessions": [
+    {
+      "zellij_session": "zelma-main",
+      "zellij_pane": "terminal_1",
+      "codex_session": "",
+      "opened_path": %q,
+      "state": "candidate",
+      "live_status": "live"
+    },
+    {
+      "zellij_session": "zelma-main",
+      "zellij_pane": "terminal_2",
+      "codex_session": "",
+      "opened_path": %q,
+      "state": "candidate",
+      "live_status": "unreachable"
+    }
+  ]
+}
+`, paneRoot, paneRoot)
 	if stdout.String() != want {
 		t.Fatalf("stdout mismatch\nwant:\n%s\ngot:\n%s", want, stdout.String())
 	}
