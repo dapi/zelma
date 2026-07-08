@@ -1022,6 +1022,51 @@ func TestSessionsListLiveTableOutput(t *testing.T) {
 	}
 }
 
+func TestSessionsListLiveTableFiltersInactiveBeforeReconcile(t *testing.T) {
+	root := newTestGitRepo(t)
+	paneRoot := resolvedPath(t, root)
+	writeRegistryFile(t, root, fmt.Sprintf(`{
+  "version": 1,
+  "sessions": [
+    {
+      "id": 1,
+      "zellij_session": "zelma-main",
+      "zellij_pane": "terminal_1",
+      "codex_session": "codex-live",
+      "opened_path": %q,
+      "state": "active"
+    },
+    {
+      "id": 2,
+      "zellij_session": "hidden-stale",
+      "zellij_pane": "terminal_2",
+      "codex_session": "codex-stale",
+      "opened_path": %q,
+      "state": "stale"
+    }
+  ]
+}
+`, paneRoot, paneRoot))
+	t.Setenv("ZELMA_ZELLIJ_BIN", writeFakeZellijWithFailingHiddenSession(t, panesJSON(paneRoot, true)))
+	t.Chdir(root)
+
+	var stdout, stderr bytes.Buffer
+
+	code := Run(context.Background(), []string{"sessions", "list", "--live"}, &stdout, &stderr)
+
+	if code != 0 {
+		t.Fatalf("Run() code = %d, want 0; stderr = %q", code, stderr.String())
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("stderr = %q, want empty", stderr.String())
+	}
+	want := "ID  STATE   LIVE_STATUS  ZELLIJ_SESSION  ZELLIJ_TAB  ZELLIJ_PANE  CODEX_SESSION  OPENED_PATH\n" +
+		"1   active  live         zelma-main                  terminal_1   codex-live     " + paneRoot + "\n"
+	if stdout.String() != want {
+		t.Fatalf("stdout mismatch\nwant:\n%s\ngot:\n%s", want, stdout.String())
+	}
+}
+
 func TestSessionsListLiveJSONOutput(t *testing.T) {
 	root := newTestGitRepo(t)
 	paneRoot := resolvedPath(t, root)
@@ -2211,6 +2256,34 @@ func writeFakeZellijListSessionsFailure(t *testing.T) string {
 	script := `#!/bin/sh
 if [ "$1" = "list-sessions" ]; then
   printf 'zellij server temporarily unavailable\n' >&2
+  exit 2
+fi
+printf 'unexpected fake zellij args: %s\n' "$*" >&2
+exit 2
+`
+	if err := os.WriteFile(path, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
+func writeFakeZellijWithFailingHiddenSession(t *testing.T, panesJSON string) string {
+	t.Helper()
+
+	path := filepath.Join(t.TempDir(), "fake-zellij")
+	script := `#!/bin/sh
+if [ "$1" = "list-sessions" ]; then
+  printf 'zelma-main\nhidden-stale\n'
+  exit 0
+fi
+if [ "$1" = "--session" ] && [ "$2" = "zelma-main" ]; then
+  cat <<'JSON'
+` + panesJSON + `
+JSON
+  exit 0
+fi
+if [ "$1" = "--session" ] && [ "$2" = "hidden-stale" ]; then
+  printf 'hidden stale session should not be reconciled\n' >&2
   exit 2
 fi
 printf 'unexpected fake zellij args: %s\n' "$*" >&2
