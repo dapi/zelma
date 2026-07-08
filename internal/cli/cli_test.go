@@ -3,6 +3,7 @@ package cli
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -76,8 +77,8 @@ func TestAgentFirstHelpOrder(t *testing.T) {
 			assertBefore(t, output, "COMMAND MAP\n", "HUMAN NOTES\n")
 			assertBefore(t, output, "COMMAND MAP\n", "Usage:\n")
 			assertBefore(t, output, "OUTPUT CONVENTIONS\n", "HUMAN NOTES\n")
-			if !strings.Contains(output, "not implemented") {
-				t.Fatalf("stdout = %q, want explicit not implemented status", output)
+			if !strings.Contains(output, "Status: partial") {
+				t.Fatalf("stdout = %q, want explicit partial status", output)
 			}
 		})
 	}
@@ -132,7 +133,7 @@ func TestHelpRoutes(t *testing.T) {
 	}
 }
 
-func TestStubHelpSnapshots(t *testing.T) {
+func TestCommandHelpSnapshots(t *testing.T) {
 	tests := []struct {
 		name string
 		args []string
@@ -146,15 +147,7 @@ func TestStubHelpSnapshots(t *testing.T) {
 		{
 			name: "sessions create help",
 			args: []string{"sessions", "create", "--help"},
-			want: `Usage:
-  zelma sessions create
-
-Status:
-  stub: not implemented yet.
-
-Description:
-  Create a zelma session.
-`,
+			want: sessionsCreateHelp,
 		},
 		{
 			name: "sessions detect help",
@@ -212,13 +205,6 @@ func TestOutputAndErrorStreamContract(t *testing.T) {
 			wantCode:   0,
 			wantStdout: "STATE  ZELLIJ_SESSION  ZELLIJ_PANE  CODEX_SESSION  OPENED_PATH\n",
 			wantStderr: "",
-		},
-		{
-			name:       "create stub writes stderr only",
-			args:       []string{"sessions", "create"},
-			wantCode:   1,
-			wantStdout: "",
-			wantStderr: "zelma sessions create is not implemented yet\n",
 		},
 		{
 			name:       "detect summary writes stdout only",
@@ -321,7 +307,7 @@ const rootHelpSnapshot = `COMMAND MAP
   zelma setup             Add .zelma to this repository .gitignore. Status: implemented.
   zelma sessions help     Show the sessions command map.
   zelma sessions list     List known zelma sessions. Status: implemented.
-  zelma sessions create   Create a zelma session. Status: stub.
+  zelma sessions create   Resolve Codex launch contract. Status: partial.
   zelma sessions detect   Detect existing Codex panes. Status: implemented.
 
 OUTPUT CONVENTIONS
@@ -330,7 +316,8 @@ OUTPUT CONVENTIONS
   setup unchanged: stdout, exit 0, "already configured: <path> contains .zelma".
   sessions list: stdout, exit 0, table by default or schema v1 JSON with --json.
   sessions detect: stdout, exit 0, summary or JSON with --json.
-  stub commands: stderr, exit 1, "<command> is not implemented yet".
+  sessions create --dry-run: stdout, exit 0, launch contract text or JSON.
+  sessions create without --dry-run: stderr, exit 1 until zellij pane creation lands.
   machine-readable session data: use "zelma sessions list --json".
 
 RECOVERY HINTS
@@ -350,14 +337,15 @@ Usage:
 const sessionsHelpSnapshot = `COMMAND MAP
   zelma sessions help     Show this sessions command map.
   zelma sessions list     List known zelma sessions. Status: implemented.
-  zelma sessions create   Create a zelma session. Status: stub.
+  zelma sessions create   Resolve Codex launch contract. Status: partial.
   zelma sessions detect   Detect existing Codex panes. Status: implemented.
 
 OUTPUT CONVENTIONS
   help output: stdout, exit 0, plain text.
   list: stdout, exit 0, table by default or schema v1 JSON with --json.
+  create --dry-run: stdout, exit 0, resolved Codex command/opened path.
   detect: stdout, exit 0, added/unchanged/skipped summary or JSON with --json.
-  create: stderr, exit 1, "zelma sessions create is not implemented yet".
+  create without --dry-run: stderr, exit 1, zellij pane creation pending.
   sessions registry output: preserves zellij_session, zellij_pane,
   codex_session, opened_path and state fields.
 
@@ -374,35 +362,67 @@ Usage:
   zelma sessions [command]
 `
 
-func TestStubDiagnostics(t *testing.T) {
-	tests := []struct {
-		name       string
-		args       []string
-		wantStderr string
-	}{
-		{
-			name:       "sessions create",
-			args:       []string{"sessions", "create"},
-			wantStderr: "zelma sessions create is not implemented yet\n",
-		},
+func TestSessionsCreateDryRunJSONUsesRepoRootByDefault(t *testing.T) {
+	root := newTestGitRepo(t)
+	fakeCodex := writeFakeCodex(t)
+	t.Setenv("ZELMA_CODEX_BIN", fakeCodex)
+	t.Chdir(filepath.Join(root, "nested"))
+
+	var stdout, stderr bytes.Buffer
+
+	code := Run(context.Background(), []string{"sessions", "create", "--dry-run", "--json"}, &stdout, &stderr)
+
+	if code != 0 {
+		t.Fatalf("Run() code = %d, want 0; stderr = %q", code, stderr.String())
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("stderr = %q, want empty", stderr.String())
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			var stdout, stderr bytes.Buffer
+	var got createLaunchContractJSON
+	if err := json.Unmarshal(stdout.Bytes(), &got); err != nil {
+		t.Fatalf("decode stdout JSON: %v; stdout = %q", err, stdout.String())
+	}
+	wantRoot := resolvedPath(t, root)
+	if got.OpenedPath != wantRoot || got.WorkingDirectory != wantRoot {
+		t.Fatalf("launch path = opened:%q working:%q, want repo root %q", got.OpenedPath, got.WorkingDirectory, wantRoot)
+	}
+	if got.Binary != fakeCodex {
+		t.Fatalf("binary = %q, want fake Codex %q", got.Binary, fakeCodex)
+	}
+	wantArgs := []string{"--cd", wantRoot}
+	if fmt.Sprint(got.Args) != fmt.Sprint(wantArgs) {
+		t.Fatalf("args = %#v, want %#v", got.Args, wantArgs)
+	}
+	if _, err := os.Stat(registry.RegistryPath(root)); !os.IsNotExist(err) {
+		t.Fatalf("registry path stat error = %v, want not exist", err)
+	}
+}
 
-			code := Run(context.Background(), tt.args, &stdout, &stderr)
+func TestSessionsCreateMissingCodexDoesNotWriteRegistry(t *testing.T) {
+	root := newTestGitRepo(t)
+	missingCodex := filepath.Join(t.TempDir(), "missing-codex")
+	t.Setenv("ZELMA_CODEX_BIN", missingCodex)
+	t.Chdir(root)
 
-			if code != 1 {
-				t.Fatalf("Run() code = %d, want 1", code)
-			}
-			if stdout.Len() != 0 {
-				t.Fatalf("stdout = %q, want empty", stdout.String())
-			}
-			if stderr.String() != tt.wantStderr {
-				t.Fatalf("stderr = %q, want %q", stderr.String(), tt.wantStderr)
-			}
-		})
+	var stdout, stderr bytes.Buffer
+
+	code := Run(context.Background(), []string{"sessions", "create", "--dry-run"}, &stdout, &stderr)
+
+	if code != 1 {
+		t.Fatalf("Run() code = %d, want 1", code)
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("stdout = %q, want empty", stdout.String())
+	}
+	if !strings.Contains(stderr.String(), "codex_missing_binary") {
+		t.Fatalf("stderr = %q, want missing Codex diagnostic", stderr.String())
+	}
+	if !strings.Contains(stderr.String(), "ZELMA_CODEX_BIN") {
+		t.Fatalf("stderr = %q, want env override hint", stderr.String())
+	}
+	if _, err := os.Stat(registry.RegistryPath(root)); !os.IsNotExist(err) {
+		t.Fatalf("registry path stat error = %v, want not exist", err)
 	}
 }
 
@@ -875,6 +895,17 @@ fi
 printf 'unexpected fake zellij args: %s\n' "$*" >&2
 exit 2
 `
+	if err := os.WriteFile(path, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
+func writeFakeCodex(t *testing.T) string {
+	t.Helper()
+
+	path := filepath.Join(t.TempDir(), "fake-codex")
+	script := "#!/bin/sh\nexit 0\n"
 	if err := os.WriteFile(path, []byte(script), 0o755); err != nil {
 		t.Fatal(err)
 	}

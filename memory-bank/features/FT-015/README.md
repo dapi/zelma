@@ -16,3 +16,6 @@ audience: humans_and_agents
 
 - [Brief](brief.md)
   Читать, когда нужно понять contract запуска Codex для `sessions create`.
+- [Design](design.md)
+  Читать, когда нужно понять selected launch contract, path policy и failure
+  boundaries.
