@@ -298,7 +298,7 @@ func newSessionsCreateCommand(stdout io.Writer) *cobra.Command {
 			}
 			openedPath, err := codex.ResolveOpenedPath(root.Path, requestedPath)
 			if err != nil {
-				return fmt.Errorf("%s: %w", cmd.CommandPath(), err)
+				return fmt.Errorf("%s: %w", cmd.CommandPath(), create.PreflightFailure(err))
 			}
 
 			contract, err := codex.PrepareLaunchContract(codex.LaunchRequest{
@@ -306,7 +306,7 @@ func newSessionsCreateCommand(stdout io.Writer) *cobra.Command {
 				OpenedPath: openedPath,
 			})
 			if err != nil {
-				return fmt.Errorf("%s: %w", cmd.CommandPath(), err)
+				return fmt.Errorf("%s: %w", cmd.CommandPath(), create.PreflightFailure(err))
 			}
 
 			if dryRun {
@@ -343,7 +343,7 @@ func newSessionsCreateCommand(stdout io.Writer) *cobra.Command {
 					return next, nil
 				})
 				if err != nil {
-					return fmt.Errorf("%s: %w", cmd.CommandPath(), err)
+					return fmt.Errorf("%s: %w", cmd.CommandPath(), create.RegistryWriteFailure(summary, path, err))
 				}
 				summary.Registered = upsertSummary.Added + upsertSummary.Unchanged
 				summary.Skipped += upsertSummary.Skipped

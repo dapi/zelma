@@ -5,6 +5,7 @@ import (
 	"errors"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/dapi/zelma/internal/codex"
@@ -102,7 +103,7 @@ func TestLaunchAndConfirmAcceptsConfiguredCodexWrapper(t *testing.T) {
 	}
 }
 
-func TestLaunchAndConfirmSkipsUnconfirmedPane(t *testing.T) {
+func TestLaunchAndConfirmReturnsUnconfirmedPaneDiagnostic(t *testing.T) {
 	root := filepath.Clean(t.TempDir())
 	contract := codex.LaunchContract{
 		Binary:           "/usr/local/bin/codex",
@@ -125,8 +126,12 @@ func TestLaunchAndConfirmSkipsUnconfirmedPane(t *testing.T) {
 		Contract:      contract,
 	}, &runtime)
 
-	if err != nil {
-		t.Fatalf("LaunchAndConfirm() error = %v, want nil", err)
+	diagnostic := requireCreateDiagnostic(t, err, ReasonPaneUnconfirmed)
+	if diagnostic.Retryable {
+		t.Fatal("Retryable = true, want false for unconfirmed pane")
+	}
+	if !strings.Contains(diagnostic.RecoveryHint, "zelma sessions detect") || !strings.Contains(diagnostic.RecoveryHint, "inspect zellij") {
+		t.Fatalf("recovery hint = %q, want detect and inspect guidance", diagnostic.RecoveryHint)
 	}
 	if got.Confirmed {
 		t.Fatal("Confirmed = true, want false")
@@ -139,7 +144,43 @@ func TestLaunchAndConfirmSkipsUnconfirmedPane(t *testing.T) {
 	}
 }
 
-func TestLaunchAndConfirmPropagatesReadErrorAfterCreate(t *testing.T) {
+func TestLaunchAndConfirmClassifiesRetryableLaunchFailure(t *testing.T) {
+	wantErr := &zellij.DiagnosticError{
+		Diagnostic: zellij.Diagnostic{
+			Code:         zellij.ErrorCodeCommandFailed,
+			Message:      "zellij command exited with status 1",
+			RecoveryHint: "inspect zellij session and command availability, then retry; zelma did not write registry state",
+		},
+		Err: errors.New("run failed"),
+	}
+	runtime := fakeRuntime{err: wantErr}
+
+	got, err := LaunchAndConfirm(context.Background(), Request{
+		ZellijSession: "zelma-main",
+		Contract: codex.LaunchContract{
+			Binary:           "/usr/local/bin/codex",
+			Args:             []string{"--cd", "/workspace/zelma"},
+			WorkingDirectory: "/workspace/zelma",
+			OpenedPath:       "/workspace/zelma",
+		},
+	}, &runtime)
+
+	diagnostic := requireCreateDiagnostic(t, err, ReasonPaneLaunchFailed)
+	if !diagnostic.Retryable {
+		t.Fatal("Retryable = false, want true for zellij command failure before pane confirmation")
+	}
+	if diagnostic.CauseCode != string(zellij.ErrorCodeCommandFailed) {
+		t.Fatalf("cause code = %q, want %q", diagnostic.CauseCode, zellij.ErrorCodeCommandFailed)
+	}
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("LaunchAndConfirm() error = %v, want wrapping %v", err, wantErr)
+	}
+	if got.Summary != (Summary{}) {
+		t.Fatalf("Summary = %+v, want zero before run failure", got.Summary)
+	}
+}
+
+func TestLaunchAndConfirmClassifiesReadErrorAfterCreate(t *testing.T) {
 	root := filepath.Clean(t.TempDir())
 	wantErr := errors.New("list panes failed")
 	runtime := fakeRuntime{
@@ -163,8 +204,54 @@ func TestLaunchAndConfirmPropagatesReadErrorAfterCreate(t *testing.T) {
 	if !errors.Is(err, wantErr) {
 		t.Fatalf("LaunchAndConfirm() error = %v, want %v", err, wantErr)
 	}
+	diagnostic := requireCreateDiagnostic(t, err, ReasonConfirmationFailed)
+	if diagnostic.Retryable {
+		t.Fatal("Retryable = true, want false after pane was created")
+	}
+	if !strings.Contains(diagnostic.RecoveryHint, "zelma sessions detect") {
+		t.Fatalf("recovery hint = %q, want detect guidance", diagnostic.RecoveryHint)
+	}
 	if got.Summary != (Summary{Created: 1}) {
 		t.Fatalf("Summary = %+v, want created=1 before read failure", got.Summary)
+	}
+}
+
+func TestPreflightFailureClassifiesMissingCodex(t *testing.T) {
+	missing := filepath.Join(t.TempDir(), "missing-codex")
+	_, launchErr := codex.PrepareLaunchContract(codex.LaunchRequest{
+		Binary:     missing,
+		OpenedPath: filepath.Clean(t.TempDir()),
+	})
+
+	diagnostic := requireCreateDiagnostic(t, PreflightFailure(launchErr), ReasonCodexMissingBinary)
+	if diagnostic.Retryable {
+		t.Fatal("Retryable = true, want false for missing Codex binary")
+	}
+	if diagnostic.CauseCode != string(codex.ErrorCodeMissingBinary) {
+		t.Fatalf("cause code = %q, want %q", diagnostic.CauseCode, codex.ErrorCodeMissingBinary)
+	}
+	if !strings.Contains(diagnostic.RecoveryHint, "fix environment") || !strings.Contains(diagnostic.RecoveryHint, "ZELMA_CODEX_BIN") {
+		t.Fatalf("recovery hint = %q, want environment fix hint", diagnostic.RecoveryHint)
+	}
+}
+
+func TestRegistryWriteFailureClassifiesLockAsRetryable(t *testing.T) {
+	summary := Summary{Created: 1}
+	writeErr := &registry.WriteError{
+		Op:   "lock",
+		Path: "/workspace/zelma/.zelma/sessions.json.lock",
+		Err:  registry.ErrRegistryLocked,
+	}
+
+	diagnostic := requireCreateDiagnostic(t, RegistryWriteFailure(summary, "/workspace/zelma/.zelma/sessions.json", writeErr), ReasonRegistryWriteFailed)
+	if !diagnostic.Retryable {
+		t.Fatal("Retryable = false, want true for registry lock contention")
+	}
+	if diagnostic.CauseCode != causeRegistryLocked {
+		t.Fatalf("cause code = %q, want %q", diagnostic.CauseCode, causeRegistryLocked)
+	}
+	if diagnostic.Summary != summary {
+		t.Fatalf("summary = %+v, want %+v", diagnostic.Summary, summary)
 	}
 }
 
@@ -202,4 +289,23 @@ func terminalPane(id int, command, cwd string) zellij.Pane {
 
 func strPtr(value string) *string {
 	return &value
+}
+
+func requireCreateDiagnostic(t *testing.T, err error, wantCode ReasonCode) Diagnostic {
+	t.Helper()
+
+	if err == nil {
+		t.Fatal("error = nil, want create diagnostic")
+	}
+	var diagnosticErr *DiagnosticError
+	if !errors.As(err, &diagnosticErr) {
+		t.Fatalf("error = %T, want *DiagnosticError", err)
+	}
+	if diagnosticErr.Diagnostic.Code != wantCode {
+		t.Fatalf("code = %q, want %q", diagnosticErr.Diagnostic.Code, wantCode)
+	}
+	if diagnosticErr.Diagnostic.RecoveryHint == "" {
+		t.Fatal("RecoveryHint is empty")
+	}
+	return diagnosticErr.Diagnostic
 }

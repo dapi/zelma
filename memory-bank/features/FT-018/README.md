@@ -16,3 +16,5 @@ audience: humans_and_agents
 
 - [Brief](brief.md)
   Читать, когда нужно понять diagnostics и recovery hints для create failures.
+- [Design](design.md)
+  Читать, когда нужен контракт reason codes, retryability и recovery hints.

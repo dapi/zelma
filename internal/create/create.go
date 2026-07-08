@@ -2,7 +2,6 @@ package create
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -42,13 +41,13 @@ type Result struct {
 
 func LaunchAndConfirm(ctx context.Context, request Request, runtime Runtime) (Result, error) {
 	if runtime == nil {
-		return Result{}, errors.New("create session: runtime is required")
+		return Result{}, invalidRequestFailure("runtime is required", nil)
 	}
 	if request.ZellijSession == "" {
-		return Result{}, errors.New("create session: zellij session is required")
+		return Result{}, invalidRequestFailure("zellij session is required", nil)
 	}
 	if len(request.Contract.Args) == 0 {
-		return Result{}, errors.New("create session: launch contract args are required")
+		return Result{}, invalidRequestFailure("launch contract args are required", nil)
 	}
 
 	ref, err := runtime.RunPane(ctx, zellij.RunPaneRequest{
@@ -59,24 +58,24 @@ func LaunchAndConfirm(ctx context.Context, request Request, runtime Runtime) (Re
 	})
 	result := Result{}
 	if err != nil {
-		return result, err
+		return result, paneLaunchFailure(err)
 	}
 	result.Summary.Created = 1
 
 	if ref.Session != request.ZellijSession {
 		result.Summary.Skipped = 1
-		return result, nil
+		return result, paneUnconfirmedFailure(result.Summary, ref)
 	}
 
 	panes, err := runtime.ListPanes(ctx, ref.Session)
 	if err != nil {
-		return result, fmt.Errorf("confirm created pane: %w", err)
+		return result, confirmationFailure(result.Summary, fmt.Errorf("confirm created pane: %w", err))
 	}
 
 	candidate, ok := ConfirmPane(request.Contract.OpenedPath, request.Contract.Binary, ref, panes)
 	if !ok {
 		result.Summary.Skipped = 1
-		return result, nil
+		return result, paneUnconfirmedFailure(result.Summary, ref)
 	}
 
 	result.Candidate = candidate
