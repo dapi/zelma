@@ -15,11 +15,21 @@ type PaneRunner interface {
 	RunPane(ctx context.Context, request RunPaneRequest) (PaneRef, error)
 }
 
+type PaneFocuser interface {
+	FocusPane(ctx context.Context, request FocusPaneRequest) error
+}
+
 type RunPaneRequest struct {
 	Session string
 	CWD     string
 	Name    string
 	Command []string
+}
+
+type FocusPaneRequest struct {
+	Session string
+	TabID   *int
+	PaneID  string
 }
 
 type PaneRef struct {
@@ -141,6 +151,69 @@ func (client Client) RunPane(ctx context.Context, request RunPaneRequest) (PaneR
 	return PaneRef{Session: request.Session, PaneID: paneID}, nil
 }
 
+func (client Client) FocusPane(ctx context.Context, request FocusPaneRequest) error {
+	if request.Session == "" {
+		return &DiagnosticError{
+			Diagnostic: Diagnostic{
+				Code:         ErrorCodeInvalidInput,
+				Command:      "zellij --session <name> action focus-pane-id <pane_id>",
+				ExitCode:     -1,
+				Message:      "zellij session name is required",
+				RecoveryHint: "pass an explicit zellij session name before focusing a pane; zelma did not write registry state",
+			},
+		}
+	}
+	if request.PaneID == "" {
+		return &DiagnosticError{
+			Diagnostic: Diagnostic{
+				Code:         ErrorCodeInvalidInput,
+				Command:      "zellij --session <name> action focus-pane-id <pane_id>",
+				ExitCode:     -1,
+				Message:      "zellij pane id is required",
+				RecoveryHint: "pass an explicit zellij pane id before focusing; zelma did not write registry state",
+			},
+		}
+	}
+	if request.TabID != nil && *request.TabID < 0 {
+		return &DiagnosticError{
+			Diagnostic: Diagnostic{
+				Code:         ErrorCodeInvalidInput,
+				Command:      "zellij --session <name> action go-to-tab-by-id <id>",
+				ExitCode:     -1,
+				Message:      "zellij tab id must be non-negative",
+				RecoveryHint: "pass a valid zellij tab id before focusing; zelma did not write registry state",
+			},
+		}
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	client = client.withDefaults()
+
+	runCtx, cancel := withTimeout(ctx, client.timeout)
+	defer cancel()
+
+	if request.TabID != nil {
+		args := focusTabArgs(request.Session, *request.TabID)
+		if err := client.runFocusAction(runCtx, args); err != nil {
+			return err
+		}
+	}
+	return client.runFocusAction(runCtx, focusPaneArgs(request.Session, request.PaneID))
+}
+
+func (client Client) runFocusAction(ctx context.Context, args []string) error {
+	result := client.run(ctx, client.binary, args)
+	command := commandString(client.binary, args)
+	if result.err != nil {
+		return normalizeFocusCommandError(command, result)
+	}
+	if isSessionNotFoundResult(result) {
+		return normalizeFocusSessionNotFoundResult(command, result)
+	}
+	return nil
+}
+
 func listPanesArgs(session string) []string {
 	return []string{"--session", session, "action", "list-panes", "--json", "--all"}
 }
@@ -156,6 +229,14 @@ func runPaneArgs(request RunPaneRequest) []string {
 	args = append(args, "--")
 	args = append(args, request.Command...)
 	return args
+}
+
+func focusTabArgs(session string, tabID int) []string {
+	return []string{"--session", session, "action", "go-to-tab-by-id", fmt.Sprint(tabID)}
+}
+
+func focusPaneArgs(session, paneID string) []string {
+	return []string{"--session", session, "action", "focus-pane-id", paneID}
 }
 
 func isSessionNotFoundResult(result commandResult) bool {
@@ -198,7 +279,29 @@ func IsSessionNotFound(err error) bool {
 	return strings.Contains(stderr, "session") && strings.Contains(stderr, "not found")
 }
 
+func normalizeFocusCommandError(command string, result commandResult) error {
+	return normalizeCommandErrorWithRecovery(
+		command,
+		result,
+		"install zellij or configure the adapter binary path, then verify with zellij --version; zelma did not write registry state",
+		"verify the target zellij session and pane still exist, then retry; zelma did not write registry state",
+	)
+}
+
 func normalizeRunPaneSessionNotFoundResult(command string, result commandResult) error {
+	return &DiagnosticError{
+		Diagnostic: Diagnostic{
+			Code:         ErrorCodeCommandFailed,
+			Command:      command,
+			ExitCode:     0,
+			Stderr:       trimStderr(result.stderr),
+			Message:      "zellij command reported session failure",
+			RecoveryHint: "verify the target zellij session exists with zellij list-sessions --short --no-formatting; zelma did not write registry state",
+		},
+	}
+}
+
+func normalizeFocusSessionNotFoundResult(command string, result commandResult) error {
 	return &DiagnosticError{
 		Diagnostic: Diagnostic{
 			Code:         ErrorCodeCommandFailed,

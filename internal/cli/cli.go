@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 	"strings"
 	"text/tabwriter"
 
@@ -59,6 +60,7 @@ func NewRootCommand(stdout, stderr io.Writer) *cobra.Command {
 		newSessionsListCommand(stdout),
 		newSessionsCreateCommand(stdout),
 		newSessionsDetectCommand(stdout),
+		newSessionsFocusCommand(stdout),
 		newSessionsCleanupCommand(stdout),
 	)
 	root.AddCommand(sessions)
@@ -80,6 +82,8 @@ func renderHelp(cmd *cobra.Command, args []string) {
 		fmt.Fprint(cmd.OutOrStdout(), sessionsCreateHelp)
 	case "zelma sessions detect":
 		fmt.Fprint(cmd.OutOrStdout(), sessionsDetectHelp)
+	case "zelma sessions focus":
+		fmt.Fprint(cmd.OutOrStdout(), sessionsFocusHelp)
 	case "zelma sessions cleanup":
 		fmt.Fprint(cmd.OutOrStdout(), sessionsCleanupHelp)
 	case "zelma help":
@@ -96,6 +100,7 @@ const rootHelp = `COMMAND MAP
   zelma sessions list     List known zelma sessions. Status: implemented.
   zelma sessions create   Create and register a confirmed Codex pane. Status: implemented.
   zelma sessions detect   Detect existing Codex panes. Status: implemented.
+  zelma sessions focus    Focus a known zellij pane by zelma session ID. Status: implemented.
   zelma sessions cleanup  Propose or confirm stale record cleanup. Status: implemented.
 
 OUTPUT CONVENTIONS
@@ -106,6 +111,7 @@ OUTPUT CONVENTIONS
   add --live to include live/unreachable zellij status without registry writes.
   sessions detect: stdout, exit 0, summary with active/candidate/stale counts,
   stale reason lines when found, or JSON with --json.
+  sessions focus: stdout, exit 0, focused summary or JSON with --json.
   sessions cleanup: stdout, exit 0, stale cleanup proposal by default; add
   --confirm to remove proposed stale records.
   sessions create --dry-run: stdout, exit 0, launch contract text or JSON.
@@ -156,6 +162,7 @@ const sessionsHelp = `COMMAND MAP
   zelma sessions list     List known zelma sessions. Status: implemented.
   zelma sessions create   Create and register a confirmed Codex pane. Status: implemented.
   zelma sessions detect   Detect existing Codex panes. Status: implemented.
+  zelma sessions focus    Focus a known zellij pane by zelma session ID. Status: implemented.
   zelma sessions cleanup  Propose or confirm stale record cleanup. Status: implemented.
 
 OUTPUT CONVENTIONS
@@ -166,6 +173,7 @@ OUTPUT CONVENTIONS
   create: stdout, exit 0, created/registered/skipped summary.
   detect: stdout, exit 0, added/unchanged/skipped summary with
   active/candidate/stale counts, stale reasons when found, or JSON with --json.
+  focus: stdout, exit 0, focused summary or focused session JSON with --json.
   cleanup: stdout, exit 0, proposed/removed/kept summary with stale records;
   without --confirm, does not mutate registry.
   sessions registry output: preserves id, zellij_session, zellij_pane,
@@ -175,12 +183,14 @@ RECOVERY HINTS
   inventory task: inspect "zelma sessions list --help".
   managed create task: inspect "zelma sessions create --help".
   manual detect task: inspect "zelma sessions detect --help".
+  focus task: inspect "zelma sessions focus --help".
 
 HUMAN NOTES
   sessions list reads .zelma/sessions.json; --live checks current zellij panes
   without registry writes. detect inspects live zellij panes and only upserts
-  unresolved candidate records. cleanup removes stale records only after
-  explicit --confirm.
+  unresolved candidate records. focus switches zellij UI to a stored pane and
+  does not mutate registry. cleanup removes stale records only after explicit
+  --confirm.
 
 Usage:
   zelma sessions [command]
@@ -245,6 +255,22 @@ Notes:
   unambiguously; otherwise writes visible candidate records. Marks active
   records stale only after successful live zellij inventory proves the zellij
   session or pane is missing. Does not create panes or delete stale records.
+`
+
+const sessionsFocusHelp = `Usage:
+  zelma sessions focus <id> [--json]
+
+Status:
+  implemented: focuses a known zellij pane by repo-local zelma session ID.
+
+Output:
+  default: focused summary with id, state, zellij session, tab and pane.
+  --json: focused session JSON object.
+
+Notes:
+  Reads .zelma/sessions.json and sends zellij focus actions. Does not create,
+  detect, cleanup or mutate registry records. Use "zelma sessions list" to find
+  the target ID.
 `
 
 const sessionsCleanupHelp = `Usage:
@@ -486,6 +512,64 @@ func newSessionsDetectCommand(stdout io.Writer) *cobra.Command {
 	return cmd
 }
 
+func newSessionsFocusCommand(stdout io.Writer) *cobra.Command {
+	var jsonOutput bool
+
+	cmd := &cobra.Command{
+		Use:   "focus <id>",
+		Short: "Focus a known zelma session pane.",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			id, err := parseSessionIDArg(args[0])
+			if err != nil {
+				return fmt.Errorf("%s: %w", cmd.CommandPath(), err)
+			}
+
+			reg, err := readCurrentRegistry(cmd.CommandPath())
+			if err != nil {
+				return err
+			}
+			session, ok := findSessionByID(reg, id)
+			if !ok {
+				return fmt.Errorf("%s: session id %d not found; run zelma sessions list", cmd.CommandPath(), id)
+			}
+
+			tabID, hasTab, err := parseZellijTabRef(session.ZellijTab)
+			if err != nil {
+				return fmt.Errorf("%s: %w", cmd.CommandPath(), err)
+			}
+			request := zellij.FocusPaneRequest{
+				Session: session.ZellijSession,
+				PaneID:  session.ZellijPane,
+			}
+			if hasTab {
+				request.TabID = &tabID
+			}
+
+			client := zellij.New(zellij.WithBinary(os.Getenv("ZELMA_ZELLIJ_BIN")))
+			if err := client.FocusPane(cmd.Context(), request); err != nil {
+				return fmt.Errorf("%s: %w", cmd.CommandPath(), err)
+			}
+
+			if jsonOutput {
+				return writeFocusSessionJSON(stdout, session)
+			}
+			_, err = fmt.Fprintf(
+				stdout,
+				"focused id=%d state=%s zellij_session=%s zellij_tab=%s zellij_pane=%s\n",
+				session.ID,
+				session.State,
+				session.ZellijSession,
+				session.ZellijTab,
+				session.ZellijPane,
+			)
+			return err
+		},
+	}
+	cmd.Flags().BoolVar(&jsonOutput, "json", false, "Print focused session JSON.")
+	return cmd
+}
+
 func newSessionsCleanupCommand(stdout io.Writer) *cobra.Command {
 	var confirm bool
 	var jsonOutput bool
@@ -681,6 +765,15 @@ func writeCleanupProposalJSON(stdout io.Writer, proposal registry.CleanupProposa
 	return err
 }
 
+func writeFocusSessionJSON(stdout io.Writer, session registry.Session) error {
+	data, err := json.MarshalIndent(session, "", "  ")
+	if err != nil {
+		return fmt.Errorf("encode focused session JSON: %w", err)
+	}
+	_, err = fmt.Fprintf(stdout, "%s\n", data)
+	return err
+}
+
 type detectSummaryJSON struct {
 	registry.DetectUpsertSummary
 	StaleCandidates       []registry.StaleCandidate      `json:"stale_candidates,omitempty"`
@@ -780,6 +873,38 @@ func configuredZellijSession() string {
 		return session
 	}
 	return create.DefaultZellijSession
+}
+
+func parseSessionIDArg(value string) (int, error) {
+	id, err := strconv.Atoi(value)
+	if err != nil || id <= 0 {
+		return 0, fmt.Errorf("invalid session id %q; pass a positive integer from zelma sessions list", value)
+	}
+	return id, nil
+}
+
+func findSessionByID(reg registry.Registry, id int) (registry.Session, bool) {
+	for _, session := range reg.Sessions {
+		if session.ID == id {
+			return session, true
+		}
+	}
+	return registry.Session{}, false
+}
+
+func parseZellijTabRef(ref string) (int, bool, error) {
+	if ref == "" {
+		return 0, false, nil
+	}
+	value, ok := strings.CutPrefix(ref, "tab_")
+	if !ok || value == "" {
+		return 0, false, fmt.Errorf("invalid zellij_tab %q; expected tab_<id>", ref)
+	}
+	id, err := strconv.Atoi(value)
+	if err != nil || id < 0 {
+		return 0, false, fmt.Errorf("invalid zellij_tab %q; expected non-negative tab id", ref)
+	}
+	return id, true, nil
 }
 
 type createLaunchContractJSON struct {

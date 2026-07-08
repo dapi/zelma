@@ -120,3 +120,5 @@ audience: humans_and_agents
   one-pass Codex evidence lookup и `sessions detect --explain`.
 - [FT-045: Numeric Zelma Session IDs](FT-045/README.md) — короткий repo-local
   numeric `id` для каждой `zelma session`, начиная с `1`.
+- [FT-046: Focus Zelma Session By ID](FT-046/README.md) — команда
+  `sessions focus <id>` для перехода к сохраненному zellij tab/pane.

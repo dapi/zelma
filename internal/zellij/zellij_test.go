@@ -445,3 +445,125 @@ func TestRunPaneMapsExitZeroSessionNotFoundToCommandFailure(t *testing.T) {
 		t.Fatalf("error = %q, must not report invalid output", err.Error())
 	}
 }
+
+func TestFocusPaneRunsTabThenPaneActions(t *testing.T) {
+	tabID := 6
+	var gotBinary []string
+	var gotArgs [][]string
+	var gotDeadline bool
+	client := New(WithBinary("fake-zellij"), WithTimeout(time.Minute))
+	client.run = func(ctx context.Context, binary string, args []string) commandResult {
+		_, gotDeadline = ctx.Deadline()
+		gotBinary = append(gotBinary, binary)
+		gotArgs = append(gotArgs, append([]string(nil), args...))
+		return commandResult{}
+	}
+
+	err := client.FocusPane(context.Background(), FocusPaneRequest{
+		Session: "zelma-main",
+		TabID:   &tabID,
+		PaneID:  "terminal_75",
+	})
+
+	if err != nil {
+		t.Fatalf("FocusPane() error = %v, want nil", err)
+	}
+	if !reflect.DeepEqual(gotBinary, []string{"fake-zellij", "fake-zellij"}) {
+		t.Fatalf("binaries = %#v, want fake-zellij twice", gotBinary)
+	}
+	wantArgs := [][]string{
+		{"--session", "zelma-main", "action", "go-to-tab-by-id", "6"},
+		{"--session", "zelma-main", "action", "focus-pane-id", "terminal_75"},
+	}
+	if !reflect.DeepEqual(gotArgs, wantArgs) {
+		t.Fatalf("args = %#v, want %#v", gotArgs, wantArgs)
+	}
+	if !gotDeadline {
+		t.Fatal("runner context has no deadline, want adapter timeout")
+	}
+}
+
+func TestFocusPaneOmitsTabActionWhenTabUnknown(t *testing.T) {
+	var gotArgs [][]string
+	client := New()
+	client.run = func(_ context.Context, _ string, args []string) commandResult {
+		gotArgs = append(gotArgs, append([]string(nil), args...))
+		return commandResult{}
+	}
+
+	err := client.FocusPane(context.Background(), FocusPaneRequest{
+		Session: "zelma-main",
+		PaneID:  "terminal_1",
+	})
+
+	if err != nil {
+		t.Fatalf("FocusPane() error = %v, want nil", err)
+	}
+	wantArgs := [][]string{
+		{"--session", "zelma-main", "action", "focus-pane-id", "terminal_1"},
+	}
+	if !reflect.DeepEqual(gotArgs, wantArgs) {
+		t.Fatalf("args = %#v, want %#v", gotArgs, wantArgs)
+	}
+}
+
+func TestFocusPaneRejectsInvalidInput(t *testing.T) {
+	negativeTabID := -1
+	tests := []struct {
+		name    string
+		request FocusPaneRequest
+	}{
+		{name: "missing session", request: FocusPaneRequest{PaneID: "terminal_1"}},
+		{name: "missing pane", request: FocusPaneRequest{Session: "zelma-main"}},
+		{name: "negative tab", request: FocusPaneRequest{Session: "zelma-main", TabID: &negativeTabID, PaneID: "terminal_1"}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client := New()
+			client.run = func(context.Context, string, []string) commandResult {
+				t.Fatal("runner must not be called for invalid focus request")
+				return commandResult{}
+			}
+
+			err := client.FocusPane(context.Background(), tt.request)
+
+			var diagnosticErr *DiagnosticError
+			if !errors.As(err, &diagnosticErr) {
+				t.Fatalf("error = %T, want *DiagnosticError", err)
+			}
+			if diagnosticErr.Diagnostic.Code != ErrorCodeInvalidInput {
+				t.Fatalf("code = %q, want %q", diagnosticErr.Diagnostic.Code, ErrorCodeInvalidInput)
+			}
+		})
+	}
+}
+
+func TestFocusPaneMapsCommandFailure(t *testing.T) {
+	client := New(WithBinary("/opt/bin/zellij"))
+	client.run = func(context.Context, string, []string) commandResult {
+		return commandResult{
+			stderr: []byte("pane not found\n"),
+			err:    fakeExitError{code: 2},
+		}
+	}
+
+	err := client.FocusPane(context.Background(), FocusPaneRequest{
+		Session: "zelma-main",
+		PaneID:  "terminal_99",
+	})
+
+	diagnostic := requireDiagnostic(t, err, ErrorCodeCommandFailed)
+	if diagnostic.Command != "/opt/bin/zellij --session zelma-main action focus-pane-id terminal_99" {
+		t.Fatalf("command = %q, want focus-pane-id command", diagnostic.Command)
+	}
+	if diagnostic.ExitCode != 2 {
+		t.Fatalf("exit code = %d, want 2", diagnostic.ExitCode)
+	}
+	if diagnostic.Stderr != "pane not found" {
+		t.Fatalf("stderr = %q, want trimmed stderr", diagnostic.Stderr)
+	}
+	if !strings.Contains(diagnostic.RecoveryHint, "did not write registry state") {
+		t.Fatalf("recovery hint = %q, want registry-state disclaimer", diagnostic.RecoveryHint)
+	}
+}

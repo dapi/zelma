@@ -36,6 +36,7 @@ They depend on the command contract documented in
 | `CTR-03` | `PreviewCreateSession` | `zelma sessions create [path] --dry-run --json` |
 | `CTR-04` | `CreateSession` | `zelma sessions create [path] --json` |
 | `CTR-05` | `DetectSessions` | `zelma sessions detect --json` |
+| `CTR-06` | `FocusSession` | `zelma sessions focus <id> --json` |
 | `CTR-06` | command failure | preserve exit code, stdout, stderr and agent recovery text |
 
 ## Invariants

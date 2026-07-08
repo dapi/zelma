@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 )
 
@@ -202,6 +203,10 @@ func (client Client) CreateSession(ctx context.Context, path string) (CreateSumm
 
 func (client Client) DetectSessions(ctx context.Context) (DetectSummary, error) {
 	return runJSON[DetectSummary](ctx, client, []string{"sessions", "detect", "--json"})
+}
+
+func (client Client) FocusSession(ctx context.Context, id int) (Session, error) {
+	return runJSON[Session](ctx, client, []string{"sessions", "focus", strconv.Itoa(id), "--json"})
 }
 
 func runJSON[T any](ctx context.Context, client Client, args []string) (T, error) {
