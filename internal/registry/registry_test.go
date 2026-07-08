@@ -311,7 +311,7 @@ func TestUpsertDetectedCandidatesAddsOnlyMissingPane(t *testing.T) {
 	}
 
 	first, firstSummary := UpsertDetectedCandidates(current, []Session{candidate})
-	if firstSummary != (DetectUpsertSummary{Added: 1}) {
+	if firstSummary != (DetectUpsertSummary{Added: 1, Candidate: 1}) {
 		t.Fatalf("first summary = %+v, want added=1", firstSummary)
 	}
 	if len(first.Sessions) != 1 {
@@ -322,7 +322,7 @@ func TestUpsertDetectedCandidatesAddsOnlyMissingPane(t *testing.T) {
 	}
 
 	second, secondSummary := UpsertDetectedCandidates(first, []Session{candidate})
-	if secondSummary != (DetectUpsertSummary{Unchanged: 1}) {
+	if secondSummary != (DetectUpsertSummary{Unchanged: 1, Candidate: 1}) {
 		t.Fatalf("second summary = %+v, want unchanged=1", secondSummary)
 	}
 	if len(second.Sessions) != 1 {
@@ -349,7 +349,7 @@ func TestUpsertDetectedCandidatesPreservesMorePreciseExistingRecord(t *testing.T
 		Registry{Version: SchemaVersion, Sessions: []Session{active}},
 		[]Session{candidate},
 	)
-	if summary != (DetectUpsertSummary{Unchanged: 1}) {
+	if summary != (DetectUpsertSummary{Unchanged: 1, Active: 1}) {
 		t.Fatalf("summary = %+v, want unchanged=1", summary)
 	}
 	if len(got.Sessions) != 1 || got.Sessions[0] != active {
@@ -376,7 +376,7 @@ func TestUpsertDetectedCandidatesAppendsWhenOnlyHistoricalRecordMatchesPane(t *t
 		Registry{Version: SchemaVersion, Sessions: []Session{closed}},
 		[]Session{candidate},
 	)
-	if summary != (DetectUpsertSummary{Added: 1}) {
+	if summary != (DetectUpsertSummary{Added: 1, Candidate: 1}) {
 		t.Fatalf("summary = %+v, want added=1", summary)
 	}
 	if len(got.Sessions) != 2 {
@@ -408,7 +408,7 @@ func TestUpsertDetectedCandidatesMatchesActiveBeforeCandidateDuplicate(t *testin
 		Registry{Version: SchemaVersion, Sessions: []Session{existingCandidate, active}},
 		[]Session{detected},
 	)
-	if summary != (DetectUpsertSummary{Unchanged: 1}) {
+	if summary != (DetectUpsertSummary{Unchanged: 1, Active: 1}) {
 		t.Fatalf("summary = %+v, want unchanged=1", summary)
 	}
 	if got.Sessions[0] != existingCandidate || got.Sessions[1] != active {
@@ -433,11 +433,106 @@ func TestUpsertDetectedCandidatesFillsMissingCandidateEvidence(t *testing.T) {
 		Registry{Version: SchemaVersion, Sessions: []Session{existing}},
 		[]Session{candidate},
 	)
-	if summary != (DetectUpsertSummary{Unchanged: 1}) {
+	if summary != (DetectUpsertSummary{Unchanged: 1, Candidate: 1}) {
 		t.Fatalf("summary = %+v, want unchanged=1", summary)
 	}
 	if got.Sessions[0].OpenedPath != candidate.OpenedPath {
 		t.Fatalf("opened path = %q, want filled %q", got.Sessions[0].OpenedPath, candidate.OpenedPath)
+	}
+}
+
+func TestUpsertDetectedCandidatesPromotesFullEvidenceToActive(t *testing.T) {
+	detected := Session{
+		ZellijSession: "main",
+		ZellijPane:    "terminal_1",
+		CodexSession:  "11111111-1111-4111-8111-111111111111",
+		OpenedPath:    "/workspace/zelma",
+		State:         StateCandidate,
+	}
+
+	got, summary := UpsertDetectedCandidates(
+		Registry{Version: SchemaVersion, Sessions: []Session{}},
+		[]Session{detected},
+	)
+	if summary != (DetectUpsertSummary{Added: 1, Active: 1}) {
+		t.Fatalf("summary = %+v, want added active", summary)
+	}
+	if got.Sessions[0].State != StateActive {
+		t.Fatalf("state = %q, want active", got.Sessions[0].State)
+	}
+}
+
+func TestUpsertDetectedCandidatesPromotesExistingCandidateWithFullEvidence(t *testing.T) {
+	existing := Session{
+		ZellijSession: "main",
+		ZellijPane:    "terminal_1",
+		OpenedPath:    "/workspace/zelma",
+		State:         StateCandidate,
+	}
+	detected := Session{
+		ZellijSession: "main",
+		ZellijPane:    "terminal_1",
+		CodexSession:  "11111111-1111-4111-8111-111111111111",
+		OpenedPath:    "/workspace/zelma",
+		State:         StateCandidate,
+	}
+
+	got, summary := UpsertDetectedCandidates(
+		Registry{Version: SchemaVersion, Sessions: []Session{existing}},
+		[]Session{detected},
+	)
+	if summary != (DetectUpsertSummary{Unchanged: 1, Active: 1}) {
+		t.Fatalf("summary = %+v, want unchanged active", summary)
+	}
+	if got.Sessions[0].State != StateActive || got.Sessions[0].CodexSession != detected.CodexSession {
+		t.Fatalf("session = %+v, want promoted active", got.Sessions[0])
+	}
+}
+
+func TestUpsertDetectedCandidatesPromotesMergedSplitEvidence(t *testing.T) {
+	existing := Session{
+		ZellijSession: "main",
+		ZellijPane:    "terminal_1",
+		CodexSession:  "11111111-1111-4111-8111-111111111111",
+		State:         StateCandidate,
+	}
+	detected := Session{
+		ZellijSession: "main",
+		ZellijPane:    "terminal_1",
+		OpenedPath:    "/workspace/zelma",
+		State:         StateCandidate,
+	}
+
+	got, summary := UpsertDetectedCandidates(
+		Registry{Version: SchemaVersion, Sessions: []Session{existing}},
+		[]Session{detected},
+	)
+	if summary != (DetectUpsertSummary{Unchanged: 1, Active: 1}) {
+		t.Fatalf("summary = %+v, want unchanged active", summary)
+	}
+	if got.Sessions[0].State != StateActive || got.Sessions[0].CodexSession != existing.CodexSession || got.Sessions[0].OpenedPath != detected.OpenedPath {
+		t.Fatalf("session = %+v, want active from merged split evidence", got.Sessions[0])
+	}
+}
+
+func TestUpsertDetectedCandidatesKeepsPartialEvidenceCandidate(t *testing.T) {
+	detected := Session{
+		ZellijSession: "main",
+		ZellijPane:    "terminal_1",
+		CodexSession:  "",
+		OpenedPath:    "/workspace/zelma",
+		State:         StateActive,
+	}
+
+	got, summary := UpsertDetectedCandidates(
+		Registry{Version: SchemaVersion, Sessions: []Session{}},
+		[]Session{detected},
+	)
+	if summary != (DetectUpsertSummary{Added: 1, Candidate: 1}) {
+		t.Fatalf("summary = %+v, want added candidate", summary)
+	}
+	if got.Sessions[0].State != StateCandidate {
+		t.Fatalf("state = %q, want candidate", got.Sessions[0].State)
 	}
 }
 

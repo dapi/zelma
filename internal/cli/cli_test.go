@@ -211,7 +211,7 @@ func TestOutputAndErrorStreamContract(t *testing.T) {
 			args:       []string{"sessions", "detect"},
 			arrange:    chdirToRepoWithFakeCodexPane,
 			wantCode:   0,
-			wantStdout: "added=1 unchanged=0 skipped=0\n",
+			wantStdout: "added=1 unchanged=0 skipped=0 active=0 candidate=1\n",
 			wantStderr: "",
 		},
 	}
@@ -315,7 +315,8 @@ OUTPUT CONVENTIONS
   setup changed: stdout, exit 0, "changed: added .zelma to <path>".
   setup unchanged: stdout, exit 0, "already configured: <path> contains .zelma".
   sessions list: stdout, exit 0, table by default or schema v1 JSON with --json.
-  sessions detect: stdout, exit 0, summary or JSON with --json.
+  sessions detect: stdout, exit 0, summary with active/candidate counts or JSON
+  with --json.
   sessions create --dry-run: stdout, exit 0, launch contract text or JSON.
   sessions create: stdout, exit 0, created/registered/skipped summary.
   machine-readable session data: use "zelma sessions list --json".
@@ -345,7 +346,8 @@ OUTPUT CONVENTIONS
   list: stdout, exit 0, table by default or schema v1 JSON with --json.
   create --dry-run: stdout, exit 0, resolved Codex command/opened path.
   create: stdout, exit 0, created/registered/skipped summary.
-  detect: stdout, exit 0, added/unchanged/skipped summary or JSON with --json.
+  detect: stdout, exit 0, added/unchanged/skipped summary with
+  active/candidate counts or JSON with --json.
   sessions registry output: preserves zellij_session, zellij_pane,
   codex_session, opened_path and state fields.
 
@@ -470,6 +472,38 @@ func TestSessionsCreateRegistersConfirmedCandidateRecord(t *testing.T) {
 	}
 	if got.Sessions[0] != want {
 		t.Fatalf("session = %+v, want %+v", got.Sessions[0], want)
+	}
+}
+
+func TestSessionsCreateRegistersActiveWithFullEvidence(t *testing.T) {
+	root := newTestGitRepo(t)
+	paneRoot := resolvedPath(t, root)
+	fakeCodex := writeFakeCodex(t)
+	t.Setenv("ZELMA_CODEX_BIN", fakeCodex)
+	t.Setenv("ZELMA_ZELLIJ_BIN", writeFakeCreateZellij(t, "terminal_7", panesJSONWithID(7, paneRoot, fakeCodex+" --cd "+paneRoot, true)))
+	t.Setenv("CODEX_HOME", writeCodexHomeWithSessionMeta(t, "11111111-1111-4111-8111-111111111111", paneRoot))
+	t.Chdir(root)
+
+	var stdout, stderr bytes.Buffer
+
+	code := Run(context.Background(), []string{"sessions", "create"}, &stdout, &stderr)
+
+	if code != 0 {
+		t.Fatalf("Run() code = %d, want 0; stderr = %q", code, stderr.String())
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("stderr = %q, want empty", stderr.String())
+	}
+	if stdout.String() != "created=1 registered=1 skipped=0\n" {
+		t.Fatalf("stdout = %q, want create summary", stdout.String())
+	}
+
+	got := readRegistry(t, root)
+	if len(got.Sessions) != 1 {
+		t.Fatalf("len(Sessions) = %d, want 1", len(got.Sessions))
+	}
+	if got.Sessions[0].State != registry.StateActive || got.Sessions[0].CodexSession != "11111111-1111-4111-8111-111111111111" {
+		t.Fatalf("session = %+v, want active with Codex session evidence", got.Sessions[0])
 	}
 }
 
@@ -780,7 +814,7 @@ func TestSessionsDetectAddsCandidateRecord(t *testing.T) {
 	if stderr.Len() != 0 {
 		t.Fatalf("stderr = %q, want empty", stderr.String())
 	}
-	if stdout.String() != "added=1 unchanged=0 skipped=0\n" {
+	if stdout.String() != "added=1 unchanged=0 skipped=0 active=0 candidate=1\n" {
 		t.Fatalf("stdout = %q, want added summary", stdout.String())
 	}
 
@@ -797,6 +831,36 @@ func TestSessionsDetectAddsCandidateRecord(t *testing.T) {
 	}
 	if got.Sessions[0] != want {
 		t.Fatalf("session = %+v, want %+v", got.Sessions[0], want)
+	}
+}
+
+func TestSessionsDetectPromotesFullEvidenceToActive(t *testing.T) {
+	root := newTestGitRepo(t)
+	paneRoot := resolvedPath(t, root)
+	t.Setenv("ZELMA_ZELLIJ_BIN", writeFakeZellij(t, panesJSON(paneRoot, true)))
+	t.Setenv("CODEX_HOME", writeCodexHomeWithSessionMeta(t, "11111111-1111-4111-8111-111111111111", paneRoot))
+	t.Chdir(root)
+
+	var stdout, stderr bytes.Buffer
+
+	code := Run(context.Background(), []string{"sessions", "detect"}, &stdout, &stderr)
+
+	if code != 0 {
+		t.Fatalf("Run() code = %d, want 0; stderr = %q", code, stderr.String())
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("stderr = %q, want empty", stderr.String())
+	}
+	if stdout.String() != "added=1 unchanged=0 skipped=0 active=1 candidate=0\n" {
+		t.Fatalf("stdout = %q, want active summary", stdout.String())
+	}
+
+	got := readRegistry(t, root)
+	if len(got.Sessions) != 1 {
+		t.Fatalf("len(Sessions) = %d, want 1", len(got.Sessions))
+	}
+	if got.Sessions[0].State != registry.StateActive || got.Sessions[0].CodexSession != "11111111-1111-4111-8111-111111111111" {
+		t.Fatalf("session = %+v, want active with Codex session evidence", got.Sessions[0])
 	}
 }
 
@@ -820,7 +884,7 @@ func TestSessionsDetectRepeatedRunIsIdempotent(t *testing.T) {
 	if secondStderr.Len() != 0 {
 		t.Fatalf("second stderr = %q, want empty", secondStderr.String())
 	}
-	if secondStdout.String() != "added=0 unchanged=1 skipped=0\n" {
+	if secondStdout.String() != "added=0 unchanged=1 skipped=0 active=0 candidate=1\n" {
 		t.Fatalf("second stdout = %q, want unchanged summary", secondStdout.String())
 	}
 	got := readRegistry(t, root)
@@ -854,7 +918,7 @@ func TestSessionsDetectPreservesExistingActiveRecord(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("Run() code = %d, want 0; stderr = %q", code, stderr.String())
 	}
-	if stdout.String() != "added=0 unchanged=1 skipped=0\n" {
+	if stdout.String() != "added=0 unchanged=1 skipped=0 active=1 candidate=0\n" {
 		t.Fatalf("stdout = %q, want unchanged summary", stdout.String())
 	}
 	got := readRegistry(t, root)
@@ -891,7 +955,7 @@ func TestSessionsDetectAppendsCandidateWhenClosedRecordReusesPaneKey(t *testing.
 	if code != 0 {
 		t.Fatalf("Run() code = %d, want 0; stderr = %q", code, stderr.String())
 	}
-	if stdout.String() != "added=1 unchanged=0 skipped=0\n" {
+	if stdout.String() != "added=1 unchanged=0 skipped=0 active=0 candidate=1\n" {
 		t.Fatalf("stdout = %q, want added summary", stdout.String())
 	}
 	got := readRegistry(t, root)
@@ -921,7 +985,9 @@ func TestSessionsDetectJSONSummary(t *testing.T) {
 	want := `{
   "added": 0,
   "unchanged": 0,
-  "skipped": 1
+  "skipped": 1,
+  "active": 0,
+  "candidate": 0
 }
 `
 	if stdout.String() != want {
@@ -1058,6 +1124,7 @@ func newTestGitRepo(t *testing.T) string {
 	t.Helper()
 
 	root := t.TempDir()
+	t.Setenv("CODEX_HOME", filepath.Join(root, "codex-home"))
 	if err := os.Mkdir(filepath.Join(root, ".git"), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -1160,6 +1227,21 @@ func writeFakeExecutable(t *testing.T, name string) string {
 		t.Fatal(err)
 	}
 	return path
+}
+
+func writeCodexHomeWithSessionMeta(t *testing.T, sessionID, cwd string) string {
+	t.Helper()
+
+	codexHome := t.TempDir()
+	dir := filepath.Join(codexHome, "sessions", "2026", "07", "08")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	content := `{"type":"session_meta","payload":{"session_id":"` + sessionID + `","cwd":"` + cwd + `","cli_version":"codex-cli 0.142.3","timestamp":"2026-07-08T09:00:00Z"}}` + "\n"
+	if err := os.WriteFile(filepath.Join(dir, "session.jsonl"), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return codexHome
 }
 
 func panesJSON(cwd string, codex bool) string {
