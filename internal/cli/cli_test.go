@@ -3,10 +3,13 @@ package cli
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/dapi/zelma/internal/registry"
 )
 
 func TestAgentFirstHelpSnapshots(t *testing.T) {
@@ -156,15 +159,7 @@ Description:
 		{
 			name: "sessions detect help",
 			args: []string{"sessions", "detect", "--help"},
-			want: `Usage:
-  zelma sessions detect
-
-Status:
-  stub: not implemented yet.
-
-Description:
-  Detect existing Codex panes.
-`,
+			want: sessionsDetectHelp,
 		},
 	}
 
@@ -226,11 +221,12 @@ func TestOutputAndErrorStreamContract(t *testing.T) {
 			wantStderr: "zelma sessions create is not implemented yet\n",
 		},
 		{
-			name:       "detect stub writes stderr only",
+			name:       "detect summary writes stdout only",
 			args:       []string{"sessions", "detect"},
-			wantCode:   1,
-			wantStdout: "",
-			wantStderr: "zelma sessions detect is not implemented yet\n",
+			arrange:    chdirToRepoWithFakeCodexPane,
+			wantCode:   0,
+			wantStdout: "added=1 unchanged=0 skipped=0\n",
+			wantStderr: "",
 		},
 	}
 
@@ -260,6 +256,14 @@ func chdirToEmptyGitRepo(t *testing.T) {
 	t.Helper()
 
 	t.Chdir(newTestGitRepo(t))
+}
+
+func chdirToRepoWithFakeCodexPane(t *testing.T) {
+	t.Helper()
+
+	root := newTestGitRepo(t)
+	t.Setenv("ZELMA_ZELLIJ_BIN", writeFakeZellij(t, panesJSON(root, true)))
+	t.Chdir(root)
 }
 
 func TestBuiltInHelpIsNotRenderedAsStub(t *testing.T) {
@@ -318,13 +322,14 @@ const rootHelpSnapshot = `COMMAND MAP
   zelma sessions help     Show the sessions command map.
   zelma sessions list     List known zelma sessions. Status: implemented.
   zelma sessions create   Create a zelma session. Status: stub.
-  zelma sessions detect   Detect existing Codex panes. Status: stub.
+  zelma sessions detect   Detect existing Codex panes. Status: implemented.
 
 OUTPUT CONVENTIONS
   help output: stdout, exit 0, plain text.
   setup changed: stdout, exit 0, "changed: added .zelma to <path>".
   setup unchanged: stdout, exit 0, "already configured: <path> contains .zelma".
   sessions list: stdout, exit 0, table by default or schema v1 JSON with --json.
+  sessions detect: stdout, exit 0, summary or JSON with --json.
   stub commands: stderr, exit 1, "<command> is not implemented yet".
   machine-readable session data: use "zelma sessions list --json".
 
@@ -346,12 +351,13 @@ const sessionsHelpSnapshot = `COMMAND MAP
   zelma sessions help     Show this sessions command map.
   zelma sessions list     List known zelma sessions. Status: implemented.
   zelma sessions create   Create a zelma session. Status: stub.
-  zelma sessions detect   Detect existing Codex panes. Status: stub.
+  zelma sessions detect   Detect existing Codex panes. Status: implemented.
 
 OUTPUT CONVENTIONS
   help output: stdout, exit 0, plain text.
   list: stdout, exit 0, table by default or schema v1 JSON with --json.
-  create/detect: stderr, exit 1, "<command> is not implemented yet".
+  detect: stdout, exit 0, added/unchanged/skipped summary or JSON with --json.
+  create: stderr, exit 1, "zelma sessions create is not implemented yet".
   sessions registry output: preserves zellij_session, zellij_pane,
   codex_session, opened_path and state fields.
 
@@ -361,8 +367,8 @@ RECOVERY HINTS
   manual detect task: inspect "zelma sessions detect --help".
 
 HUMAN NOTES
-  sessions list reads .zelma/sessions.json without live zellij checks. create
-  and detect remain routed stubs.
+  sessions list reads .zelma/sessions.json without live zellij checks. detect
+  inspects live zellij panes and only upserts unresolved candidate records.
 
 Usage:
   zelma sessions [command]
@@ -378,11 +384,6 @@ func TestStubDiagnostics(t *testing.T) {
 			name:       "sessions create",
 			args:       []string{"sessions", "create"},
 			wantStderr: "zelma sessions create is not implemented yet\n",
-		},
-		{
-			name:       "sessions detect",
-			args:       []string{"sessions", "detect"},
-			wantStderr: "zelma sessions detect is not implemented yet\n",
 		},
 	}
 
@@ -541,6 +542,133 @@ func TestSessionsListTableOutput(t *testing.T) {
 	}
 }
 
+func TestSessionsDetectAddsCandidateRecord(t *testing.T) {
+	root := newTestGitRepo(t)
+	t.Setenv("ZELMA_ZELLIJ_BIN", writeFakeZellij(t, panesJSON(root, true)))
+	t.Chdir(root)
+
+	var stdout, stderr bytes.Buffer
+
+	code := Run(context.Background(), []string{"sessions", "detect"}, &stdout, &stderr)
+
+	if code != 0 {
+		t.Fatalf("Run() code = %d, want 0; stderr = %q", code, stderr.String())
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("stderr = %q, want empty", stderr.String())
+	}
+	if stdout.String() != "added=1 unchanged=0 skipped=0\n" {
+		t.Fatalf("stdout = %q, want added summary", stdout.String())
+	}
+
+	got := readRegistry(t, root)
+	if len(got.Sessions) != 1 {
+		t.Fatalf("len(Sessions) = %d, want 1", len(got.Sessions))
+	}
+	want := registry.Session{
+		ZellijSession: "zelma-main",
+		ZellijPane:    "terminal_1",
+		CodexSession:  "",
+		OpenedPath:    root,
+		State:         registry.StateCandidate,
+	}
+	if got.Sessions[0] != want {
+		t.Fatalf("session = %+v, want %+v", got.Sessions[0], want)
+	}
+}
+
+func TestSessionsDetectRepeatedRunIsIdempotent(t *testing.T) {
+	root := newTestGitRepo(t)
+	t.Setenv("ZELMA_ZELLIJ_BIN", writeFakeZellij(t, panesJSON(root, true)))
+	t.Chdir(root)
+
+	var firstStdout, firstStderr bytes.Buffer
+	firstCode := Run(context.Background(), []string{"sessions", "detect"}, &firstStdout, &firstStderr)
+	if firstCode != 0 {
+		t.Fatalf("first Run() code = %d, want 0; stderr = %q", firstCode, firstStderr.String())
+	}
+
+	var secondStdout, secondStderr bytes.Buffer
+	secondCode := Run(context.Background(), []string{"sessions", "detect"}, &secondStdout, &secondStderr)
+
+	if secondCode != 0 {
+		t.Fatalf("second Run() code = %d, want 0; stderr = %q", secondCode, secondStderr.String())
+	}
+	if secondStderr.Len() != 0 {
+		t.Fatalf("second stderr = %q, want empty", secondStderr.String())
+	}
+	if secondStdout.String() != "added=0 unchanged=1 skipped=0\n" {
+		t.Fatalf("second stdout = %q, want unchanged summary", secondStdout.String())
+	}
+	got := readRegistry(t, root)
+	if len(got.Sessions) != 1 {
+		t.Fatalf("len(Sessions) = %d, want 1", len(got.Sessions))
+	}
+}
+
+func TestSessionsDetectPreservesExistingActiveRecord(t *testing.T) {
+	root := newTestGitRepo(t)
+	writeRegistryFile(t, root, fmt.Sprintf(`{
+  "version": 1,
+  "sessions": [
+    {
+      "zellij_session": "zelma-main",
+      "zellij_pane": "terminal_1",
+      "codex_session": "codex-a",
+      "opened_path": %q,
+      "state": "active"
+    }
+  ]
+}
+`, root))
+	t.Setenv("ZELMA_ZELLIJ_BIN", writeFakeZellij(t, panesJSON(filepath.Join(root, "nested"), true)))
+	t.Chdir(root)
+
+	var stdout, stderr bytes.Buffer
+
+	code := Run(context.Background(), []string{"sessions", "detect"}, &stdout, &stderr)
+
+	if code != 0 {
+		t.Fatalf("Run() code = %d, want 0; stderr = %q", code, stderr.String())
+	}
+	if stdout.String() != "added=0 unchanged=1 skipped=0\n" {
+		t.Fatalf("stdout = %q, want unchanged summary", stdout.String())
+	}
+	got := readRegistry(t, root)
+	if len(got.Sessions) != 1 {
+		t.Fatalf("len(Sessions) = %d, want 1", len(got.Sessions))
+	}
+	if got.Sessions[0].State != registry.StateActive || got.Sessions[0].CodexSession != "codex-a" || got.Sessions[0].OpenedPath != root {
+		t.Fatalf("active record = %+v, want original precise record", got.Sessions[0])
+	}
+}
+
+func TestSessionsDetectJSONSummary(t *testing.T) {
+	root := newTestGitRepo(t)
+	t.Setenv("ZELMA_ZELLIJ_BIN", writeFakeZellij(t, panesJSON(root, false)))
+	t.Chdir(root)
+
+	var stdout, stderr bytes.Buffer
+
+	code := Run(context.Background(), []string{"sessions", "detect", "--json"}, &stdout, &stderr)
+
+	if code != 0 {
+		t.Fatalf("Run() code = %d, want 0; stderr = %q", code, stderr.String())
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("stderr = %q, want empty", stderr.String())
+	}
+	want := `{
+  "added": 0,
+  "unchanged": 0,
+  "skipped": 1
+}
+`
+	if stdout.String() != want {
+		t.Fatalf("stdout mismatch\nwant:\n%s\ngot:\n%s", want, stdout.String())
+	}
+}
+
 func TestSetupCreatesGitignoreWithZelmaEntry(t *testing.T) {
 	root := newTestGitRepo(t)
 	t.Chdir(root)
@@ -689,6 +817,65 @@ func writeRegistryFile(t *testing.T, root, content string) {
 	if err := os.WriteFile(filepath.Join(registryDir, "sessions.json"), []byte(content), 0o644); err != nil {
 		t.Fatal(err)
 	}
+}
+
+func writeFakeZellij(t *testing.T, panesJSON string) string {
+	t.Helper()
+
+	path := filepath.Join(t.TempDir(), "fake-zellij")
+	script := `#!/bin/sh
+if [ "$1" = "list-sessions" ]; then
+  printf 'zelma-main\n'
+  exit 0
+fi
+if [ "$1" = "--session" ] && [ "$2" = "zelma-main" ]; then
+  cat <<'JSON'
+` + panesJSON + `
+JSON
+  exit 0
+fi
+printf 'unexpected fake zellij args: %s\n' "$*" >&2
+exit 2
+`
+	if err := os.WriteFile(path, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
+func panesJSON(cwd string, codex bool) string {
+	command := "/bin/zsh"
+	title := "shell"
+	if codex {
+		command = "/usr/local/bin/codex --cd " + cwd
+		title = "codex"
+	}
+	return fmt.Sprintf(`[
+  {
+    "id": 1,
+    "is_plugin": false,
+    "title": %q,
+    "is_focused": true,
+    "is_floating": false,
+    "is_suppressed": false,
+    "exited": false,
+    "tab_id": 1,
+    "tab_position": 0,
+    "tab_name": "work",
+    "pane_command": %q,
+    "pane_cwd": %q
+  }
+]`, title, command, cwd)
+}
+
+func readRegistry(t *testing.T, root string) registry.Registry {
+	t.Helper()
+
+	reg, err := registry.ReadFile(registry.RegistryPath(root))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return reg
 }
 
 func assertFileContent(t *testing.T, path, want string) {

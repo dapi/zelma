@@ -9,9 +9,11 @@ import (
 	"os"
 	"text/tabwriter"
 
+	"github.com/dapi/zelma/internal/detection"
 	"github.com/dapi/zelma/internal/registry"
 	"github.com/dapi/zelma/internal/repo"
 	"github.com/dapi/zelma/internal/setup"
+	"github.com/dapi/zelma/internal/zellij"
 	"github.com/spf13/cobra"
 )
 
@@ -52,7 +54,7 @@ func NewRootCommand(stdout, stderr io.Writer) *cobra.Command {
 	sessions.AddCommand(
 		newSessionsListCommand(stdout),
 		newStubCommand("create", "Create a zelma session."),
-		newStubCommand("detect", "Detect existing Codex panes."),
+		newSessionsDetectCommand(stdout),
 	)
 	root.AddCommand(sessions)
 
@@ -69,6 +71,8 @@ func renderHelp(cmd *cobra.Command, args []string) {
 		fmt.Fprint(cmd.OutOrStdout(), sessionsHelp)
 	case "zelma sessions list":
 		fmt.Fprint(cmd.OutOrStdout(), sessionsListHelp)
+	case "zelma sessions detect":
+		fmt.Fprint(cmd.OutOrStdout(), sessionsDetectHelp)
 	case "zelma help":
 		fmt.Fprint(cmd.OutOrStdout(), helpCommandHelp)
 	default:
@@ -82,7 +86,7 @@ func renderHelp(cmd *cobra.Command, args []string) {
 
 func isStubCommand(cmd *cobra.Command) bool {
 	switch cmd.CommandPath() {
-	case "zelma sessions create", "zelma sessions detect":
+	case "zelma sessions create":
 		return true
 	default:
 		return false
@@ -95,13 +99,14 @@ const rootHelp = `COMMAND MAP
   zelma sessions help     Show the sessions command map.
   zelma sessions list     List known zelma sessions. Status: implemented.
   zelma sessions create   Create a zelma session. Status: stub.
-  zelma sessions detect   Detect existing Codex panes. Status: stub.
+  zelma sessions detect   Detect existing Codex panes. Status: implemented.
 
 OUTPUT CONVENTIONS
   help output: stdout, exit 0, plain text.
   setup changed: stdout, exit 0, "changed: added .zelma to <path>".
   setup unchanged: stdout, exit 0, "already configured: <path> contains .zelma".
   sessions list: stdout, exit 0, table by default or schema v1 JSON with --json.
+  sessions detect: stdout, exit 0, summary or JSON with --json.
   stub commands: stderr, exit 1, "<command> is not implemented yet".
   machine-readable session data: use "zelma sessions list --json".
 
@@ -146,12 +151,13 @@ const sessionsHelp = `COMMAND MAP
   zelma sessions help     Show this sessions command map.
   zelma sessions list     List known zelma sessions. Status: implemented.
   zelma sessions create   Create a zelma session. Status: stub.
-  zelma sessions detect   Detect existing Codex panes. Status: stub.
+  zelma sessions detect   Detect existing Codex panes. Status: implemented.
 
 OUTPUT CONVENTIONS
   help output: stdout, exit 0, plain text.
   list: stdout, exit 0, table by default or schema v1 JSON with --json.
-  create/detect: stderr, exit 1, "<command> is not implemented yet".
+  detect: stdout, exit 0, added/unchanged/skipped summary or JSON with --json.
+  create: stderr, exit 1, "zelma sessions create is not implemented yet".
   sessions registry output: preserves zellij_session, zellij_pane,
   codex_session, opened_path and state fields.
 
@@ -161,8 +167,8 @@ RECOVERY HINTS
   manual detect task: inspect "zelma sessions detect --help".
 
 HUMAN NOTES
-  sessions list reads .zelma/sessions.json without live zellij checks. create
-  and detect remain routed stubs.
+  sessions list reads .zelma/sessions.json without live zellij checks. detect
+  inspects live zellij panes and only upserts unresolved candidate records.
 
 Usage:
   zelma sessions [command]
@@ -180,6 +186,21 @@ Output:
 
 Notes:
   Does not create, detect, mutate or live-check zellij panes.
+`
+
+const sessionsDetectHelp = `Usage:
+  zelma sessions detect [--json]
+
+Status:
+  implemented: reads zellij panes and upserts candidate registry records.
+
+Output:
+  default: added/unchanged/skipped summary.
+  --json: stable summary object with added, unchanged and skipped counts.
+
+Notes:
+  Does not create panes, delete stale records or promote unresolved candidates
+  to active sessions.
 `
 
 const helpCommandHelp = `Usage:
@@ -248,6 +269,48 @@ func newSessionsListCommand(stdout io.Writer) *cobra.Command {
 	return cmd
 }
 
+func newSessionsDetectCommand(stdout io.Writer) *cobra.Command {
+	var jsonOutput bool
+
+	cmd := &cobra.Command{
+		Use:   "detect",
+		Short: "Detect existing Codex panes.",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			root, err := repo.ResolveRoot("")
+			if err != nil {
+				return errors.New(repo.Diagnostic(cmd.CommandPath(), err))
+			}
+
+			client := zellij.New(zellij.WithBinary(os.Getenv("ZELMA_ZELLIJ_BIN")))
+			detected, err := detection.DetectCandidates(cmd.Context(), root.Path, client)
+			if err != nil {
+				return fmt.Errorf("%s: %w", cmd.CommandPath(), err)
+			}
+
+			path := registry.RegistryPath(root.Path)
+			var summary registry.DetectUpsertSummary
+			err = registry.UpdateFile(path, func(current registry.Registry) (registry.Registry, error) {
+				next, upsertSummary := registry.UpsertDetectedCandidates(current, detected.Candidates)
+				upsertSummary.Skipped += detected.Skipped
+				summary = upsertSummary
+				return next, nil
+			})
+			if err != nil {
+				return fmt.Errorf("%s: %w", cmd.CommandPath(), err)
+			}
+
+			if jsonOutput {
+				return writeDetectSummaryJSON(stdout, summary)
+			}
+			_, err = fmt.Fprintf(stdout, "added=%d unchanged=%d skipped=%d\n", summary.Added, summary.Unchanged, summary.Skipped)
+			return err
+		},
+	}
+	cmd.Flags().BoolVar(&jsonOutput, "json", false, "Print detect summary JSON.")
+	return cmd
+}
+
 func readCurrentRegistry(command string) (registry.Registry, error) {
 	root, err := repo.ResolveRoot("")
 	if err != nil {
@@ -269,6 +332,15 @@ func writeSessionsJSON(stdout io.Writer, reg registry.Registry) error {
 	data, err := json.MarshalIndent(reg, "", "  ")
 	if err != nil {
 		return fmt.Errorf("encode sessions registry JSON: %w", err)
+	}
+	_, err = fmt.Fprintf(stdout, "%s\n", data)
+	return err
+}
+
+func writeDetectSummaryJSON(stdout io.Writer, summary registry.DetectUpsertSummary) error {
+	data, err := json.MarshalIndent(summary, "", "  ")
+	if err != nil {
+		return fmt.Errorf("encode detect summary JSON: %w", err)
 	}
 	_, err = fmt.Fprintf(stdout, "%s\n", data)
 	return err
