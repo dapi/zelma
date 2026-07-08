@@ -16,3 +16,5 @@ audience: humans_and_agents
 
 - [Brief](brief.md)
   Читать, когда нужно понять cleanup/remove proposal scope.
+- [Design](design.md)
+  Читать, когда нужно понять выбранный CLI/registry contract для cleanup.
