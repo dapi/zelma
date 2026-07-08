@@ -49,6 +49,7 @@ func TestMachineReadableOutputCompatibilityExamples(t *testing.T) {
   "version": 1,
   "sessions": [
     {
+      "id": 1,
       "zellij_session": "zelma-main",
       "zellij_pane": "terminal_1",
       "codex_session": "11111111-1111-4111-8111-111111111111",
@@ -66,6 +67,7 @@ func TestMachineReadableOutputCompatibilityExamples(t *testing.T) {
   "version": 1,
   "sessions": [
     {
+      "id": 1,
       "zellij_session": "zelma-main",
       "zellij_pane": "terminal_1",
       "codex_session": "11111111-1111-4111-8111-111111111111",
@@ -113,6 +115,7 @@ func TestMachineReadableOutputCompatibilityExamples(t *testing.T) {
   "version": 1,
   "sessions": [
     {
+      "id": 1,
       "zellij_session": "zelma-main",
       "zellij_pane": "terminal_1",
       "codex_session": "",
@@ -121,6 +124,7 @@ func TestMachineReadableOutputCompatibilityExamples(t *testing.T) {
       "live_status": "live"
     },
     {
+      "id": 2,
       "zellij_session": "zelma-main",
       "zellij_pane": "terminal_2",
       "codex_session": "",
@@ -237,6 +241,7 @@ func TestMachineReadableOutputCompatibilityExamples(t *testing.T) {
   "stale": 1,
   "stale_candidates": [
     {
+      "id": 1,
       "zellij_session": "zelma-main",
       "zellij_pane": "terminal_9",
       "codex_session": "11111111-1111-4111-8111-111111111111",
@@ -281,6 +286,7 @@ func TestMachineReadableOutputCompatibilityExamples(t *testing.T) {
   },
   "stale_records": [
     {
+      "id": 1,
       "zellij_session": "zelma-main",
       "zellij_pane": "terminal_1",
       "codex_session": "11111111-1111-4111-8111-111111111111",
@@ -331,6 +337,7 @@ func TestMachineReadableOutputCompatibilityExamples(t *testing.T) {
   },
   "stale_records": [
     {
+      "id": 1,
       "zellij_session": "zelma-main",
       "zellij_pane": "terminal_1",
       "codex_session": "11111111-1111-4111-8111-111111111111",
@@ -414,6 +421,7 @@ func parseSkillSetupResult(t *testing.T, data []byte) {
 }
 
 type skillSession struct {
+	ID            int    `json:"id"`
 	ZellijSession string `json:"zellij_session"`
 	ZellijTab     string `json:"zellij_tab,omitempty"`
 	ZellijTabName string `json:"zellij_tab_name,omitempty"`
@@ -429,6 +437,7 @@ type skillLiveSession struct {
 }
 
 type skillStaleRecord struct {
+	ID            int    `json:"id"`
 	ZellijSession string `json:"zellij_session"`
 	ZellijTab     string `json:"zellij_tab,omitempty"`
 	ZellijTabName string `json:"zellij_tab_name,omitempty"`
@@ -439,6 +448,7 @@ type skillStaleRecord struct {
 }
 
 type skillStaleCandidate struct {
+	ID            int    `json:"id"`
 	ZellijSession string `json:"zellij_session"`
 	ZellijPane    string `json:"zellij_pane"`
 	CodexSession  string `json:"codex_session,omitempty"`
@@ -529,7 +539,7 @@ func parseSkillDetectSummary(t *testing.T, data []byte) {
 		t.Fatalf("detect summary contains impossible negative total: %+v", output)
 	}
 	for _, candidate := range output.StaleCandidates {
-		if candidate.ZellijSession == "" || candidate.ZellijPane == "" || candidate.PreviousState == "" || candidate.Reason == "" {
+		if candidate.ID <= 0 || candidate.ZellijSession == "" || candidate.ZellijPane == "" || candidate.PreviousState == "" || candidate.Reason == "" {
 			t.Fatalf("stale candidate = %+v, want stable identity, previous_state and reason", candidate)
 		}
 	}
@@ -597,7 +607,7 @@ func decodeStrict(t *testing.T, data []byte, dst any) {
 func assertSkillSession(t *testing.T, session skillSession) {
 	t.Helper()
 
-	if session.ZellijSession == "" || session.ZellijPane == "" || session.OpenedPath == "" || session.State == "" {
+	if session.ID <= 0 || session.ZellijSession == "" || session.ZellijPane == "" || session.OpenedPath == "" || session.State == "" {
 		t.Fatalf("session = %+v, want stable identity, opened_path and state", session)
 	}
 	switch session.State {

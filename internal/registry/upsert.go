@@ -48,12 +48,19 @@ func UpsertDetectedCandidates(current Registry, candidates []Session) (Registry,
 		summary.Added++
 		summary.countState(candidate.State)
 	}
-	return next, summary
+	return normalizeRegistry(next), summary
 }
 
 func mergeDetectedCandidate(existing, candidate Session) Session {
 	existing = mergeDetectedZellijLocation(existing, candidate)
 	if existing.State == StateCandidate && candidate.State == StateActive {
+		candidate.ID = existing.ID
+		if candidate.ZellijTab == "" {
+			candidate.ZellijTab = existing.ZellijTab
+		}
+		if candidate.ZellijTabName == "" {
+			candidate.ZellijTabName = existing.ZellijTabName
+		}
 		return candidate
 	}
 	if existing.State != StateCandidate {

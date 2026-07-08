@@ -18,6 +18,7 @@ type RuntimeSnapshot struct {
 }
 
 type StaleCandidate struct {
+	ID            int             `json:"id"`
 	ZellijSession string          `json:"zellij_session"`
 	ZellijPane    string          `json:"zellij_pane"`
 	CodexSession  string          `json:"codex_session,omitempty"`
@@ -55,6 +56,7 @@ func MarkStaleCandidates(current Registry, snapshot RuntimeSnapshot) (Registry, 
 		}
 
 		stale = append(stale, StaleCandidate{
+			ID:            session.ID,
 			ZellijSession: session.ZellijSession,
 			ZellijPane:    session.ZellijPane,
 			CodexSession:  session.CodexSession,

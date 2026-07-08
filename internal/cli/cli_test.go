@@ -213,7 +213,7 @@ func TestOutputAndErrorStreamContract(t *testing.T) {
 			args:       []string{"sessions", "list"},
 			arrange:    chdirToEmptyGitRepo,
 			wantCode:   0,
-			wantStdout: "STATE  ZELLIJ_SESSION  ZELLIJ_TAB  ZELLIJ_PANE  CODEX_SESSION  OPENED_PATH\n",
+			wantStdout: "ID  STATE  ZELLIJ_SESSION  ZELLIJ_TAB  ZELLIJ_PANE  CODEX_SESSION  OPENED_PATH\n",
 			wantStderr: "",
 		},
 		{
@@ -367,7 +367,7 @@ OUTPUT CONVENTIONS
   active/candidate/stale counts, stale reasons when found, or JSON with --json.
   cleanup: stdout, exit 0, proposed/removed/kept summary with stale records;
   without --confirm, does not mutate registry.
-  sessions registry output: preserves zellij_session, zellij_pane,
+  sessions registry output: preserves id, zellij_session, zellij_pane,
   codex_session, opened_path and state fields.
 
 RECOVERY HINTS
@@ -485,6 +485,7 @@ func TestSessionsCreateRegistersConfirmedCandidateRecord(t *testing.T) {
 		t.Fatalf("len(Sessions) = %d, want 1", len(got.Sessions))
 	}
 	want := registry.Session{
+		ID:            1,
 		ZellijSession: "zelma-main",
 		ZellijTab:     "tab_1",
 		ZellijTabName: "work",
@@ -704,7 +705,7 @@ func TestSessionsListEmptyRegistrySucceeds(t *testing.T) {
 	if stderr.Len() != 0 {
 		t.Fatalf("stderr = %q, want empty", stderr.String())
 	}
-	want := "STATE  ZELLIJ_SESSION  ZELLIJ_TAB  ZELLIJ_PANE  CODEX_SESSION  OPENED_PATH\n"
+	want := "ID  STATE  ZELLIJ_SESSION  ZELLIJ_TAB  ZELLIJ_PANE  CODEX_SESSION  OPENED_PATH\n"
 	if stdout.String() != want {
 		t.Fatalf("stdout mismatch\nwant:\n%s\ngot:\n%s", want, stdout.String())
 	}
@@ -740,6 +741,7 @@ func TestSessionsListJSONPreservesRegistryFields(t *testing.T) {
   "version": 1,
   "sessions": [
     {
+      "id": 1,
       "zellij_session": "zelma-main",
       "zellij_pane": "1",
       "codex_session": "codex-2026-07-07T10-00-00Z-a1b2",
@@ -765,6 +767,7 @@ func TestSessionsListJSONPreservesRegistryFields(t *testing.T) {
   "version": 1,
   "sessions": [
     {
+      "id": 1,
       "zellij_session": "zelma-main",
       "zellij_pane": "1",
       "codex_session": "codex-2026-07-07T10-00-00Z-a1b2",
@@ -813,9 +816,9 @@ func TestSessionsListTableOutput(t *testing.T) {
 	if stderr.Len() != 0 {
 		t.Fatalf("stderr = %q, want empty", stderr.String())
 	}
-	want := "STATE   ZELLIJ_SESSION   ZELLIJ_TAB  ZELLIJ_PANE  CODEX_SESSION  OPENED_PATH\n" +
-		"active  zelma-main                   1            codex-a        /workspace/zelma\n" +
-		"closed  feature-issue-6              3            codex-b        /workspace/zelma/memory-bank/features/FT-006\n"
+	want := "ID  STATE   ZELLIJ_SESSION   ZELLIJ_TAB  ZELLIJ_PANE  CODEX_SESSION  OPENED_PATH\n" +
+		"1   active  zelma-main                   1            codex-a        /workspace/zelma\n" +
+		"2   closed  feature-issue-6              3            codex-b        /workspace/zelma/memory-bank/features/FT-006\n"
 	if stdout.String() != want {
 		t.Fatalf("stdout mismatch\nwant:\n%s\ngot:\n%s", want, stdout.String())
 	}
@@ -828,6 +831,7 @@ func TestSessionsListLiveTableOutput(t *testing.T) {
   "version": 1,
   "sessions": [
     {
+      "id": 1,
       "zellij_session": "zelma-main",
       "zellij_pane": "terminal_1",
       "codex_session": "codex-live",
@@ -835,6 +839,7 @@ func TestSessionsListLiveTableOutput(t *testing.T) {
       "state": "active"
     },
     {
+      "id": 2,
       "zellij_session": "zelma-main",
       "zellij_pane": "terminal_2",
       "codex_session": "codex-missing-pane",
@@ -866,10 +871,10 @@ func TestSessionsListLiveTableOutput(t *testing.T) {
 	if stderr.Len() != 0 {
 		t.Fatalf("stderr = %q, want empty", stderr.String())
 	}
-	want := "STATE   LIVE_STATUS  ZELLIJ_SESSION   ZELLIJ_TAB  ZELLIJ_PANE  CODEX_SESSION          OPENED_PATH\n" +
-		"active  live         zelma-main                   terminal_1   codex-live             " + paneRoot + "\n" +
-		"active  unreachable  zelma-main                   terminal_2   codex-missing-pane     " + paneRoot + "\n" +
-		"active  unreachable  missing-session              terminal_1   codex-missing-session  " + paneRoot + "\n"
+	want := "ID  STATE   LIVE_STATUS  ZELLIJ_SESSION   ZELLIJ_TAB  ZELLIJ_PANE  CODEX_SESSION          OPENED_PATH\n" +
+		"1   active  live         zelma-main                   terminal_1   codex-live             " + paneRoot + "\n" +
+		"2   active  unreachable  zelma-main                   terminal_2   codex-missing-pane     " + paneRoot + "\n" +
+		"3   active  unreachable  missing-session              terminal_1   codex-missing-session  " + paneRoot + "\n"
 	if stdout.String() != want {
 		t.Fatalf("stdout mismatch\nwant:\n%s\ngot:\n%s", want, stdout.String())
 	}
@@ -886,6 +891,7 @@ func TestSessionsListLiveJSONOutput(t *testing.T) {
   "version": 1,
   "sessions": [
     {
+      "id": 1,
       "zellij_session": "zelma-main",
       "zellij_pane": "terminal_1",
       "codex_session": "",
@@ -893,6 +899,7 @@ func TestSessionsListLiveJSONOutput(t *testing.T) {
       "state": "candidate"
     },
     {
+      "id": 2,
       "zellij_session": "zelma-main",
       "zellij_pane": "terminal_2",
       "codex_session": "",
@@ -919,6 +926,7 @@ func TestSessionsListLiveJSONOutput(t *testing.T) {
   "version": 1,
   "sessions": [
     {
+      "id": 1,
       "zellij_session": "zelma-main",
       "zellij_pane": "terminal_1",
       "codex_session": "",
@@ -927,6 +935,7 @@ func TestSessionsListLiveJSONOutput(t *testing.T) {
       "live_status": "live"
     },
     {
+      "id": 2,
       "zellij_session": "zelma-main",
       "zellij_pane": "terminal_2",
       "codex_session": "",
@@ -967,6 +976,7 @@ func TestSessionsDetectAddsCandidateRecord(t *testing.T) {
 		t.Fatalf("len(Sessions) = %d, want 1", len(got.Sessions))
 	}
 	want := registry.Session{
+		ID:            1,
 		ZellijSession: "zelma-main",
 		ZellijTab:     "tab_1",
 		ZellijTabName: "work",
@@ -1405,7 +1415,7 @@ func TestSessionsCleanupProposalDoesNotMutateRegistry(t *testing.T) {
 		t.Fatalf("stderr = %q, want empty", stderr.String())
 	}
 	want := "proposed=1 removed=0 kept=2\n" +
-		"stale zellij_session=zelma-main zellij_pane=terminal_1 codex_session=11111111-1111-4111-8111-111111111111 opened_path=" + openedPath + "\n"
+		"stale id=1 zellij_session=zelma-main zellij_pane=terminal_1 codex_session=11111111-1111-4111-8111-111111111111 opened_path=" + openedPath + "\n"
 	if stdout.String() != want {
 		t.Fatalf("stdout mismatch\nwant:\n%s\ngot:\n%s", want, stdout.String())
 	}
@@ -1458,7 +1468,7 @@ func TestSessionsCleanupConfirmRemovesOnlyStaleRecords(t *testing.T) {
 		t.Fatalf("stderr = %q, want empty", stderr.String())
 	}
 	want := "proposed=1 removed=1 kept=2\n" +
-		"stale zellij_session=zelma-main zellij_pane=terminal_1 codex_session=11111111-1111-4111-8111-111111111111 opened_path=" + openedPath + "\n"
+		"stale id=1 zellij_session=zelma-main zellij_pane=terminal_1 codex_session=11111111-1111-4111-8111-111111111111 opened_path=" + openedPath + "\n"
 	if stdout.String() != want {
 		t.Fatalf("stdout mismatch\nwant:\n%s\ngot:\n%s", want, stdout.String())
 	}
@@ -1513,6 +1523,7 @@ func TestSessionsCleanupJSONProposal(t *testing.T) {
   },
   "stale_records": [
     {
+      "id": 1,
       "zellij_session": "zelma-main",
       "zellij_pane": "terminal_1",
       "codex_session": "11111111-1111-4111-8111-111111111111",

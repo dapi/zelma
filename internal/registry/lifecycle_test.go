@@ -14,7 +14,9 @@ func TestReconcileLifecycleKeepsActiveWhenLiveIdentityMatches(t *testing.T) {
 	if summary != (LifecycleSummary{Unchanged: 1}) {
 		t.Fatalf("summary = %+v, want unchanged active", summary)
 	}
-	if got.Sessions[0] != active {
+	want := active
+	want.ID = 1
+	if got.Sessions[0] != want {
 		t.Fatalf("session = %+v, want unchanged active", got.Sessions[0])
 	}
 }
@@ -33,6 +35,7 @@ func TestReconcileLifecycleMarksMissingActiveRecordStale(t *testing.T) {
 		t.Fatalf("summary = %+v, want one stale transition", summary)
 	}
 	want := active
+	want.ID = 1
 	want.State = StateStale
 	if got.Sessions[0] != want {
 		t.Fatalf("session = %+v, want stale record without deletion", got.Sessions[0])
@@ -57,7 +60,9 @@ func TestReconcileLifecycleRevalidatesStaleRecordWithMatchingLiveIdentity(t *tes
 	if summary != (LifecycleSummary{Revalidated: 1}) {
 		t.Fatalf("summary = %+v, want one revalidated transition", summary)
 	}
-	if got.Sessions[0] != observed {
+	want := observed
+	want.ID = 1
+	if got.Sessions[0] != want {
 		t.Fatalf("session = %+v, want revalidated active", got.Sessions[0])
 	}
 }
@@ -74,7 +79,9 @@ func TestReconcileLifecycleDoesNotStaleOnTransientRuntimeFailure(t *testing.T) {
 	if summary != (LifecycleSummary{Unchanged: 1}) {
 		t.Fatalf("summary = %+v, want unchanged on unreliable observation", summary)
 	}
-	if got.Sessions[0] != active {
+	want := active
+	want.ID = 1
+	if got.Sessions[0] != want {
 		t.Fatalf("session = %+v, want active preserved on transient failure", got.Sessions[0])
 	}
 }
@@ -96,7 +103,9 @@ func TestReconcileLifecycleDoesNotDeleteOrCloseByDefault(t *testing.T) {
 	if len(got.Sessions) != 2 {
 		t.Fatalf("len(Sessions) = %d, want no deletion", len(got.Sessions))
 	}
-	if got.Sessions[0].State != StateStale || got.Sessions[1] != closed {
+	wantClosed := closed
+	wantClosed.ID = 2
+	if got.Sessions[0].State != StateStale || got.Sessions[0].ID != 1 || got.Sessions[1] != wantClosed {
 		t.Fatalf("sessions = %+v, want active marked stale and closed preserved", got.Sessions)
 	}
 }

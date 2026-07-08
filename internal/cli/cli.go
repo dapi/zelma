@@ -168,7 +168,7 @@ OUTPUT CONVENTIONS
   active/candidate/stale counts, stale reasons when found, or JSON with --json.
   cleanup: stdout, exit 0, proposed/removed/kept summary with stale records;
   without --confirm, does not mutate registry.
-  sessions registry output: preserves zellij_session, zellij_pane,
+  sessions registry output: preserves id, zellij_session, zellij_pane,
   codex_session, opened_path and state fields.
 
 RECOVERY HINTS
@@ -552,7 +552,8 @@ func writeStaleCandidateLines(stdout io.Writer, candidates []registry.StaleCandi
 	for _, candidate := range candidates {
 		if _, err := fmt.Fprintf(
 			stdout,
-			"stale zellij_session=%s zellij_pane=%s previous_state=%s reason=%s\n",
+			"stale id=%d zellij_session=%s zellij_pane=%s previous_state=%s reason=%s\n",
+			candidate.ID,
 			candidate.ZellijSession,
 			candidate.ZellijPane,
 			candidate.PreviousState,
@@ -591,7 +592,8 @@ func writeCleanupProposal(stdout io.Writer, proposal registry.CleanupProposal) e
 	for _, session := range proposal.StaleRecords {
 		if _, err := fmt.Fprintf(
 			stdout,
-			"stale zellij_session=%s zellij_pane=%s codex_session=%s opened_path=%s\n",
+			"stale id=%d zellij_session=%s zellij_pane=%s codex_session=%s opened_path=%s\n",
+			session.ID,
 			session.ZellijSession,
 			session.ZellijPane,
 			session.CodexSession,
@@ -804,13 +806,14 @@ func writeCreateLaunchContractJSON(stdout io.Writer, contract codex.LaunchContra
 
 func writeSessionsTable(stdout io.Writer, reg registry.Registry) error {
 	tw := tabwriter.NewWriter(stdout, 0, 0, 2, ' ', 0)
-	if _, err := fmt.Fprintln(tw, "STATE\tZELLIJ_SESSION\tZELLIJ_TAB\tZELLIJ_PANE\tCODEX_SESSION\tOPENED_PATH"); err != nil {
+	if _, err := fmt.Fprintln(tw, "ID\tSTATE\tZELLIJ_SESSION\tZELLIJ_TAB\tZELLIJ_PANE\tCODEX_SESSION\tOPENED_PATH"); err != nil {
 		return err
 	}
 	for _, session := range reg.Sessions {
 		if _, err := fmt.Fprintf(
 			tw,
-			"%s\t%s\t%s\t%s\t%s\t%s\n",
+			"%d\t%s\t%s\t%s\t%s\t%s\t%s\n",
+			session.ID,
 			session.State,
 			session.ZellijSession,
 			session.ZellijTab,
@@ -826,13 +829,14 @@ func writeSessionsTable(stdout io.Writer, reg registry.Registry) error {
 
 func writeLiveSessionsTable(stdout io.Writer, reg live.Registry) error {
 	tw := tabwriter.NewWriter(stdout, 0, 0, 2, ' ', 0)
-	if _, err := fmt.Fprintln(tw, "STATE\tLIVE_STATUS\tZELLIJ_SESSION\tZELLIJ_TAB\tZELLIJ_PANE\tCODEX_SESSION\tOPENED_PATH"); err != nil {
+	if _, err := fmt.Fprintln(tw, "ID\tSTATE\tLIVE_STATUS\tZELLIJ_SESSION\tZELLIJ_TAB\tZELLIJ_PANE\tCODEX_SESSION\tOPENED_PATH"); err != nil {
 		return err
 	}
 	for _, session := range reg.Sessions {
 		if _, err := fmt.Fprintf(
 			tw,
-			"%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
+			"%d\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
+			session.ID,
 			session.State,
 			session.LiveStatus,
 			session.ZellijSession,

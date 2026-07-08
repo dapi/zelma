@@ -51,6 +51,7 @@ type SessionsList struct {
 }
 
 type Session struct {
+	ID            int    `json:"id"`
 	ZellijSession string `json:"zellij_session"`
 	ZellijTab     string `json:"zellij_tab,omitempty"`
 	ZellijTabName string `json:"zellij_tab_name,omitempty"`
@@ -85,6 +86,7 @@ type DetectSummary struct {
 }
 
 type StaleCandidate struct {
+	ID            int    `json:"id"`
 	ZellijSession string `json:"zellij_session"`
 	ZellijPane    string `json:"zellij_pane"`
 	CodexSession  string `json:"codex_session,omitempty"`

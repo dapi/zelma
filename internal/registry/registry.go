@@ -82,6 +82,7 @@ type Registry struct {
 }
 
 type Session struct {
+	ID            int    `json:"id"`
 	ZellijSession string `json:"zellij_session"`
 	ZellijTab     string `json:"zellij_tab,omitempty"`
 	ZellijTabName string `json:"zellij_tab_name,omitempty"`
@@ -224,8 +225,27 @@ func syncDir(dir string) {
 func normalizeRegistry(registry Registry) Registry {
 	if registry.Sessions == nil {
 		registry.Sessions = []Session{}
+		return registry
 	}
+	registry.Sessions = append([]Session(nil), registry.Sessions...)
+	assignSessionIDs(registry.Sessions)
 	return registry
+}
+
+func assignSessionIDs(sessions []Session) {
+	next := 1
+	for _, session := range sessions {
+		if session.ID >= next {
+			next = session.ID + 1
+		}
+	}
+	for i := range sessions {
+		if sessions[i].ID != 0 {
+			continue
+		}
+		sessions[i].ID = next
+		next++
+	}
 }
 
 func readFileIfExists(path string) (Registry, error) {
@@ -298,6 +318,7 @@ func Decode(r io.Reader) (Registry, error) {
 	if err != nil {
 		return Registry{}, err
 	}
+	registry = normalizeRegistry(registry)
 	if err := Validate(registry); err != nil {
 		return Registry{}, err
 	}
@@ -305,15 +326,22 @@ func Decode(r io.Reader) (Registry, error) {
 }
 
 func Validate(registry Registry) error {
+	registry = normalizeRegistry(registry)
 	if registry.Version != SchemaVersion {
 		return diagnostic(ErrorCodeUnsupportedVersion, "version", fmt.Sprintf("unsupported schema version %d", registry.Version), "use schema version 1 or run a future migration command when one exists", nil)
 	}
 
+	sessionIDs := map[int]int{}
 	activePanes := map[string]int{}
 	for i, session := range registry.Sessions {
 		if err := validateSession(i, session); err != nil {
 			return err
 		}
+		if first, ok := sessionIDs[session.ID]; ok {
+			return diagnostic(ErrorCodeDuplicateSession, fmt.Sprintf("sessions[%d].id", i), fmt.Sprintf("duplicates zelma session id from sessions[%d]", first), "keep each id unique or remove the duplicate record before retrying", nil)
+		}
+		sessionIDs[session.ID] = i
+
 		if session.State != StateActive {
 			continue
 		}
@@ -332,6 +360,9 @@ func Validate(registry Registry) error {
 }
 
 func validateSession(index int, session Session) error {
+	if session.ID <= 0 {
+		return diagnostic(ErrorCodeInvalidField, fmt.Sprintf("sessions[%d].id", index), "id must be a positive integer", "remove id to let zelma assign one, or set it to a unique positive integer", nil)
+	}
 	if session.ZellijSession == "" {
 		return diagnostic(ErrorCodeInvalidField, fmt.Sprintf("sessions[%d].zellij_session", index), "zellij_session is required", "restore the zellij session reference or remove the invalid record", nil)
 	}
@@ -396,6 +427,7 @@ func (raw registryJSON) registry() (Registry, error) {
 }
 
 type sessionJSON struct {
+	ID            *int    `json:"id"`
 	ZellijSession *string `json:"zellij_session"`
 	ZellijTab     *string `json:"zellij_tab"`
 	ZellijTabName *string `json:"zellij_tab_name"`
@@ -423,6 +455,7 @@ func (raw sessionJSON) session(index int) (Session, error) {
 	}
 
 	return Session{
+		ID:            optionalInt(raw.ID),
 		ZellijSession: *raw.ZellijSession,
 		ZellijTab:     optionalString(raw.ZellijTab),
 		ZellijTabName: optionalString(raw.ZellijTabName),
@@ -431,6 +464,13 @@ func (raw sessionJSON) session(index int) (Session, error) {
 		OpenedPath:    *raw.OpenedPath,
 		State:         *raw.State,
 	}, nil
+}
+
+func optionalInt(value *int) int {
+	if value == nil {
+		return 0
+	}
+	return *value
 }
 
 func optionalString(value *string) string {

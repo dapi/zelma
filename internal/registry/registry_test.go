@@ -37,6 +37,7 @@ func TestDecodeRepresentativeFixturePreservesSessionRefs(t *testing.T) {
 
 	want := []Session{
 		{
+			ID:            1,
 			ZellijSession: "zelma-main",
 			ZellijPane:    "1",
 			CodexSession:  "codex-2026-07-07T10-00-00Z-a1b2",
@@ -44,6 +45,7 @@ func TestDecodeRepresentativeFixturePreservesSessionRefs(t *testing.T) {
 			State:         StateActive,
 		},
 		{
+			ID:            2,
 			ZellijSession: "zelma-main",
 			ZellijPane:    "2",
 			CodexSession:  "codex-2026-07-07T10-30-00Z-c3d4",
@@ -51,6 +53,7 @@ func TestDecodeRepresentativeFixturePreservesSessionRefs(t *testing.T) {
 			State:         StateStale,
 		},
 		{
+			ID:            3,
 			ZellijSession: "feature-issue-6",
 			ZellijPane:    "3",
 			CodexSession:  "codex-2026-07-07T11-00-00Z-e5f6",
@@ -66,6 +69,36 @@ func TestDecodeRepresentativeFixturePreservesSessionRefs(t *testing.T) {
 		if registry.Sessions[i] != want[i] {
 			t.Fatalf("Sessions[%d] = %+v, want %+v", i, registry.Sessions[i], want[i])
 		}
+	}
+}
+
+func TestDecodeBackfillsMissingSessionIDs(t *testing.T) {
+	got, err := Parse([]byte(`{
+  "version": 1,
+  "sessions": [
+    {
+      "zellij_session": "main",
+      "zellij_pane": "terminal_1",
+      "codex_session": "",
+      "opened_path": "",
+      "state": "candidate"
+    },
+    {
+      "id": 7,
+      "zellij_session": "main",
+      "zellij_pane": "terminal_2",
+      "codex_session": "",
+      "opened_path": "",
+      "state": "candidate"
+    }
+  ]
+}
+`))
+	if err != nil {
+		t.Fatalf("Parse() error = %v, want nil", err)
+	}
+	if got.Sessions[0].ID != 8 || got.Sessions[1].ID != 7 {
+		t.Fatalf("session IDs = %d,%d; want backfilled 8 and preserved 7", got.Sessions[0].ID, got.Sessions[1].ID)
 	}
 }
 
@@ -129,6 +162,16 @@ func TestDecodeRejectsInvalidRegistry(t *testing.T) {
 			name:    "conflicting active pane",
 			json:    `{"version":1,"sessions":[{"zellij_session":"main","zellij_pane":"1","codex_session":"codex-a","opened_path":"/workspace/a","state":"active"},{"zellij_session":"main","zellij_pane":"1","codex_session":"codex-b","opened_path":"/workspace/b","state":"active"}]}`,
 			wantErr: "conflicts with active zellij pane",
+		},
+		{
+			name:    "duplicate zelma session id",
+			json:    `{"version":1,"sessions":[{"id":7,"zellij_session":"main","zellij_pane":"1","codex_session":"codex-a","opened_path":"/workspace/a","state":"active"},{"id":7,"zellij_session":"main","zellij_pane":"2","codex_session":"codex-b","opened_path":"/workspace/b","state":"active"}]}`,
+			wantErr: "duplicates zelma session id",
+		},
+		{
+			name:    "negative zelma session id",
+			json:    `{"version":1,"sessions":[{"id":-1,"zellij_session":"main","zellij_pane":"1","codex_session":"codex-a","opened_path":"/workspace/a","state":"active"}]}`,
+			wantErr: "id must be a positive integer",
 		},
 		{
 			name:    "trailing data",
@@ -196,6 +239,12 @@ func TestDecodeReturnsMachineReadableDiagnostics(t *testing.T) {
 			json:     `{"version":1,"sessions":[{"zellij_session":"main","zellij_pane":"1","codex_session":"codex-a","opened_path":"/workspace/a","state":"active"},{"zellij_session":"main","zellij_pane":"1","codex_session":"codex-b","opened_path":"/workspace/b","state":"active"}]}`,
 			wantCode: ErrorCodeConflictingSession,
 			wantPath: "sessions[1]",
+		},
+		{
+			name:     "duplicate zelma session id",
+			json:     `{"version":1,"sessions":[{"id":3,"zellij_session":"main","zellij_pane":"1","codex_session":"codex-a","opened_path":"/workspace/a","state":"active"},{"id":3,"zellij_session":"main","zellij_pane":"2","codex_session":"codex-b","opened_path":"/workspace/b","state":"active"}]}`,
+			wantCode: ErrorCodeDuplicateSession,
+			wantPath: "sessions[1].id",
 		},
 	}
 
@@ -317,8 +366,10 @@ func TestUpsertDetectedCandidatesAddsOnlyMissingPane(t *testing.T) {
 	if len(first.Sessions) != 1 {
 		t.Fatalf("len(first.Sessions) = %d, want 1", len(first.Sessions))
 	}
-	if first.Sessions[0] != candidate {
-		t.Fatalf("first session = %+v, want %+v", first.Sessions[0], candidate)
+	want := candidate
+	want.ID = 1
+	if first.Sessions[0] != want {
+		t.Fatalf("first session = %+v, want %+v", first.Sessions[0], want)
 	}
 
 	second, secondSummary := UpsertDetectedCandidates(first, []Session{candidate})
@@ -330,8 +381,40 @@ func TestUpsertDetectedCandidatesAddsOnlyMissingPane(t *testing.T) {
 	}
 }
 
+func TestUpsertDetectedCandidatesAssignsNextSessionID(t *testing.T) {
+	current := Registry{
+		Version: SchemaVersion,
+		Sessions: []Session{
+			{
+				ID:            41,
+				ZellijSession: "main",
+				ZellijPane:    "terminal_1",
+				CodexSession:  "codex-a",
+				OpenedPath:    "/workspace/a",
+				State:         StateActive,
+			},
+		},
+	}
+	candidate := Session{
+		ZellijSession: "main",
+		ZellijPane:    "terminal_2",
+		OpenedPath:    "/workspace/zelma",
+		State:         StateCandidate,
+	}
+
+	got, summary := UpsertDetectedCandidates(current, []Session{candidate})
+
+	if summary != (DetectUpsertSummary{Added: 1, Candidate: 1}) {
+		t.Fatalf("summary = %+v, want added candidate", summary)
+	}
+	if len(got.Sessions) != 2 || got.Sessions[1].ID != 42 {
+		t.Fatalf("sessions = %+v, want appended session id 42", got.Sessions)
+	}
+}
+
 func TestUpsertDetectedCandidatesPreservesMorePreciseExistingRecord(t *testing.T) {
 	active := Session{
+		ID:            1,
 		ZellijSession: "main",
 		ZellijPane:    "terminal_1",
 		CodexSession:  "codex-a",
@@ -359,6 +442,7 @@ func TestUpsertDetectedCandidatesPreservesMorePreciseExistingRecord(t *testing.T
 
 func TestUpsertDetectedCandidatesAppendsWhenOnlyHistoricalRecordMatchesPane(t *testing.T) {
 	closed := Session{
+		ID:            1,
 		ZellijSession: "main",
 		ZellijPane:    "terminal_1",
 		CodexSession:  "codex-closed",
@@ -382,13 +466,16 @@ func TestUpsertDetectedCandidatesAppendsWhenOnlyHistoricalRecordMatchesPane(t *t
 	if len(got.Sessions) != 2 {
 		t.Fatalf("len(Sessions) = %d, want 2", len(got.Sessions))
 	}
-	if got.Sessions[0] != closed || got.Sessions[1] != candidate {
+	wantCandidate := candidate
+	wantCandidate.ID = 2
+	if got.Sessions[0] != closed || got.Sessions[1] != wantCandidate {
 		t.Fatalf("sessions = %+v, want closed record preserved and candidate appended", got.Sessions)
 	}
 }
 
 func TestUpsertDetectedCandidatesMatchesActiveBeforeCandidateDuplicate(t *testing.T) {
 	active := Session{
+		ID:            2,
 		ZellijSession: "main",
 		ZellijPane:    "terminal_1",
 		CodexSession:  "codex-active",
@@ -396,6 +483,7 @@ func TestUpsertDetectedCandidatesMatchesActiveBeforeCandidateDuplicate(t *testin
 		State:         StateActive,
 	}
 	existingCandidate := Session{
+		ID:            1,
 		ZellijSession: "main",
 		ZellijPane:    "terminal_1",
 		OpenedPath:    "",
@@ -579,6 +667,7 @@ func TestUpsertDetectedCandidatesSkipsInvalidCandidateKey(t *testing.T) {
 
 func TestMarkStaleCandidatesMarksMissingPaneWithReason(t *testing.T) {
 	active := Session{
+		ID:            1,
 		ZellijSession: "main",
 		ZellijPane:    "terminal_1",
 		CodexSession:  "11111111-1111-4111-8111-111111111111",
@@ -656,6 +745,8 @@ func TestMarkStaleCandidatesPreservesLiveAndHistoricalRecords(t *testing.T) {
 	if len(stale) != 0 {
 		t.Fatalf("stale = %+v, want none", stale)
 	}
+	active.ID = 1
+	closed.ID = 2
 	if got.Sessions[0] != active || got.Sessions[1] != closed {
 		t.Fatalf("sessions = %+v, want preserved records", got.Sessions)
 	}
@@ -707,8 +798,9 @@ func TestWriteFileCreatesAtomicRegistryFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Parse(written registry) error = %v, want nil", err)
 	}
-	if len(got.Sessions) != 1 || got.Sessions[0] != registry.Sessions[0] {
-		t.Fatalf("written registry = %+v, want %+v", got, registry)
+	want := normalizeRegistry(registry)
+	if len(got.Sessions) != 1 || got.Sessions[0] != want.Sessions[0] {
+		t.Fatalf("written registry = %+v, want %+v", got, want)
 	}
 }
 
