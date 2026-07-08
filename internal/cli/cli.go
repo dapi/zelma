@@ -111,7 +111,8 @@ OUTPUT CONVENTIONS
   help output: stdout, exit 0, plain text.
   setup changed: stdout, exit 0, "changed: prepared .zelma at <path>".
   setup unchanged: stdout, exit 0, "already configured: <path> contains .zelma".
-  sessions list: stdout, exit 0, table by default or schema v1 JSON with --json;
+  sessions list: stdout, exit 0, active-only table by default or schema v1
+  registry JSON with --json; add --all for inactive records in human output;
   add --live to include live/unreachable zellij status without registry writes.
   sessions detect: stdout, exit 0, summary with active/candidate/stale counts,
   stale reason lines when found, or JSON with --json.
@@ -171,8 +172,9 @@ const sessionsHelp = `COMMAND MAP
 
 OUTPUT CONVENTIONS
   help output: stdout, exit 0, plain text.
-  list: stdout, exit 0, table by default or schema v1 JSON with --json; add
-  --live to include live/unreachable zellij status without registry writes.
+  list: stdout, exit 0, active-only table by default or schema v1 registry JSON
+  with --json; add --all for inactive records in human output; add --live to
+  include live/unreachable zellij status without registry writes.
   create --dry-run: stdout, exit 0, resolved Codex command/opened path.
   create: stdout, exit 0, created/registered/skipped summary.
   detect: stdout, exit 0, added/unchanged/skipped summary with
@@ -201,15 +203,16 @@ Usage:
 `
 
 const sessionsListHelp = `Usage:
-  zelma sessions list [--json] [--live]
+  zelma sessions list [--json] [--live] [--all]
 
 Status:
   implemented: reads the repository-local sessions registry; --live reconciles
   records with current zellij panes.
 
 Output:
-  default: tabular human-readable session inventory.
-  --json: schema v1 JSON object with version and sessions.
+  default: tabular human-readable active session inventory.
+  --all: include stale, candidate, closed and archived records in human output.
+  --json: schema v1 registry JSON object with version and all sessions.
   --live: adds live_status values: live or unreachable.
 
 Notes:
@@ -339,6 +342,7 @@ func newSetupCommand(stdout io.Writer) *cobra.Command {
 func newSessionsListCommand(stdout io.Writer) *cobra.Command {
 	var jsonOutput bool
 	var liveOutput bool
+	var allOutput bool
 
 	cmd := &cobra.Command{
 		Use:   "list",
@@ -358,16 +362,23 @@ func newSessionsListCommand(stdout io.Writer) *cobra.Command {
 				if jsonOutput {
 					return writeLiveSessionsJSON(stdout, liveReg)
 				}
+				if !allOutput {
+					liveReg = filterLiveRegistryByState(liveReg, registry.StateActive)
+				}
 				return writeLiveSessionsTable(stdout, liveReg)
 			}
 			if jsonOutput {
 				return writeSessionsJSON(stdout, reg)
+			}
+			if !allOutput {
+				reg = filterRegistryByState(reg, registry.StateActive)
 			}
 			return writeSessionsTable(stdout, reg)
 		},
 	}
 	cmd.Flags().BoolVar(&jsonOutput, "json", false, "Print schema v1 JSON.")
 	cmd.Flags().BoolVar(&liveOutput, "live", false, "Include live zellij pane status without mutating the registry.")
+	cmd.Flags().BoolVar(&allOutput, "all", false, "Include inactive sessions in human-readable output.")
 	return cmd
 }
 
@@ -1002,6 +1013,19 @@ func writeSessionsTable(stdout io.Writer, reg registry.Registry) error {
 	return tw.Flush()
 }
 
+func filterRegistryByState(reg registry.Registry, state registry.State) registry.Registry {
+	filtered := registry.Registry{
+		Version:  reg.Version,
+		Sessions: make([]registry.Session, 0, len(reg.Sessions)),
+	}
+	for _, session := range reg.Sessions {
+		if session.State == state {
+			filtered.Sessions = append(filtered.Sessions, session)
+		}
+	}
+	return filtered
+}
+
 func writeLiveSessionsTable(stdout io.Writer, reg live.Registry) error {
 	tw := tabwriter.NewWriter(stdout, 0, 0, 2, ' ', 0)
 	if _, err := fmt.Fprintln(tw, "ID\tSTATE\tLIVE_STATUS\tZELLIJ_SESSION\tZELLIJ_TAB\tZELLIJ_PANE\tCODEX_SESSION\tOPENED_PATH"); err != nil {
@@ -1024,4 +1048,17 @@ func writeLiveSessionsTable(stdout io.Writer, reg live.Registry) error {
 		}
 	}
 	return tw.Flush()
+}
+
+func filterLiveRegistryByState(reg live.Registry, state registry.State) live.Registry {
+	filtered := live.Registry{
+		Version:  reg.Version,
+		Sessions: make([]live.Session, 0, len(reg.Sessions)),
+	}
+	for _, session := range reg.Sessions {
+		if session.State == state {
+			filtered.Sessions = append(filtered.Sessions, session)
+		}
+	}
+	return filtered
 }

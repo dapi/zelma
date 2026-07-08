@@ -337,7 +337,8 @@ OUTPUT CONVENTIONS
   help output: stdout, exit 0, plain text.
   setup changed: stdout, exit 0, "changed: prepared .zelma at <path>".
   setup unchanged: stdout, exit 0, "already configured: <path> contains .zelma".
-  sessions list: stdout, exit 0, table by default or schema v1 JSON with --json;
+  sessions list: stdout, exit 0, active-only table by default or schema v1
+  registry JSON with --json; add --all for inactive records in human output;
   add --live to include live/unreachable zellij status without registry writes.
   sessions detect: stdout, exit 0, summary with active/candidate/stale counts,
   stale reason lines when found, or JSON with --json.
@@ -373,8 +374,9 @@ const sessionsHelpSnapshot = `COMMAND MAP
 
 OUTPUT CONVENTIONS
   help output: stdout, exit 0, plain text.
-  list: stdout, exit 0, table by default or schema v1 JSON with --json; add
-  --live to include live/unreachable zellij status without registry writes.
+  list: stdout, exit 0, active-only table by default or schema v1 registry JSON
+  with --json; add --all for inactive records in human output; add --live to
+  include live/unreachable zellij status without registry writes.
   create --dry-run: stdout, exit 0, resolved Codex command/opened path.
   create: stdout, exit 0, created/registered/skipped summary.
   detect: stdout, exit 0, added/unchanged/skipped summary with
@@ -799,7 +801,70 @@ func TestSessionsListJSONPreservesRegistryFields(t *testing.T) {
 	}
 }
 
-func TestSessionsListTableOutput(t *testing.T) {
+func TestSessionsListJSONPreservesInactiveRecordsForCompatibility(t *testing.T) {
+	root := newTestGitRepo(t)
+	writeRegistryFile(t, root, `{
+  "version": 1,
+  "sessions": [
+    {
+      "id": 1,
+      "zellij_session": "zelma-main",
+      "zellij_pane": "1",
+      "codex_session": "codex-a",
+      "opened_path": "/workspace/zelma",
+      "state": "active"
+    },
+    {
+      "id": 2,
+      "zellij_session": "feature-issue-6",
+      "zellij_pane": "3",
+      "codex_session": "codex-b",
+      "opened_path": "/workspace/zelma/memory-bank/features/FT-006",
+      "state": "stale"
+    }
+  ]
+}
+`)
+	t.Chdir(root)
+
+	var stdout, stderr bytes.Buffer
+
+	code := Run(context.Background(), []string{"sessions", "list", "--json"}, &stdout, &stderr)
+
+	if code != 0 {
+		t.Fatalf("Run() code = %d, want 0; stderr = %q", code, stderr.String())
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("stderr = %q, want empty", stderr.String())
+	}
+	want := `{
+  "version": 1,
+  "sessions": [
+    {
+      "id": 1,
+      "zellij_session": "zelma-main",
+      "zellij_pane": "1",
+      "codex_session": "codex-a",
+      "opened_path": "/workspace/zelma",
+      "state": "active"
+    },
+    {
+      "id": 2,
+      "zellij_session": "feature-issue-6",
+      "zellij_pane": "3",
+      "codex_session": "codex-b",
+      "opened_path": "/workspace/zelma/memory-bank/features/FT-006",
+      "state": "stale"
+    }
+  ]
+}
+`
+	if stdout.String() != want {
+		t.Fatalf("stdout mismatch\nwant:\n%s\ngot:\n%s", want, stdout.String())
+	}
+}
+
+func TestSessionsListTableOutputShowsOnlyActiveByDefault(t *testing.T) {
 	root := newTestGitRepo(t)
 	writeRegistryFile(t, root, `{
   "version": 1,
@@ -816,7 +881,14 @@ func TestSessionsListTableOutput(t *testing.T) {
       "zellij_pane": "3",
       "codex_session": "codex-b",
       "opened_path": "/workspace/zelma/memory-bank/features/FT-006",
-      "state": "closed"
+      "state": "stale"
+    },
+    {
+      "zellij_session": "candidate-session",
+      "zellij_pane": "4",
+      "codex_session": "",
+      "opened_path": "/workspace/zelma",
+      "state": "candidate"
     }
   ]
 }
@@ -833,9 +905,58 @@ func TestSessionsListTableOutput(t *testing.T) {
 	if stderr.Len() != 0 {
 		t.Fatalf("stderr = %q, want empty", stderr.String())
 	}
-	want := "ID  STATE   ZELLIJ_SESSION   ZELLIJ_TAB  ZELLIJ_PANE  CODEX_SESSION  OPENED_PATH\n" +
-		"1   active  zelma-main                   1            codex-a        /workspace/zelma\n" +
-		"2   closed  feature-issue-6              3            codex-b        /workspace/zelma/memory-bank/features/FT-006\n"
+	want := "ID  STATE   ZELLIJ_SESSION  ZELLIJ_TAB  ZELLIJ_PANE  CODEX_SESSION  OPENED_PATH\n" +
+		"1   active  zelma-main                  1            codex-a        /workspace/zelma\n"
+	if stdout.String() != want {
+		t.Fatalf("stdout mismatch\nwant:\n%s\ngot:\n%s", want, stdout.String())
+	}
+}
+
+func TestSessionsListAllTableOutputIncludesInactiveRecords(t *testing.T) {
+	root := newTestGitRepo(t)
+	writeRegistryFile(t, root, `{
+  "version": 1,
+  "sessions": [
+    {
+      "zellij_session": "zelma-main",
+      "zellij_pane": "1",
+      "codex_session": "codex-a",
+      "opened_path": "/workspace/zelma",
+      "state": "active"
+    },
+    {
+      "zellij_session": "feature-issue-6",
+      "zellij_pane": "3",
+      "codex_session": "codex-b",
+      "opened_path": "/workspace/zelma/memory-bank/features/FT-006",
+      "state": "stale"
+    },
+    {
+      "zellij_session": "candidate-session",
+      "zellij_pane": "4",
+      "codex_session": "",
+      "opened_path": "/workspace/zelma",
+      "state": "candidate"
+    }
+  ]
+}
+`)
+	t.Chdir(root)
+
+	var stdout, stderr bytes.Buffer
+
+	code := Run(context.Background(), []string{"sessions", "list", "--all"}, &stdout, &stderr)
+
+	if code != 0 {
+		t.Fatalf("Run() code = %d, want 0; stderr = %q", code, stderr.String())
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("stderr = %q, want empty", stderr.String())
+	}
+	want := "ID  STATE      ZELLIJ_SESSION     ZELLIJ_TAB  ZELLIJ_PANE  CODEX_SESSION  OPENED_PATH\n" +
+		"1   active     zelma-main                     1            codex-a        /workspace/zelma\n" +
+		"2   stale      feature-issue-6                3            codex-b        /workspace/zelma/memory-bank/features/FT-006\n" +
+		"3   candidate  candidate-session              4                           /workspace/zelma\n"
 	if stdout.String() != want {
 		t.Fatalf("stdout mismatch\nwant:\n%s\ngot:\n%s", want, stdout.String())
 	}

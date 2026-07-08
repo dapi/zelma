@@ -59,7 +59,11 @@ Reads the repository-local `.zelma/sessions.json`. A missing registry is treated
 as an empty registry. Without `--live`, this command does not contact zellij and
 does not mutate the registry.
 
-Output is schema v1 registry JSON:
+Output is schema v1 registry JSON and preserves all registry records for
+machine-readable compatibility, including active, candidate, stale, closed and
+archived states. The human table output of `zelma sessions list` is active-only
+by default; use `zelma sessions list --all` when a human needs the inactive
+records too.
 
 ```json
 {
