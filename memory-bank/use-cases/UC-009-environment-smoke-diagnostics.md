@@ -37,7 +37,7 @@ Setup agent.
 1. Агент вызывает `zelma setup --json`.
 2. Zelma проверяет repo root и идемпотентно добавляет `.zelma` в `.gitignore`.
 3. Агент вызывает `zelma sessions list --json`.
-4. Агент вызывает `zelma sessions detect --json`.
+4. Auto-detect внутри `sessions list` проверяет доступность zellij/Codex probing.
 5. Агент получает summary готовности и warnings.
 
 ## Alternate Flows / Exceptions

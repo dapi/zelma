@@ -77,8 +77,9 @@ Requirements:
   command is explicitly help text.
 - Any command intended for skills must provide a stable `--json` output mode
   before a skill depends on it.
-- Error messages should include the next safe command when possible, for example
-  `zelma sessions detect --json` or `zelma sessions list --json`.
+- Error messages should include the next safe command when possible, normally
+  `zelma sessions list --json` for inventory/reconciliation or
+  `zelma sessions detect --json` for explicit diagnostic detect.
 
 ## Concurrency And Critical Sections
 

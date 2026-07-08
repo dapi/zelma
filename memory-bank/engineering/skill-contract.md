@@ -32,20 +32,23 @@ The skill should choose commands from the user's intent:
 
 | Intent | Command | Why |
 | --- | --- | --- |
-| Show known managed sessions | `zelma sessions list --json` | Stable registry inventory for agents. |
-| Check whether known sessions still have live panes | `zelma sessions list --live --json` | Read-only live status without registry mutation. |
+| Show current managed sessions | `zelma sessions list --json` | Primary inventory command; auto-detects fresh-enough manual panes before returning schema v1 JSON. |
+| Show registry only without probing | `zelma sessions list --no-detect --json` | Stable registry-only inventory for callers that must avoid zellij/Codex probing. |
+| Check whether known sessions still have live panes | `zelma sessions list --live --json` | Auto-detects first unless cache is fresh, then adds live status. |
 | Create a managed Codex pane | `zelma sessions create [path] --json` | Controlled workflow that creates and registers a confirmed pane. |
 | Preview create inputs | `zelma sessions create [path] --dry-run --json` | Resolve Codex command and opened path without side effects. |
-| Register manually created Codex panes | `zelma sessions detect --json` | Detect live zellij panes and upsert candidate or active records. |
+| Run an explicit diagnostic detect pass | `zelma sessions detect --json` | Detect live zellij panes and upsert candidate or active records outside the normal list workflow. |
 | Focus a known session pane | `zelma sessions focus <id> --json` | Switch zellij UI to a registry-backed tab/pane without registry mutation. |
 | Review stale cleanup | `zelma sessions cleanup --json` | Propose stale records without mutation. |
 | Remove stale records after explicit user intent | `zelma sessions cleanup --confirm --json` | Mutating cleanup for records already marked `stale`. |
 
-If the agent only needs current registry data, prefer `sessions list --json`.
-Use `--live` only when live reachability matters, because it contacts zellij.
-Use `detect` when the user says a Codex pane already exists outside `zelma` or
-when recovery guidance suggests reconciling live panes. Use `cleanup --confirm`
-only after explicit user intent to remove stale registry records.
+If the agent needs current inventory, prefer `sessions list --json`. Use
+`--no-detect` only when the caller explicitly needs a registry-only read with no
+zellij/Codex probing. Use `--live` when live reachability matters; it may contact
+zellij even when auto-detect is skipped by cache freshness. Keep standalone
+`detect` for diagnostics/manual reconciliation, not normal inventory. Use
+`cleanup --confirm` only after explicit user intent to remove stale registry
+records.
 
 ## Command Contracts
 
@@ -55,9 +58,10 @@ and exit non-zero.
 
 ### `zelma sessions list --json`
 
-Reads the repository-local `.zelma/sessions.json`. A missing registry is treated
-as an empty registry. Without `--live`, this command does not contact zellij and
-does not mutate the registry.
+Runs auto-detect by default unless the last successful auto-detect timestamp is
+fresh according to `sessions_list.auto_detect_ttl` in `.zelma/config.json`
+(default `5s`), then reads the repository-local `.zelma/sessions.json`. A
+missing registry is treated as an empty registry.
 
 Output is schema v1 registry JSON and preserves all registry records for
 machine-readable compatibility, including active, candidate, stale, closed and
@@ -83,8 +87,9 @@ records too.
 }
 ```
 
-With `--live`, each session also includes `live_status` with `live` or
-`unreachable`. The live view is read-only; it does not persist `live_status`.
+With `--no-detect`, the command skips auto-detect and reads only
+`.zelma/sessions.json`. With `--live`, each session also includes `live_status`
+with `live` or `unreachable`. The live view does not persist `live_status`.
 
 ### `zelma sessions create [path] --json`
 
@@ -106,7 +111,7 @@ The successful JSON summary is:
 New records are `candidate` unless Codex session evidence resolves
 unambiguously. If pane creation succeeds but confirmation or registry write
 fails, `zelma` does not claim to clean up the zellij pane; recovery should run
-`zelma sessions detect --json` after the environment issue is understood.
+`zelma sessions list --json` after the environment issue is understood.
 
 ### `zelma sessions create [path] --dry-run --json`
 
@@ -125,8 +130,9 @@ debug Codex binary/path resolution before a mutating create.
 ### `zelma sessions detect --json`
 
 Reads live zellij sessions and panes through `zelma`, classifies Codex panes,
-and upserts registry records. It does not create panes and does not delete stale
-records.
+and upserts registry records. This command is kept for diagnostic/manual detect
+passes; normal inventory should use `zelma sessions list --json`. It does not
+create panes and does not delete stale records.
 
 The successful JSON summary is:
 
@@ -206,9 +212,9 @@ contains:
 | Registry JSON is invalid | `stop`; tell the user to restore valid schema v1 JSON before mutating commands. |
 | Codex binary is missing during create | `stop`; fix Codex installation or `ZELMA_CODEX_BIN`, then retry. |
 | zellij is unavailable or command execution fails | `stop`; fix zellij availability/session before retrying. |
-| Created pane cannot be confirmed | `detect`; run `zelma sessions detect --json` and inspect the pane. |
-| Registry write fails after pane creation | `detect`; fix filesystem/lock issue, then run `zelma sessions detect --json` before retrying create. |
-| Registry is empty but live panes are likely | `detect`; run `zelma sessions detect --json`. |
+| Created pane cannot be confirmed | `detect`; run `zelma sessions list --json` and inspect the pane. |
+| Registry write fails after pane creation | `detect`; fix filesystem/lock issue, then run `zelma sessions list --json` before retrying create. |
+| Registry is empty but live panes are likely | `detect`; run `zelma sessions list --json`. |
 | `list --live` or `detect` marks sessions stale | `inspect`; present stale records and use `cleanup --json` for proposal. |
 
 Recovery `next_command` values must stay within the public `zelma` CLI. They

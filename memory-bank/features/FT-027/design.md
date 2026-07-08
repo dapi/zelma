@@ -49,8 +49,11 @@ JSON output keeps the existing schema shape:
 - existing session fields;
 - per-session `live_status`.
 
-Plain `sessions list` and `sessions list --json` keep the existing registry-only
-contract and do not contact zellij.
+As of GitHub issue #86, plain `sessions list` and `sessions list --json`
+auto-detect by default before rendering inventory. Use
+`sessions list --no-detect` for the registry-only contract that does not run the
+detect pass. `--live` still owns only live-status enrichment and does not persist
+`live_status`.
 
 ## Reconciliation Flow
 

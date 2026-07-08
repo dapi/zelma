@@ -23,7 +23,7 @@ canonical_for:
 | Event ID | Event | Meaning | Producer | Consumers | Minimal facts |
 | --- | --- | --- | --- | --- | --- |
 | `DE-01` | `ZelmaSessionCreated` | `sessions create` produced a live Codex pane and registered it | CLI / Session Registry | CLI output, skills, logs/tests | Session id, zellij session, zellij pane, codex session, opened path, origin `create` |
-| `DE-02` | `CodexPaneDetected` | `sessions detect` found a zellij pane with evidence of Codex runtime | Detection | Session Registry | Zellij session, zellij pane, opened path evidence, Codex evidence |
+| `DE-02` | `CodexPaneDetected` | Detection found a zellij pane with evidence of Codex runtime through explicit `sessions detect` or default `sessions list` auto-detect | Detection | Session Registry | Zellij session, zellij pane, opened path evidence, Codex evidence |
 | `DE-03` | `ZelmaSessionRegistered` | Registry now contains a session record created from create or detect workflow | Session Registry | CLI output, skills, tests | Registry path, session id, state, origin |
 | `DE-04` | `ZelmaSessionBecameStale` | Previously active record no longer validates against runtime state | Reconciliation | CLI output, skills, cleanup workflow | Session id, previous refs, observed missing evidence |
 | `DE-05` | `ZelmaSessionRevalidated` | Stale or uncertain record was confirmed live again | Reconciliation | CLI output, skills | Session id, confirmed refs |

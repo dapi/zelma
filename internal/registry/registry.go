@@ -228,6 +228,9 @@ func normalizeRegistry(registry Registry) Registry {
 		return registry
 	}
 	registry.Sessions = append([]Session(nil), registry.Sessions...)
+	if registry.Sessions == nil {
+		registry.Sessions = []Session{}
+	}
 	assignSessionIDs(registry.Sessions)
 	return registry
 }

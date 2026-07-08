@@ -49,6 +49,9 @@ Initial schema:
 
 ```json
 {
+  "sessions_list": {
+    "auto_detect_ttl": "5s"
+  },
   "start_issue": {
     "zellij_surface": "pane"
   }
@@ -64,6 +67,12 @@ Resolution order for values that support both env and repo-local config:
 `start_issue.zellij_surface` controls where the autonomous issue shipping
 supervisor launches the task agent inside the current zellij session. Allowed
 values are `pane` and `tab`. The default is `pane`.
+
+`sessions_list.auto_detect_ttl` controls how long `zelma sessions list` may
+reuse the timestamp from the last successful auto-detect pass before probing
+zellij/Codex again. The value uses Go duration syntax such as `5s`, `500ms` or
+`1m`. The default is `5s`. Use `zelma sessions list --no-detect` for a
+registry-only read that ignores this cache.
 
 ## Naming Convention For Env Vars
 
@@ -94,6 +103,7 @@ Rules:
 | `ZELMA_CODEX_BIN` | Optional path/name for Codex executable | `codex` via `PATH` | `codex-adapter` |
 | `ZELMA_REGISTRY_PATH` | Optional registry file path for tests/recovery | `.zelma/sessions.json` | `registry` |
 | `ZELMA_START_ISSUE_ZELLIJ_SURFACE` | Optional supervisor launch surface override; allowed values: `pane`, `tab` | `.zelma/config.json` `start_issue.zellij_surface`, then `pane` | supervisor CLI |
+| `sessions_list.auto_detect_ttl` | Repo-local TTL for `sessions list` auto-detect cache | `5s` | sessions CLI |
 
 ## Secrets
 

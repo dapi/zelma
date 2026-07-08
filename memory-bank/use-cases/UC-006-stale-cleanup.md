@@ -34,7 +34,7 @@ Task agent завершил работу, pane закрыта или zellij sess
 
 ## Main Flow
 
-1. Агент вызывает `zelma sessions detect --json` или `zelma sessions list --live --json`.
+1. Агент вызывает `zelma sessions list --json` или `zelma sessions list --live --json`.
 2. Zelma помечает отсутствующие pane как stale.
 3. Агент вызывает `zelma sessions cleanup --json` для proposal.
 4. Агент вызывает `zelma sessions cleanup --confirm --json`, если proposal ожидаем.

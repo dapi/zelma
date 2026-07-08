@@ -24,17 +24,32 @@
 
 - `zelma sessions create` — создает новый `zellij pane`, запускает в нем Codex и
   сохраняет запись о сессии в `.zelma/sessions.json`.
-- `zelma sessions detect` — находит вручную созданные `zellij panes`, в которых
-  уже запущен Codex, и регистрирует их в `.zelma/sessions.json`.
-- `zelma sessions list` — показывает активные `zelma sessions` для текущего
+- `zelma sessions list` — primary inventory command: перед выводом запускает
+  auto-detect вручную созданных Codex panes, если successful detection cache
+  старше configured TTL, и показывает active `zelma sessions` для текущего
   репозитория; `--all` добавляет stale и другие non-active записи.
+- `zelma sessions list --no-detect` — registry-only read старого типа без
+  probing `zellij`/Codex.
+- `zelma sessions detect` — diagnostic/manual command для явного detect pass;
+  в normal workflow его заменяет `sessions list`.
 - `zelma sessions focus <id>` — переключает `zellij` на tab/pane известной
   `zelma session`.
 
 `sessions create` покрывает controlled workflow, где `zelma` создает pane сама.
-`sessions detect` покрывает real-world workflow, где пользователь сначала
-вручную открыл pane в `zellij`, запустил Codex, а потом хочет поставить эту
-сессию под контроль `zelma`.
+`sessions list` покрывает real-world workflow, где пользователь сначала вручную
+открыл pane в `zellij`, запустил Codex, а потом хочет увидеть эту сессию в
+инвентаре без отдельного detect step.
+
+Auto-detect cache хранит timestamp последнего successful detect pass в
+`.zelma/detection-cache.json`. Default TTL — `5s`; repo-local override:
+
+```json
+{
+  "sessions_list": {
+    "auto_detect_ttl": "5s"
+  }
+}
+```
 
 ## Zellij tab focus
 

@@ -25,7 +25,7 @@ canonical_for:
 | `DR-02` | `.zelma/sessions.json` is the repo-local canonical registry for `zelma sessions` | `SessionRegistry` | Нужен один source of truth для CLI и skills | Product prompt `2026-07-07` |
 | `DR-03` | There MUST NOT be two active records for the same `(repo root, zellij session, zellij pane)` | `SessionRegistry` | Detect должен быть идемпотентным и не плодить дубликаты | Domain decision |
 | `DR-04` | `sessions detect` MUST NOT register panes without evidence that Codex is running there | Detection | Защищает non-Codex terminal work from accidental takeover | Product constraint |
-| `DR-05` | `sessions list` MUST NOT create, detect, close or mutate sessions as its primary behavior | CLI commands | Inventory command должен быть predictable и safe | Domain decision |
+| `DR-05` | `sessions list` MAY run bounded auto-detect and mutate registry records before rendering inventory; callers that require a registry-only read MUST use `sessions list --no-detect` | CLI commands | Inventory command должен быть ergonomic by default while preserving an explicit predictable read-only path | GitHub issue #86 |
 | `DR-06` | `OpenedPath` stored in registry MUST be normalized and absolute | `OpenedPath` | Relative paths become ambiguous across shells and skills | Domain decision |
 | `DR-07` | Any registry schema change MUST be versioned or migrated | `SessionRegistry` | Skills and older CLI versions need stable contracts | Product metric guardrail |
 | `DR-08` | A `DetectionCandidate` without required Codex identity MUST remain non-active until resolved | Detection lifecycle | Сохраняет смысл active `zelma session` | Domain decision |
