@@ -2,7 +2,7 @@
 title: "EP-008: Autonomous Issue Shipping Supervisor"
 doc_kind: epic
 doc_function: index
-purpose: "Навигация по draft package epic для автономного orchestration вокруг start-issue: zellij pane, review/fix loops, PR, CI, merge и notification."
+purpose: "Навигация по draft package epic для автономного orchestration вокруг start-issue: default zellij pane, optional tab, review/fix loops, PR, CI, merge и notification."
 derived_from:
   - ../../dna/governance.md
   - brief.md
@@ -15,7 +15,8 @@ audience: humans_and_agents
 ## О разделе
 
 Draft package для supervisor-агента, который запускает разработку указанной
-GitHub issue через `start-issue` в отдельной zellij pane/tab и доводит delivery
+GitHub issue через `start-issue` в новой zellij pane по умолчанию, либо в tab
+только по явному выбору пользователя, и доводит delivery
 до отревьюшенного, mergeable PR с зеленым CI, исправленными review/CI issues,
 запушенными коммитами и merge.
 

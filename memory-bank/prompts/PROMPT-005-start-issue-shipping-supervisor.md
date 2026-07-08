@@ -33,6 +33,9 @@ variables:
   - name: AGENT
     required: false
     description: "Agent backend passed to start-issue."
+  - name: ZELLIJ_SURFACE
+    required: false
+    description: "Where to launch the task agent inside the current zellij session: pane or tab. Defaults to pane."
   - name: AUTO_MERGE
     required: true
     description: "Whether supervisor may merge after all gates pass: yes or no."
@@ -55,7 +58,8 @@ model_notes:
 ## When To Use
 
 Используй этот prompt в отдельной supervisor-сессии, когда нужно запустить
-`start-issue` для GitHub issue в новой zellij pane/tab и автономно довести
+`start-issue` для GitHub issue в новой zellij pane по умолчанию, либо в tab
+только по явному запросу пользователя, и автономно довести
 delivery до clean review, green CI, mergeable PR and merge.
 
 Не используй его для одноразовой локальной проверки уже готовой ветки без
@@ -65,7 +69,7 @@ zellij/start-issue lifecycle.
 
 ```prompt
 <role>
-Ты supervisor для delivery через `start-issue`. Твоя задача - взять указанную GitHub issue, запустить разработку через `start-issue` в новой zellij pane/tab и довести результат до terminal outcome: merged PR либо явный blocker/max-cycles.
+Ты supervisor для delivery через `start-issue`. Твоя задача - взять указанную GitHub issue, запустить разработку через `start-issue` в новой zellij pane по умолчанию, либо в tab только если пользователь явно указал это, и довести результат до terminal outcome: merged PR либо явный blocker/max-cycles.
 </role>
 
 <input>
@@ -75,6 +79,7 @@ BASE_BRANCH: {{BASE_BRANCH}}
 REPO_PATH: {{REPO_PATH}}
 START_ISSUE_BASE: {{START_ISSUE_BASE}}
 AGENT: {{AGENT}}
+ZELLIJ_SURFACE: {{ZELLIJ_SURFACE}}
 AUTO_MERGE: {{AUTO_MERGE}}
 PROMPT_FILE: {{PROMPT_FILE}}
 MAX_REVIEW_CYCLES: {{MAX_REVIEW_CYCLES}}
@@ -85,6 +90,8 @@ MAX_CI_CYCLES: {{MAX_CI_CYCLES}}
 - If `REPO_PATH` is empty, use the current working directory.
 - If `START_ISSUE_BASE` is empty, use `BASE_BRANCH`.
 - If `AGENT` is empty, use the project/default `start-issue` agent.
+- If `ZELLIJ_SURFACE` is empty, use `pane`.
+- `ZELLIJ_SURFACE` may be only `pane` or `tab`; do not choose `tab` unless the caller explicitly requested it.
 - If `MAX_REVIEW_CYCLES` is empty, use 5.
 - If `MAX_CI_CYCLES` is empty, use 3.
 - `AUTO_MERGE` must be explicit: `yes` or `no`.
@@ -108,7 +115,7 @@ Success is allowed only when all conditions are true:
 7. PR is open, non-draft, mergeable and clean.
 8. GitHub checks are present and green.
 9. If `AUTO_MERGE=yes`, PR was merged and the merge commit was verified.
-10. The task zellij pane/tab was closed only after terminal outcome.
+10. The task zellij surface was closed only after terminal outcome.
 </definition_of_done>
 
 <instructions>
@@ -128,13 +135,15 @@ Success is allowed only when all conditions are true:
    - Before passing any markdown prompt file through `start-issue --prompt-file`, verify the selected `AGENT` can accept that exact file format and invocation. For Codex, do not pass repository markdown prompt files with frontmatter through `--prompt-file` unless a dry run proves the launch works; launch without `--prompt-file` and send/read the prompt instructions inside the task pane instead.
    - Do not start PR review/improve cycles for an `implementation` issue until the task pane has produced implementation-scope changes, not only feature-pack/docs updates.
 
-2. Запусти start-issue в новой zellij pane или tab:
-   - Create a new zellij pane or tab named `issue-{{ISSUE_NUMBER}}`.
+2. Запусти start-issue в выбранной zellij surface:
+   - Default to a new zellij pane named `issue-{{ISSUE_NUMBER}}`.
+   - Use a new zellij tab only when `ZELLIJ_SURFACE=tab` was explicitly provided by the caller.
+   - Do not create a separate zellij session for the issue.
    - Run `start-issue {{ISSUE_NUMBER}} --repo {{OWNER_REPO}} --base <START_ISSUE_BASE or BASE_BRANCH>`.
    - Add `--agent {{AGENT}}` only if `AGENT` is provided.
    - Add `--prompt-file <effective prompt file>` only when `PROMPT_FILE` is provided or preflight selected a prompt file and the agent compatibility check passed.
    - If prompt-file compatibility is not confirmed, launch `start-issue` without `--prompt-file`, then immediately instruct the task agent to read and apply the effective prompt file before implementation.
-   - Record the task `pane_id`, command, cwd and start time.
+   - Record the selected zellij surface type, task `pane_id`, `tab_id` if applicable, command, cwd and start time.
 
 3. Observe pane:
    - Use:
@@ -204,8 +213,10 @@ Success is allowed only when all conditions are true:
      `gh pr view <PR> --repo {{OWNER_REPO}} --json state,mergedAt,mergeCommit,url`
 
 9. Cleanup and notification:
-   - Close the task pane only after terminal outcome:
+   - Close the task zellij surface only after terminal outcome.
+   - If `ZELLIJ_SURFACE=pane`, close the task pane:
      `zellij action close-pane --pane-id <pane_id>`
+   - If `ZELLIJ_SURFACE=tab`, close the created task tab by `tab_id`; do not close the currently focused tab by accident.
    - Send desktop notification:
      `osascript -e 'display notification "Issue {{ISSUE_NUMBER}} terminal outcome reached" with title "start-issue supervisor"'`
 </instructions>
@@ -220,7 +231,9 @@ Success is allowed only when all conditions are true:
 - Do not bypass branch protection, required approvals, security gates or human gates.
 - Do not fix unrelated findings.
 - Do not treat feature-pack review/improve output as completion for an issue whose acceptance requires implementation behavior.
-- Do not close the task pane before terminal outcome.
+- Do not close the task zellij surface before terminal outcome.
+- Do not launch the task in a new tab unless `ZELLIJ_SURFACE=tab` was explicitly provided.
+- Do not launch the task in a separate zellij session.
 - Do not overwrite unrelated local changes.
 - If a prompt override is used, report the selected prompt source.
 </constraints>
@@ -236,7 +249,7 @@ Return a concise final report:
 - CI cycles count.
 - CI status.
 - Mergeability status.
-- Pane id and cleanup status.
+- Zellij surface type, pane id, tab id if applicable and cleanup status.
 - Any blockers or human gates, with facts.
 </output_format>
 ```
@@ -251,6 +264,7 @@ Return a concise final report:
 | `REPO_PATH` | no | Local repository path. | `/Users/me/code/project` |
 | `START_ISSUE_BASE` | no | Explicit base ref/SHA for `start-issue`. | `origin/main` |
 | `AGENT` | no | Agent backend for `start-issue`. | `codex` |
+| `ZELLIJ_SURFACE` | no | Current-session zellij surface for the task agent. Defaults to `pane`; `tab` requires explicit caller choice. | `pane` |
 | `AUTO_MERGE` | yes | Whether supervisor may merge after gates pass. | `yes` |
 | `PROMPT_FILE` | no | Optional start-issue prompt override file. | `.zelma/prompts/ship-issue.md` |
 | `MAX_REVIEW_CYCLES` | no | Review/fix loop limit. | `5` |
@@ -266,9 +280,11 @@ Return a concise final report:
 | Review model policy | Prompt requires `GPT-5.5 Extra high` for `/review` and medium for implementation/fixes. | drafted |
 | Review quiz polling | Prompt polls `/review` quiz/menu after 3 seconds and answers prompts quickly before returning to normal polling. | drafted |
 | Codex prompt-file compatibility | Prompt avoids passing markdown/frontmatter prompt files to Codex through `start-issue --prompt-file` unless compatibility is verified. | drafted |
+| Zellij surface default | Prompt defaults to pane, allows tab only by explicit caller input and forbids separate per-issue zellij sessions. | drafted |
 
 ## Change Notes
 
+- 2026-07-08: Made zellij launch surface explicit: default pane, optional tab only by caller request, no separate per-issue zellij session.
 - 2026-07-07: Added prompt-file compatibility guard and recovery for Codex launch usage failures.
 - 2026-07-07: Added fast 3-second polling for `/review` preset/base/model quiz prompts.
 - 2026-07-07: Added model policy: implementation/fixes on `GPT-5.5 medium`, `/review` gates on `GPT-5.5 Extra high`.

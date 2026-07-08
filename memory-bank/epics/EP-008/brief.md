@@ -29,15 +29,17 @@ mergeability, выполнить merge и закрыть pane. Это повто
 ## Результат
 
 Появляется supervisor-команда, которая принимает GitHub issue и автономно
-управляет lifecycle delivery: запускает `start-issue` в новой zellij surface,
+управляет lifecycle delivery: запускает `start-issue` в новой zellij pane по
+умолчанию или в tab только по явному выбору пользователя,
 наблюдает за pane, выполняет review/fix и CI/fix cycles, требует clean review,
 mergeable PR и зеленый CI, пушит in-scope fixes через исполнительного агента,
 вливает PR по явной policy и отправляет desktop notification о результате.
 
 ## Набросок Объема
 
-- `EP-008-REQ-01` Запускать `start-issue <issue>` в новой zellij pane или tab с
-  контролируемым cwd, repo, base и agent prompt.
+- `EP-008-REQ-01` Запускать `start-issue <issue>` в новой zellij pane с
+  контролируемым cwd, repo, base и agent prompt; tab разрешен только как явный
+  launch-surface override пользователя.
 - `EP-008-REQ-02` Хранить prompt как редактируемый template, а не hardcoded
   строку внутри supervisor.
 - `EP-008-REQ-03` Поддерживать project-local override prompt через `.zelma`,
@@ -54,7 +56,7 @@ mergeable PR и зеленый CI, пушит in-scope fixes через испо
   дожидаться fix commit/push и заново проверять review/CI gates.
 - `EP-008-REQ-09` Вливать PR только когда policy разрешает auto-merge и gates
   выполнены: clean review, green CI, non-draft, mergeable/clean.
-- `EP-008-REQ-10` После terminal outcome закрывать task pane/tab, сохранять
+- `EP-008-REQ-10` После terminal outcome закрывать task zellij surface, сохранять
   state/log и отправлять desktop notification.
 
 ## Что Не Входит
@@ -66,6 +68,7 @@ mergeable PR и зеленый CI, пушит in-scope fixes через испо
 - `EP-008-NS-03` Нет silent merge по умолчанию без явной auto-merge policy.
 - `EP-008-NS-04` Нет исправления unrelated findings за пределами issue scope.
 - `EP-008-NS-05` Нет глобального daemon как обязательной части MVP.
+- `EP-008-NS-06` Нет отдельной zellij session per issue в default workflow.
 
 ## Prompt Override Model
 
