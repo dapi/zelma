@@ -8,10 +8,10 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/gofrs/flock"
-	"github.com/google/renameio/v2"
 )
 
 const SchemaVersion = 1
@@ -159,10 +159,64 @@ func writeFileLocked(path string, registry Registry) error {
 	}
 	data = append(data, '\n')
 
-	if err := renameio.WriteFile(path, data, 0o644); err != nil {
+	if err := writeFileAtomic(path, data, 0o644); err != nil {
 		return &WriteError{Op: "commit", Path: path, Err: err}
 	}
 	return nil
+}
+
+func writeFileAtomic(path string, data []byte, perm os.FileMode) (err error) {
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return err
+	}
+
+	tmp, err := os.CreateTemp(dir, "."+filepath.Base(path)+".*.tmp")
+	if err != nil {
+		return err
+	}
+	tmpPath := tmp.Name()
+	defer func() {
+		if err != nil {
+			_ = os.Remove(tmpPath)
+		}
+	}()
+
+	if _, err := tmp.Write(data); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err := tmp.Chmod(perm); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err := tmp.Sync(); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+
+	if runtime.GOOS == "windows" {
+		_ = os.Remove(path)
+	}
+	if err := os.Rename(tmpPath, path); err != nil {
+		return err
+	}
+	if runtime.GOOS != "windows" {
+		syncDir(dir)
+	}
+	return nil
+}
+
+func syncDir(dir string) {
+	handle, err := os.Open(dir)
+	if err != nil {
+		return
+	}
+	defer handle.Close()
+	_ = handle.Sync()
 }
 
 func normalizeRegistry(registry Registry) Registry {

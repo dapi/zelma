@@ -49,6 +49,18 @@
 - `python3 scripts/check_memory_bank_index.py` — аудит достижимости markdown-документов, broken links и expected README-индексов внутри `memory-bank/`.
 - `git diff --check` — проверка лишних пробелов и conflict markers перед PR.
 
+## Releases
+
+Versioned binaries are published from git tags through GitHub Actions.
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+The release workflow builds Linux, macOS and Windows archives and publishes them
+to <https://github.com/dapi/zelma/releases> with `SHA256SUMS.txt`.
+
 ### Аудит ссылок и индексации `memory-bank`
 
 Скрипт [`scripts/check_memory_bank_index.py`](scripts/check_memory_bank_index.py) аудирует `memory-bank/` и проверяет:

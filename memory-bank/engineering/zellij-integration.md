@@ -267,7 +267,7 @@ mark a record `active` until those rules produce a resolved UUID.
 | `os/exec` | https://pkg.go.dev/os/exec | Run `zellij` with context, stdout/stderr capture and stdin pipes | Primary, standard library |
 | `encoding/json` | https://pkg.go.dev/encoding/json | Parse zellij JSON output and `.zelma/sessions.json` | Primary, standard library |
 | `github.com/spf13/cobra` | https://pkg.go.dev/github.com/spf13/cobra | Command tree for `zelma sessions create/detect/list` | Selected CLI framework |
-| `github.com/google/renameio/v2` | https://pkg.go.dev/github.com/google/renameio/v2 | Atomic replacement of `.zelma/sessions.json` | Candidate persistence helper |
+| `os.CreateTemp` + `os.Rename` | https://pkg.go.dev/os | Atomic replacement of `.zelma/sessions.json` on Unix and best-effort replace on Windows | Primary persistence helper |
 | `github.com/gofrs/flock` | https://pkg.go.dev/github.com/gofrs/flock | Cross-process lock around registry writes | Candidate locking helper |
 | `github.com/calico32/kdl-go` | https://pkg.go.dev/github.com/calico32/kdl-go | Parse/emit KDL layouts if zelma starts generating zellij layouts | Optional, not MVP |
 | `github.com/njreid/gokdl2` | https://pkg.go.dev/github.com/njreid/gokdl2 | Alternative KDL parser with v1/v2 support and compliance focus | Optional, compare before adopting KDL |
