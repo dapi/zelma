@@ -1010,6 +1010,37 @@ func TestSessionsDetectAddsCandidateRecordForNodeCodexEntrypoint(t *testing.T) {
 	}
 }
 
+func TestSessionsDetectPromotesResumeArgToActive(t *testing.T) {
+	root := newTestGitRepo(t)
+	paneRoot := resolvedPath(t, root)
+	command := "codex --dangerously-bypass-approvals-and-sandbox --search resume 019f3d81-b070-7a91-9a6f-9f50f1cba355"
+	t.Setenv("ZELMA_ZELLIJ_BIN", writeFakeZellij(t, panesJSONWithID(75, paneRoot, command, true)))
+	t.Chdir(root)
+
+	var stdout, stderr bytes.Buffer
+
+	code := Run(context.Background(), []string{"sessions", "detect"}, &stdout, &stderr)
+
+	if code != 0 {
+		t.Fatalf("Run() code = %d, want 0; stderr = %q", code, stderr.String())
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("stderr = %q, want empty", stderr.String())
+	}
+	if stdout.String() != "added=1 unchanged=0 skipped=0 active=1 candidate=0 stale=0\n" {
+		t.Fatalf("stdout = %q, want active summary", stdout.String())
+	}
+
+	got := readRegistry(t, root)
+	if len(got.Sessions) != 1 {
+		t.Fatalf("len(Sessions) = %d, want 1", len(got.Sessions))
+	}
+	session := got.Sessions[0]
+	if session.State != registry.StateActive || session.CodexSession != "019f3d81-b070-7a91-9a6f-9f50f1cba355" || session.ZellijPane != "terminal_75" {
+		t.Fatalf("session = %+v, want active resume arg session", session)
+	}
+}
+
 func TestSessionsDetectPromotesFullEvidenceToActive(t *testing.T) {
 	root := newTestGitRepo(t)
 	paneRoot := resolvedPath(t, root)

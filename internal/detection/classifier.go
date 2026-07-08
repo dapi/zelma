@@ -3,8 +3,8 @@ package detection
 import (
 	"path/filepath"
 	"strings"
-	"unicode"
 
+	"github.com/dapi/zelma/internal/codex"
 	"github.com/dapi/zelma/internal/zellij"
 )
 
@@ -32,9 +32,10 @@ const (
 )
 
 type Classification struct {
-	Verdict    Verdict
-	Reasons    []ReasonCode
-	OpenedPath string
+	Verdict      Verdict
+	Reasons      []ReasonCode
+	OpenedPath   string
+	CodexSession string
 }
 
 func ClassifyPane(pane zellij.Pane, repoRoot string) Classification {
@@ -53,8 +54,10 @@ func ClassifyPane(pane zellij.Pane, repoRoot string) Classification {
 		candidate = false
 	}
 
+	codexSession := ""
 	if paneCommandIdentifiesCodex(pane.PaneCommand) {
 		reasons = append(reasons, ReasonCodexCommand)
+		codexSession = codexSessionFromCommand(pane.PaneCommand)
 	} else {
 		reasons = append(reasons, commandReason(pane.PaneCommand))
 		candidate = false
@@ -68,9 +71,10 @@ func ClassifyPane(pane zellij.Pane, repoRoot string) Classification {
 
 	if candidate {
 		return Classification{
-			Verdict:    VerdictCandidate,
-			Reasons:    reasons,
-			OpenedPath: openedPath,
+			Verdict:      VerdictCandidate,
+			Reasons:      reasons,
+			OpenedPath:   openedPath,
+			CodexSession: codexSession,
 		}
 	}
 
@@ -95,158 +99,22 @@ func commandReason(command *string) ReasonCode {
 }
 
 func CodexCommandEntrypoint(command string) string {
-	tokens := commandTokens(command)
-	if len(tokens) == 0 {
-		executable := CommandExecutable(command)
-		if isCodexExecutableToken(executable) {
-			return executable
-		}
-		return ""
-	}
-	if isCodexExecutableToken(tokens[0]) {
-		return tokens[0]
-	}
-	if isNodeExecutableToken(tokens[0]) {
-		entrypoint := nodeScriptEntrypoint(tokens[1:])
-		if isCodexExecutableToken(entrypoint) {
-			return entrypoint
-		}
-	}
-	return ""
+	return codex.CodexCommandEntrypoint(command)
 }
 
 func CommandExecutable(command string) string {
-	command = strings.TrimLeftFunc(command, unicode.IsSpace)
-	if command == "" {
+	return codex.CommandExecutable(command)
+}
+
+func codexSessionFromCommand(command *string) string {
+	if command == nil {
 		return ""
 	}
-
-	if command[0] == '\'' || command[0] == '"' {
-		quote := command[0]
-		for i := 1; i < len(command); i++ {
-			if command[i] == quote {
-				return command[1:i]
-			}
-		}
+	evidence := codex.FindCommandSessionEvidence(*command)
+	if evidence.Verdict != codex.SessionEvidenceResolved || evidence.Ref == nil {
 		return ""
 	}
-
-	var builder strings.Builder
-	escaped := false
-	for _, r := range command {
-		if escaped {
-			builder.WriteRune(r)
-			escaped = false
-			continue
-		}
-		if r == '\\' {
-			escaped = true
-			continue
-		}
-		if unicode.IsSpace(r) {
-			break
-		}
-		builder.WriteRune(r)
-	}
-	if escaped {
-		builder.WriteRune('\\')
-	}
-	return builder.String()
-}
-
-func commandTokens(command string) []string {
-	var tokens []string
-	var builder strings.Builder
-	var quote rune
-	escaped := false
-
-	flush := func() {
-		if builder.Len() == 0 {
-			return
-		}
-		tokens = append(tokens, builder.String())
-		builder.Reset()
-	}
-
-	for _, r := range command {
-		if escaped {
-			builder.WriteRune(r)
-			escaped = false
-			continue
-		}
-		if r == '\\' {
-			escaped = true
-			continue
-		}
-		if quote != 0 {
-			if r == quote {
-				quote = 0
-				continue
-			}
-			builder.WriteRune(r)
-			continue
-		}
-		if r == '\'' || r == '"' {
-			quote = r
-			continue
-		}
-		if unicode.IsSpace(r) {
-			flush()
-			continue
-		}
-		builder.WriteRune(r)
-	}
-	if escaped {
-		builder.WriteRune('\\')
-	}
-	flush()
-	return tokens
-}
-
-func isCodexExecutableToken(token string) bool {
-	if token == "" {
-		return false
-	}
-	base := strings.ToLower(filepath.Base(token))
-	return base == "codex" || base == "codex.exe"
-}
-
-func isNodeExecutableToken(token string) bool {
-	base := strings.ToLower(filepath.Base(token))
-	return base == "node" || base == "node.exe"
-}
-
-func nodeScriptEntrypoint(tokens []string) string {
-	for i := 0; i < len(tokens); i++ {
-		token := tokens[i]
-		if token == "--" {
-			if i+1 < len(tokens) {
-				return tokens[i+1]
-			}
-			return ""
-		}
-		if token == "-e" || token == "--eval" || token == "-p" || token == "--print" {
-			return ""
-		}
-		if nodeOptionConsumesValue(token) {
-			i++
-			continue
-		}
-		if strings.HasPrefix(token, "-") {
-			continue
-		}
-		return token
-	}
-	return ""
-}
-
-func nodeOptionConsumesValue(token string) bool {
-	switch token {
-	case "-r", "--require", "--import", "--loader", "--experimental-loader", "--require-module":
-		return true
-	default:
-		return false
-	}
+	return evidence.Ref.SessionID
 }
 
 func classifyCWD(cwd *string, repoRoot string) (string, ReasonCode, bool) {

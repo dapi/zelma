@@ -74,7 +74,7 @@ This is a design-level value object, not a final JSON schema:
 ```text
 CodexSessionRef {
   session_id: UUID
-  source: argv_resume | session_file_created_by_zelma | session_file_unique_match | manual_override
+  source: argv_resume | argv_external_session_uuid | session_file_created_by_zelma | session_file_unique_match | manual_override
   session_file?: path
   confidence: strong | medium
 }
@@ -95,6 +95,7 @@ Rules:
 | `zellij` terminal pane command contains Codex binary | `zellij-adapter` | weak | Establishes candidate only |
 | `zellij` pane cwd equals or is inside repo root | `zellij-adapter` | weak | Supports `OpenedPath` resolution |
 | Process argv contains `codex resume <uuid>` | `codex-adapter` | strong | Directly resolves `CodexSessionRef` |
+| Process argv contains `CODEX_EXTERNAL_SESSION_UUID=<uuid>` or `External session UUID: <uuid>` | `codex-adapter` | strong external ref | Resolves `CodexSessionRef` as wrapper-provided external identity |
 | Session file `session_meta.payload.session_id` or `id` is a UUID | `codex-adapter` | medium/strong depending on correlation | Candidate UUID source |
 | Session file cwd matches normalized opened path | `codex-adapter` | medium | Correlates Codex file to pane/repo |
 | Session file was created after a `zelma sessions create` launch timestamp | `codex-adapter` + `detection` | strong if unique | Resolves create result |
@@ -144,6 +145,8 @@ Steps:
    future stronger process-level proof identifies Codex for the pane.
 4. Try explicit UUID extraction from process argv:
    - accept `codex resume <uuid>` when the UUID parses;
+   - accept wrapper-provided external UUID evidence when the command also
+     identifies Codex;
    - ignore raw prompts and unrelated args;
    - do not persist full argv.
 5. If explicit UUID is unavailable, scan Codex session metadata:
@@ -190,6 +193,8 @@ Rules:
   `CodexSessionRef` unless one match has strong evidence.
 - A Codex command without explicit `resume <uuid>` plus several recent session
   files for the same repo is `candidate_ambiguous`.
+- A wrapper-provided external UUID may resolve a `CodexSessionRef`, but it must
+  keep source semantics separate from Codex `session_meta` identity.
 - A stale session file with matching cwd is not enough to claim a live pane.
 - Future manual resolution should accept a user-provided Codex UUID and validate
   it against session metadata before registry write.
@@ -221,6 +226,8 @@ regression-covered:
 - `zellij list-panes --json --all` output with non-Codex panes.
 - Codex pane with command/cwd but no resolvable UUID -> `candidate_unresolved`.
 - Codex `resume <uuid>` command -> `active_ready`.
+- Codex command with wrapper-provided external UUID -> `active_ready` with
+  external source semantics.
 - Synthetic `session_meta` JSONL with matching cwd and UUID.
 - Multiple matching session files -> `candidate_ambiguous`.
 - Create flow launch-window match -> `active_ready`.

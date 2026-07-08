@@ -117,15 +117,16 @@ func DiscoverMetadataSources(options MetadataDiscoveryOptions) MetadataSourceInv
 					"codex executable",
 					"resume subcommand",
 					"UUID token",
+					"external session UUID token",
 					"--cd path",
 				},
 				ExcludedFields: []string{
 					"full argv",
 					"prompt arguments",
-					"environment variables",
+					"unrelated environment variables",
 				},
 				RecoveryHint:      "implement explicit process correlation before reading argv",
-				DownstreamFeature: "FT-020",
+				DownstreamFeature: "FT-043",
 			},
 			codexHomeSource,
 			{
