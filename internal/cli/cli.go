@@ -100,7 +100,7 @@ const rootHelp = `COMMAND MAP
 
 OUTPUT CONVENTIONS
   help output: stdout, exit 0, plain text.
-  setup changed: stdout, exit 0, "changed: added .zelma to <path>".
+  setup changed: stdout, exit 0, "changed: prepared .zelma at <path>".
   setup unchanged: stdout, exit 0, "already configured: <path> contains .zelma".
   sessions list: stdout, exit 0, table by default or schema v1 JSON with --json;
   add --live to include live/unreachable zellij status without registry writes.
@@ -120,22 +120,24 @@ RECOVERY HINTS
 HUMAN NOTES
   zelma manages Codex sessions in zellij panes. sessions list reads the
   repository-local registry; --live additionally checks current zellij state
-  without mutating registry. setup configures repository-local ignore rules.
+  without mutating registry. setup creates .zelma and configures repository-
+  local ignore rules.
 
 Usage:
   zelma [command]
 `
 
 const setupHelp = `COMMAND MAP
-  zelma setup             Add .zelma to this repository .gitignore.
+  zelma setup             Create .zelma and add it to this repository .gitignore.
   zelma help              Return to the top-level command map.
 
 STATUS
   implemented: repository-local .gitignore configuration.
 
 OUTPUT CONVENTIONS
-  changed: stdout, exit 0, "changed: added .zelma to <path>".
+  changed: stdout, exit 0, "changed: prepared .zelma at <path>".
   already configured: stdout, exit 0, "already configured: <path> contains .zelma".
+  --json: stable setup result with paths and changed flags.
   repository error: stderr, exit 1, prefixed with "zelma setup:".
 
 RECOVERY HINTS
@@ -143,10 +145,10 @@ RECOVERY HINTS
   gitignore write failure: inspect filesystem permissions and retry.
 
 HUMAN NOTES
-  setup does not create .zelma/sessions.json and does not contact zellij.
+  setup creates .zelma but not sessions.json and does not contact zellij.
 
 Usage:
-  zelma setup
+  zelma setup [--json]
 `
 
 const sessionsHelp = `COMMAND MAP
@@ -273,7 +275,9 @@ Description:
 `
 
 func newSetupCommand(stdout io.Writer) *cobra.Command {
-	return &cobra.Command{
+	var jsonOutput bool
+
+	cmd := &cobra.Command{
 		Use:   "setup",
 		Short: "Prepare a repository for zelma.",
 		Args:  cobra.NoArgs,
@@ -286,14 +290,19 @@ func newSetupCommand(stdout io.Writer) *cobra.Command {
 				}
 				return errors.New(repo.Diagnostic(cmd.CommandPath(), err))
 			}
+			if jsonOutput {
+				return writeSetupJSON(stdout, result)
+			}
 			if result.Changed {
-				fmt.Fprintf(stdout, "changed: added .zelma to %s\n", result.GitignorePath)
+				fmt.Fprintf(stdout, "changed: prepared .zelma at %s\n", result.ZelmaDirPath)
 				return nil
 			}
 			fmt.Fprintf(stdout, "already configured: %s contains .zelma\n", result.GitignorePath)
 			return nil
 		},
 	}
+	cmd.Flags().BoolVar(&jsonOutput, "json", false, "Print setup result JSON.")
+	return cmd
 }
 
 func newSessionsListCommand(stdout io.Writer) *cobra.Command {
@@ -591,6 +600,22 @@ func writeSessionsJSON(stdout io.Writer, reg registry.Registry) error {
 	return err
 }
 
+func writeSetupJSON(stdout io.Writer, result setup.Result) error {
+	output := setupResultJSON{
+		GitignorePath:    result.GitignorePath,
+		ZelmaDirPath:     result.ZelmaDirPath,
+		Changed:          result.Changed,
+		GitignoreChanged: result.GitignoreChanged,
+		ZelmaDirCreated:  result.ZelmaDirCreated,
+	}
+	data, err := json.MarshalIndent(output, "", "  ")
+	if err != nil {
+		return fmt.Errorf("encode setup result JSON: %w", err)
+	}
+	_, err = fmt.Fprintf(stdout, "%s\n", data)
+	return err
+}
+
 func writeLiveSessionsJSON(stdout io.Writer, reg live.Registry) error {
 	data, err := json.MarshalIndent(reg, "", "  ")
 	if err != nil {
@@ -625,6 +650,14 @@ func writeCleanupProposalJSON(stdout io.Writer, proposal registry.CleanupProposa
 type detectSummaryJSON struct {
 	registry.DetectUpsertSummary
 	StaleCandidates []registry.StaleCandidate `json:"stale_candidates,omitempty"`
+}
+
+type setupResultJSON struct {
+	GitignorePath    string `json:"gitignore_path"`
+	ZelmaDirPath     string `json:"zelma_dir_path"`
+	Changed          bool   `json:"changed"`
+	GitignoreChanged bool   `json:"gitignore_changed"`
+	ZelmaDirCreated  bool   `json:"zelma_dir_created"`
 }
 
 func writeCreateSummaryJSON(stdout io.Writer, summary create.Summary) error {

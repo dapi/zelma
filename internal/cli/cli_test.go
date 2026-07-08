@@ -323,7 +323,7 @@ const rootHelpSnapshot = `COMMAND MAP
 
 OUTPUT CONVENTIONS
   help output: stdout, exit 0, plain text.
-  setup changed: stdout, exit 0, "changed: added .zelma to <path>".
+  setup changed: stdout, exit 0, "changed: prepared .zelma at <path>".
   setup unchanged: stdout, exit 0, "already configured: <path> contains .zelma".
   sessions list: stdout, exit 0, table by default or schema v1 JSON with --json;
   add --live to include live/unreachable zellij status without registry writes.
@@ -343,7 +343,8 @@ RECOVERY HINTS
 HUMAN NOTES
   zelma manages Codex sessions in zellij panes. sessions list reads the
   repository-local registry; --live additionally checks current zellij state
-  without mutating registry. setup configures repository-local ignore rules.
+  without mutating registry. setup creates .zelma and configures repository-
+  local ignore rules.
 
 Usage:
   zelma [command]
@@ -1399,10 +1400,11 @@ func TestSetupCreatesGitignoreWithZelmaEntry(t *testing.T) {
 	if stderr.Len() != 0 {
 		t.Fatalf("stderr = %q, want empty", stderr.String())
 	}
-	if !strings.Contains(stdout.String(), "changed: added .zelma to ") {
+	if !strings.Contains(stdout.String(), "changed: prepared .zelma at ") {
 		t.Fatalf("stdout = %q, want changed summary", stdout.String())
 	}
 	assertFileContent(t, filepath.Join(root, ".gitignore"), ".zelma\n")
+	assertDirExists(t, filepath.Join(root, ".zelma"))
 }
 
 func TestSetupIsIdempotentWhenGitignoreAlreadyContainsZelma(t *testing.T) {
@@ -1437,6 +1439,7 @@ func TestSetupIsIdempotentWhenGitignoreAlreadyContainsZelma(t *testing.T) {
 	if after != before {
 		t.Fatalf(".gitignore changed on repeated setup: before %q after %q", before, after)
 	}
+	assertDirExists(t, filepath.Join(root, ".zelma"))
 }
 
 func TestSetupPreservesExistingGitignoreRules(t *testing.T) {
@@ -1458,6 +1461,7 @@ func TestSetupPreservesExistingGitignoreRules(t *testing.T) {
 		t.Fatalf("stderr = %q, want empty", stderr.String())
 	}
 	assertFileContent(t, gitignorePath, "dist/\n.env\n.zelma\n")
+	assertDirExists(t, filepath.Join(root, ".zelma"))
 }
 
 func TestSetupRejectsUnexpectedArgs(t *testing.T) {
@@ -1522,6 +1526,18 @@ func newTestGitRepo(t *testing.T) string {
 		t.Fatal(err)
 	}
 	return root
+}
+
+func assertDirExists(t *testing.T, path string) {
+	t.Helper()
+
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatalf("stat %s: %v", path, err)
+	}
+	if !info.IsDir() {
+		t.Fatalf("%s is not a directory", path)
+	}
 }
 
 func writeRegistryFile(t *testing.T, root, content string) {

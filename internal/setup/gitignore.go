@@ -12,8 +12,11 @@ import (
 const zelmaIgnoreEntry = ".zelma"
 
 type Result struct {
-	GitignorePath string
-	Changed       bool
+	GitignorePath    string
+	ZelmaDirPath     string
+	Changed          bool
+	GitignoreChanged bool
+	ZelmaDirCreated  bool
 }
 
 type GitignoreError struct {
@@ -37,6 +40,7 @@ func ConfigureGitignore(start string) (Result, error) {
 	}
 
 	gitignorePath := filepath.Join(root.Path, ".gitignore")
+	zelmaDirPath := filepath.Join(root.Path, zelmaIgnoreEntry)
 	content, err := os.ReadFile(gitignorePath)
 	if err != nil && !os.IsNotExist(err) {
 		return Result{}, &GitignoreError{Op: "read", Path: gitignorePath, Err: err}
@@ -44,16 +48,31 @@ func ConfigureGitignore(start string) (Result, error) {
 
 	result := Result{
 		GitignorePath: gitignorePath,
+		ZelmaDirPath:  zelmaDirPath,
 	}
-	if hasZelmaIgnoreEntry(content) {
-		return result, nil
+	if !hasZelmaIgnoreEntry(content) {
+		next := appendZelmaIgnoreEntry(content)
+		if err := os.WriteFile(gitignorePath, next, 0o644); err != nil {
+			return Result{}, &GitignoreError{Op: "write", Path: gitignorePath, Err: err}
+		}
+		result.GitignoreChanged = true
 	}
 
-	next := appendZelmaIgnoreEntry(content)
-	if err := os.WriteFile(gitignorePath, next, 0o644); err != nil {
-		return Result{}, &GitignoreError{Op: "write", Path: gitignorePath, Err: err}
+	if err := os.Mkdir(zelmaDirPath, 0o755); err != nil {
+		if !os.IsExist(err) {
+			return Result{}, &GitignoreError{Op: "create", Path: zelmaDirPath, Err: err}
+		}
+		info, statErr := os.Stat(zelmaDirPath)
+		if statErr != nil {
+			return Result{}, &GitignoreError{Op: "stat", Path: zelmaDirPath, Err: statErr}
+		}
+		if !info.IsDir() {
+			return Result{}, &GitignoreError{Op: "create", Path: zelmaDirPath, Err: err}
+		}
+	} else {
+		result.ZelmaDirCreated = true
 	}
-	result.Changed = true
+	result.Changed = result.GitignoreChanged || result.ZelmaDirCreated
 	return result, nil
 }
 

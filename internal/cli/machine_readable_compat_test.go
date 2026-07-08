@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -18,6 +19,27 @@ func TestMachineReadableOutputCompatibilityExamples(t *testing.T) {
 		want    func(string) string
 		parse   func(*testing.T, []byte)
 	}{
+		{
+			name: "setup json",
+			args: []string{"setup", "--json"},
+			arrange: func(t *testing.T) string {
+				root := newTestGitRepo(t)
+				t.Chdir(root)
+				return root
+			},
+			want: func(root string) string {
+				root = resolvedPath(t, root)
+				return fmt.Sprintf(`{
+  "gitignore_path": %q,
+  "zelma_dir_path": %q,
+  "changed": true,
+  "gitignore_changed": true,
+  "zelma_dir_created": true
+}
+`, filepath.Join(root, ".gitignore"), filepath.Join(root, ".zelma"))
+			},
+			parse: parseSkillSetupResult,
+		},
 		{
 			name: "sessions list json",
 			args: []string{"sessions", "list", "--json"},
@@ -369,6 +391,25 @@ func TestMachineReadableDiagnosticCompatibility(t *testing.T) {
 		if !strings.Contains(stderr.String(), want) {
 			t.Fatalf("stderr = %q, want substring %q", stderr.String(), want)
 		}
+	}
+}
+
+func parseSkillSetupResult(t *testing.T, data []byte) {
+	t.Helper()
+
+	var output struct {
+		GitignorePath    string `json:"gitignore_path"`
+		ZelmaDirPath     string `json:"zelma_dir_path"`
+		Changed          bool   `json:"changed"`
+		GitignoreChanged bool   `json:"gitignore_changed"`
+		ZelmaDirCreated  bool   `json:"zelma_dir_created"`
+	}
+	decodeStrict(t, data, &output)
+	if output.GitignorePath == "" || output.ZelmaDirPath == "" {
+		t.Fatalf("setup result = %+v, want stable paths", output)
+	}
+	if !output.Changed || !output.GitignoreChanged || !output.ZelmaDirCreated {
+		t.Fatalf("setup result = %+v, want first setup changed all flags", output)
 	}
 }
 
