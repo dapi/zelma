@@ -1,5 +1,5 @@
 ---
-title: "FT-046: Focus Zelma Session By ID"
+title: "FT-047: Focus Zelma Session By ID"
 doc_kind: feature
 doc_function: canonical
 purpose: "Канонический brief для фокусировки zellij pane по numeric zelma session id."
@@ -18,7 +18,7 @@ must_not_define:
   - selected_solution
 ---
 
-# FT-046: Focus Zelma Session By ID
+# FT-047: Focus Zelma Session By ID
 
 ## Что
 
