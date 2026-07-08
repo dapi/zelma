@@ -156,6 +156,14 @@ Expand-Archive .\zelma.zip -DestinationPath .
 Move `zelma.exe` into a directory listed in `PATH` if you want to run it from
 any terminal.
 
+## Codex Skill Package
+
+The repo-local distributable Codex skill lives at
+[`skills/zelma/SKILL.md`](skills/zelma/SKILL.md), with optional OpenAI UI
+metadata in [`skills/zelma/agents/openai.yaml`](skills/zelma/agents/openai.yaml).
+The skill is an agent-facing wrapper over the public `zelma` CLI only; it does
+not call `zellij` directly and does not parse `.zelma/sessions.json`.
+
 ### Аудит ссылок и индексации `memory-bank`
 
 Скрипт [`scripts/check_memory_bank_index.py`](scripts/check_memory_bank_index.py) аудирует `memory-bank/` и проверяет:
