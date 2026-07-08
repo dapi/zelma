@@ -16,3 +16,6 @@ audience: humans_and_agents
 
 - [Brief](brief.md)
   Читать, когда нужно понять scope документации skills.
+- [Codex Skill Contract](../../engineering/skill-contract.md)
+  Читать, когда агенту нужен практический contract выбора команд,
+  machine-readable outputs, recovery paths и boundaries skill layer.
