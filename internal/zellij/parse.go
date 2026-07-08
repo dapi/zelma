@@ -121,6 +121,7 @@ func ParsePaneID(value string) (PaneID, error) {
 
 type Pane struct {
 	ID              PaneID
+	ProcessID       *int
 	Title           string
 	IsFocused       bool
 	IsFloating      bool
@@ -170,6 +171,8 @@ func ParseListPanesJSON(data []byte) ([]Pane, error) {
 
 type paneJSON struct {
 	ID              *int    `json:"id"`
+	ProcessID       *int    `json:"pid"`
+	PaneProcessID   *int    `json:"pane_pid"`
 	IsPlugin        *bool   `json:"is_plugin"`
 	Title           *string `json:"title"`
 	IsFocused       *bool   `json:"is_focused"`
@@ -232,9 +235,17 @@ func (raw paneJSON) pane(index int) (Pane, error) {
 	if *raw.IsPlugin {
 		kind = PaneKindPlugin
 	}
+	processID := raw.ProcessID
+	if processID == nil {
+		processID = raw.PaneProcessID
+	}
+	if processID != nil && *processID <= 0 {
+		return Pane{}, parseError(OutputKindPanes, ParseErrorInvalidField, path+".pid", "pid must be positive when present", nil)
+	}
 
 	return Pane{
 		ID:              PaneID{Kind: kind, Number: *raw.ID},
+		ProcessID:       processID,
 		Title:           *raw.Title,
 		IsFocused:       *raw.IsFocused,
 		IsFloating:      *raw.IsFloating,

@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/dapi/zelma/internal/codex"
 	"github.com/dapi/zelma/internal/registry"
 )
 
@@ -1173,6 +1174,197 @@ func TestSessionsDetectPromotesFullEvidenceToActive(t *testing.T) {
 	}
 }
 
+func TestSessionsDetectPIDFallbackPromotesAmbiguousSameRepoCandidate(t *testing.T) {
+	root := newTestGitRepo(t)
+	paneRoot := resolvedPath(t, root)
+	panePID := 4242
+	sessionID := "22222222-2222-4222-8222-222222222222"
+	t.Setenv("ZELMA_ZELLIJ_BIN", writeFakeZellij(t, panesJSONWithPID(75, paneRoot, "/usr/local/bin/codex --cd "+paneRoot, true, panePID)))
+	t.Setenv("CODEX_HOME", writeCodexHomeWithSessionMetas(t, []string{
+		"11111111-1111-4111-8111-111111111111",
+		"33333333-3333-4333-8333-333333333333",
+	}, paneRoot))
+	withPaneProcessResolver(t, codex.ProcessSnapshotEvidenceResolver{
+		Processes: []codex.ProcessObservation{
+			{
+				PID:         101,
+				PanePID:     panePID,
+				Live:        true,
+				CommandLine: "codex resume " + sessionID + " --cd " + paneRoot,
+			},
+		},
+	})
+	t.Chdir(root)
+
+	var stdout, stderr bytes.Buffer
+
+	code := Run(context.Background(), []string{"sessions", "detect", "--json", "--explain"}, &stdout, &stderr)
+
+	if code != 0 {
+		t.Fatalf("Run() code = %d, want 0; stderr = %q", code, stderr.String())
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("stderr = %q, want empty", stderr.String())
+	}
+	var summary struct {
+		registry.DetectUpsertSummary
+		CandidateExplanations []candidateEvidenceExplanation `json:"candidate_explanations"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &summary); err != nil {
+		t.Fatalf("decode detect JSON: %v; stdout = %s", err, stdout.String())
+	}
+	if summary.Active != 1 || summary.Candidate != 0 || len(summary.CandidateExplanations) != 1 {
+		t.Fatalf("summary = %+v, want active PID-resolved candidate", summary)
+	}
+	explanation := summary.CandidateExplanations[0]
+	if explanation.EvidenceSource != string(codex.CodexSessionRefSourcePIDCorrelatedProcess) ||
+		explanation.PIDFallbackVerdict != string(codex.SessionEvidenceResolved) ||
+		explanation.CodexSession != sessionID {
+		t.Fatalf("explanation = %+v, want resolved PID fallback", explanation)
+	}
+
+	got := readRegistry(t, root)
+	if len(got.Sessions) != 1 {
+		t.Fatalf("len(Sessions) = %d, want 1", len(got.Sessions))
+	}
+	if got.Sessions[0].State != registry.StateActive || got.Sessions[0].CodexSession != sessionID {
+		t.Fatalf("session = %+v, want active with PID-correlated session", got.Sessions[0])
+	}
+	registryData := readFile(t, registry.RegistryPath(root))
+	if strings.Contains(registryData, "4242") || strings.Contains(registryData, "pid") {
+		t.Fatalf("registry leaked PID details: %s", registryData)
+	}
+}
+
+func TestSessionsDetectPIDFallbackAmbiguityKeepsCandidate(t *testing.T) {
+	root := newTestGitRepo(t)
+	paneRoot := resolvedPath(t, root)
+	panePID := 4242
+	t.Setenv("ZELMA_ZELLIJ_BIN", writeFakeZellij(t, panesJSONWithPID(75, paneRoot, "/usr/local/bin/codex --cd "+paneRoot, true, panePID)))
+	withPaneProcessResolver(t, codex.ProcessSnapshotEvidenceResolver{
+		Processes: []codex.ProcessObservation{
+			{PID: 101, PanePID: panePID, Live: true, CommandLine: "codex resume 11111111-1111-4111-8111-111111111111"},
+			{PID: 102, PanePID: panePID, Live: true, CommandLine: "codex resume 22222222-2222-4222-8222-222222222222"},
+		},
+	})
+	t.Chdir(root)
+
+	var stdout, stderr bytes.Buffer
+
+	code := Run(context.Background(), []string{"sessions", "detect", "--json", "--explain"}, &stdout, &stderr)
+
+	if code != 0 {
+		t.Fatalf("Run() code = %d, want 0; stderr = %q", code, stderr.String())
+	}
+	var summary struct {
+		registry.DetectUpsertSummary
+		CandidateExplanations []candidateEvidenceExplanation `json:"candidate_explanations"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &summary); err != nil {
+		t.Fatalf("decode detect JSON: %v; stdout = %s", err, stdout.String())
+	}
+	if summary.Active != 0 || summary.Candidate != 1 {
+		t.Fatalf("summary = %+v, want unresolved candidate", summary)
+	}
+	explanation := summary.CandidateExplanations[0]
+	if explanation.PIDFallbackVerdict != string(codex.SessionEvidenceInsufficient) ||
+		explanation.PIDFallbackReason != "PID fallback found multiple live Codex process candidates" {
+		t.Fatalf("explanation = %+v, want multiple PID reason", explanation)
+	}
+	got := readRegistry(t, root)
+	if got.Sessions[0].State != registry.StateCandidate || got.Sessions[0].CodexSession != "" {
+		t.Fatalf("session = %+v, want unresolved candidate", got.Sessions[0])
+	}
+}
+
+func TestSessionsDetectPIDFallbackZeroAndUnsupportedKeepCandidateWithReason(t *testing.T) {
+	tests := []struct {
+		name            string
+		arrangeResolver func(*testing.T, int)
+		wantReason      string
+	}{
+		{
+			name: "zero",
+			arrangeResolver: func(t *testing.T, panePID int) {
+				withPaneProcessResolver(t, codex.ProcessSnapshotEvidenceResolver{})
+			},
+			wantReason: "PID fallback found no live Codex process with safe session UUID",
+		},
+		{
+			name: "unsupported",
+			arrangeResolver: func(t *testing.T, panePID int) {
+			},
+			wantReason: "PID fallback unsupported by current adapter",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			root := newTestGitRepo(t)
+			paneRoot := resolvedPath(t, root)
+			panePID := 4242
+			t.Setenv("ZELMA_ZELLIJ_BIN", writeFakeZellij(t, panesJSONWithPID(75, paneRoot, "/usr/local/bin/codex --cd "+paneRoot, true, panePID)))
+			tt.arrangeResolver(t, panePID)
+			t.Chdir(root)
+
+			var stdout, stderr bytes.Buffer
+
+			code := Run(context.Background(), []string{"sessions", "detect", "--json", "--explain"}, &stdout, &stderr)
+
+			if code != 0 {
+				t.Fatalf("Run() code = %d, want 0; stderr = %q", code, stderr.String())
+			}
+			var summary struct {
+				registry.DetectUpsertSummary
+				CandidateExplanations []candidateEvidenceExplanation `json:"candidate_explanations"`
+			}
+			if err := json.Unmarshal(stdout.Bytes(), &summary); err != nil {
+				t.Fatalf("decode detect JSON: %v; stdout = %s", err, stdout.String())
+			}
+			if summary.Active != 0 || summary.Candidate != 1 {
+				t.Fatalf("summary = %+v, want candidate", summary)
+			}
+			if summary.CandidateExplanations[0].PIDFallbackReason != tt.wantReason {
+				t.Fatalf("explanation = %+v, want PID reason %q", summary.CandidateExplanations[0], tt.wantReason)
+			}
+		})
+	}
+}
+
+func TestSessionsDetectPIDFallbackExplainRedactsRawProcessDetails(t *testing.T) {
+	root := newTestGitRepo(t)
+	paneRoot := resolvedPath(t, root)
+	panePID := 4242
+	privatePrompt := "private prompt should stay hidden"
+	sessionID := "22222222-2222-4222-8222-222222222222"
+	t.Setenv("ZELMA_ZELLIJ_BIN", writeFakeZellij(t, panesJSONWithPID(75, paneRoot, "/usr/local/bin/codex --cd "+paneRoot, true, panePID)))
+	withPaneProcessResolver(t, codex.ProcessSnapshotEvidenceResolver{
+		Processes: []codex.ProcessObservation{
+			{
+				PID:         101,
+				PanePID:     panePID,
+				Live:        true,
+				CommandLine: "env TOKEN='" + privatePrompt + "' codex resume " + sessionID + " '" + privatePrompt + "'",
+			},
+		},
+	})
+	t.Chdir(root)
+
+	var stdout, stderr bytes.Buffer
+
+	code := Run(context.Background(), []string{"sessions", "detect", "--json", "--explain"}, &stdout, &stderr)
+
+	if code != 0 {
+		t.Fatalf("Run() code = %d, want 0; stderr = %q", code, stderr.String())
+	}
+	registryData := readFile(t, registry.RegistryPath(root))
+	for _, output := range []string{stdout.String(), registryData} {
+		if strings.Contains(output, privatePrompt) || strings.Contains(output, "TOKEN=") || strings.Contains(output, "101") || strings.Contains(output, "4242") {
+			t.Fatalf("output leaked raw process details: %s", output)
+		}
+	}
+}
+
 func TestSessionsDetectRepeatedRunIsIdempotent(t *testing.T) {
 	root := newTestGitRepo(t)
 	t.Setenv("ZELMA_ZELLIJ_BIN", writeFakeZellij(t, panesJSON(resolvedPath(t, root), true)))
@@ -1993,14 +2185,22 @@ func writeFakeExecutable(t *testing.T, name string) string {
 func writeCodexHomeWithSessionMeta(t *testing.T, sessionID, cwd string) string {
 	t.Helper()
 
+	return writeCodexHomeWithSessionMetas(t, []string{sessionID}, cwd)
+}
+
+func writeCodexHomeWithSessionMetas(t *testing.T, sessionIDs []string, cwd string) string {
+	t.Helper()
+
 	codexHome := t.TempDir()
 	dir := filepath.Join(codexHome, "sessions", "2026", "07", "08")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	content := `{"type":"session_meta","payload":{"session_id":"` + sessionID + `","cwd":"` + cwd + `","cli_version":"codex-cli 0.142.3","timestamp":"2026-07-08T09:00:00Z"}}` + "\n"
-	if err := os.WriteFile(filepath.Join(dir, "session.jsonl"), []byte(content), 0o644); err != nil {
-		t.Fatal(err)
+	for i, sessionID := range sessionIDs {
+		content := `{"type":"session_meta","payload":{"session_id":"` + sessionID + `","cwd":"` + cwd + `","cli_version":"codex-cli 0.142.3","timestamp":"2026-07-08T09:00:00Z"}}` + "\n"
+		if err := os.WriteFile(filepath.Join(dir, fmt.Sprintf("session-%d.jsonl", i)), []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
 	}
 	return codexHome
 }
@@ -2014,13 +2214,26 @@ func panesJSON(cwd string, codex bool) string {
 }
 
 func panesJSONWithID(id int, cwd, command string, codex bool) string {
+	return panesJSONWithOptionalPID(id, cwd, command, codex, nil)
+}
+
+func panesJSONWithPID(id int, cwd, command string, codex bool, pid int) string {
+	return panesJSONWithOptionalPID(id, cwd, command, codex, &pid)
+}
+
+func panesJSONWithOptionalPID(id int, cwd, command string, codex bool, pid *int) string {
 	title := "shell"
 	if codex {
 		title = "codex"
 	}
+	pidField := ""
+	if pid != nil {
+		pidField = fmt.Sprintf("    \"pid\": %d,\n", *pid)
+	}
 	return fmt.Sprintf(`[
   {
     "id": %d,
+%s
     "is_plugin": false,
     "title": %q,
     "is_focused": true,
@@ -2033,7 +2246,19 @@ func panesJSONWithID(id int, cwd, command string, codex bool) string {
     "pane_command": %q,
     "pane_cwd": %q
   }
-]`, id, title, command, cwd)
+]`, id, pidField, title, command, cwd)
+}
+
+func withPaneProcessResolver(t *testing.T, resolver codex.PaneProcessEvidenceResolver) {
+	t.Helper()
+
+	previous := paneProcessEvidenceResolverFactory
+	paneProcessEvidenceResolverFactory = func() codex.PaneProcessEvidenceResolver {
+		return resolver
+	}
+	t.Cleanup(func() {
+		paneProcessEvidenceResolverFactory = previous
+	})
 }
 
 func readRegistry(t *testing.T, root string) registry.Registry {

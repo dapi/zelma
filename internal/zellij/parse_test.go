@@ -127,6 +127,64 @@ func TestParseListPanesAllowsMissingOptionalCommandMetadata(t *testing.T) {
 	}
 }
 
+func TestParseListPanesPreservesOptionalPanePID(t *testing.T) {
+	input := `[
+  {
+    "id": 7,
+    "pid": 4242,
+    "is_plugin": false,
+    "title": "codex",
+    "is_focused": false,
+    "is_floating": false,
+    "is_suppressed": false,
+    "exited": false,
+    "tab_id": 1,
+    "tab_position": 0,
+    "tab_name": "work",
+    "pane_command": "codex",
+    "pane_cwd": "/workspace/zelma"
+  }
+]`
+
+	panes, err := ParseListPanesJSON([]byte(input))
+	if err != nil {
+		t.Fatalf("ParseListPanesJSON() error = %v, want nil", err)
+	}
+	if len(panes) != 1 || panes[0].ProcessID == nil || *panes[0].ProcessID != 4242 {
+		t.Fatalf("ProcessID = %+v, want 4242", panes)
+	}
+}
+
+func TestParseListPanesRejectsInvalidPanePID(t *testing.T) {
+	input := `[
+  {
+    "id": 7,
+    "pid": 0,
+    "is_plugin": false,
+    "title": "codex",
+    "is_focused": false,
+    "is_floating": false,
+    "is_suppressed": false,
+    "exited": false,
+    "tab_id": 1,
+    "tab_position": 0,
+    "tab_name": "work"
+  }
+]`
+
+	_, err := ParseListPanesJSON([]byte(input))
+	if err == nil {
+		t.Fatal("ParseListPanesJSON() error = nil, want invalid pid error")
+	}
+	var parseErr *ParseError
+	if !errors.As(err, &parseErr) {
+		t.Fatalf("error = %T, want *ParseError", err)
+	}
+	if parseErr.Code != ParseErrorInvalidField || parseErr.Path != "panes[0].pid" {
+		t.Fatalf("parse error = %+v, want invalid panes[0].pid", parseErr)
+	}
+}
+
 func TestParseListPanesRejectsInvalidFixtures(t *testing.T) {
 	tests := []struct {
 		name     string
