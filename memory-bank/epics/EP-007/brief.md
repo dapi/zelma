@@ -8,7 +8,7 @@ derived_from:
   - ../../domain/states.md
   - ../../domain/rules.md
   - ../../engineering/zellij-integration.md
-status: draft
+status: active
 audience: humans_and_agents
 must_not_define:
   - implementation_sequence

@@ -7,7 +7,7 @@ derived_from:
   - brief.md
   - design.md
   - ../../engineering/codex-runtime-identification.md
-status: draft
+status: active
 audience: humans_and_agents
 ---
 

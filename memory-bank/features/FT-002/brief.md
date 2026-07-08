@@ -10,7 +10,7 @@ derived_from:
   - ../../epics/EP-001/charter.md
   - ../../adr/ADR-001-mvp-cli-architecture.md
 status: active
-delivery_status: in_progress
+delivery_status: implemented
 audience: humans_and_agents
 must_not_define:
   - implementation_sequence

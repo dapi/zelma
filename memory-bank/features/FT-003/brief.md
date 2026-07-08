@@ -8,8 +8,8 @@ derived_from:
   - ../../product/vision.md
   - ../../epics/EP-001/brief.md
   - ../../engineering/architecture.md
-status: draft
-delivery_status: in_progress
+status: active
+delivery_status: implemented
 audience: humans_and_agents
 must_not_define:
   - implementation_sequence

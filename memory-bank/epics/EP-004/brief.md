@@ -7,7 +7,7 @@ derived_from:
   - ../../product/roadmap.md
   - ../../engineering/zellij-integration.md
   - ../../adr/ADR-001-mvp-cli-architecture.md
-status: draft
+status: active
 audience: humans_and_agents
 must_not_define:
   - implementation_sequence

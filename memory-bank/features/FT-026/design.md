@@ -6,8 +6,8 @@ purpose: "Selected design for mapping CLI diagnostics to safe skill recovery act
 derived_from:
   - brief.md
   - ../../engineering/skill-contract.md
-status: draft
-delivery_status: planned
+status: active
+delivery_status: implemented
 audience: humans_and_agents
 ---
 

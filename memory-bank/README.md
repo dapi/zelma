@@ -13,9 +13,9 @@ audience: humans_and_agents
 # Zelma Documentation Index
 
 Каталог `memory-bank/` содержит durable knowledge layer проекта `zelma`.
-Главный фокус текущей версии документации: зафиксировать продуктовую цель,
-предметную модель `zelma sessions` и roadmap до того, как проект будет разбит
-на epics и feature packages.
+Главный фокус текущей версии документации: удерживать согласованными
+продуктовую цель, предметную модель `zelma sessions`, roadmap, instantiated
+epics и feature packages.
 
 `zelma` управляет Codex-сессиями внутри `zellij panes`: создает управляемые
 сессии, обнаруживает вручную запущенные Codex panes и хранит локальный реестр в

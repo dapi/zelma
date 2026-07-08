@@ -9,7 +9,7 @@ derived_from:
   - ../../domain/states.md
   - ../../engineering/architecture.md
   - ../../engineering/codex-runtime-identification.md
-status: draft
+status: active
 audience: humans_and_agents
 ---
 
@@ -26,10 +26,11 @@ ordered steps:
    exists, has Codex command evidence and reports the requested opened path.
 
 The registry write happens only after step 3 succeeds. Confirmation produces an
-unresolved `candidate` registry record because this feature does not implement
-CodexSessionRef extraction. This preserves the active-state invariant from
-`domain/rules.md`: active records require zellij session, zellij pane, Codex
-session and opened path.
+unresolved `candidate` registry record with `zellij_session`, `zellij_pane` and
+normalized `opened_path` because this feature does not implement CodexSessionRef
+extraction. This preserves the active-state invariant from `domain/rules.md`:
+active records require zellij session, zellij pane, Codex session and opened
+path.
 
 ## Target Session
 

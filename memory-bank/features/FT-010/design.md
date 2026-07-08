@@ -8,7 +8,7 @@ derived_from:
   - ../../adr/ADR-001-mvp-cli-architecture.md
   - ../../engineering/architecture.md
   - ../../engineering/zellij-integration.md
-status: draft
+status: active
 audience: humans_and_agents
 ---
 

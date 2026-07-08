@@ -5,8 +5,8 @@ doc_function: canonical
 purpose: "Канонический brief для e2e-покрытия smoke diagnostics окружения."
 derived_from:
   - ../../use-cases/UC-009-environment-smoke-diagnostics.md
-status: draft
-delivery_status: planned
+status: active
+delivery_status: implemented
 milestone: milestone-1
 audience: humans_and_agents
 must_not_define:

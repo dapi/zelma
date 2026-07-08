@@ -12,7 +12,7 @@ derived_from:
   - ../../engineering/architecture.md
   - ../../engineering/testing-policy.md
 status: active
-delivery_status: planned
+delivery_status: implemented
 audience: humans_and_agents
 must_not_define:
   - implementation_sequence

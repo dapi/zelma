@@ -24,11 +24,12 @@ when all active invariants are known:
 - `codex_session`
 - normalized absolute `opened_path`
 
-Detected pane evidence alone remains `candidate`. Codex session identity is
-resolved from privacy-safe `session_meta` evidence produced by FT-020. The
-lookup only reads the first record of `.jsonl` session logs and accepts evidence
-for a pane when exactly one parsed `session_meta.payload.cwd` matches the pane's
-`opened_path`.
+Detected pane evidence with `zellij_session`, `zellij_pane` and normalized
+absolute `opened_path` remains `candidate` until Codex session identity is
+resolved. The lookup uses privacy-safe `session_meta` evidence produced by
+FT-020. It only reads the first record of `.jsonl` session logs and accepts
+evidence for a pane when exactly one parsed `session_meta.payload.cwd` matches
+the pane's `opened_path`.
 
 ## Contracts
 
@@ -42,8 +43,9 @@ for a pane when exactly one parsed `session_meta.payload.cwd` matches the pane's
 ## Invariants
 
 - `INV-01` `active` records satisfy domain rule `DR-01`.
-- `INV-02` Candidate records remain visible in `sessions list` and keep their
-  `state` field as `candidate`.
+- `INV-02` Candidate records remain visible in `sessions list`, keep their
+  `state` field as `candidate`, and always include normalized absolute
+  `opened_path`.
 - `INV-03` Ambiguous session logs are not used to promote a pane.
 - `INV-04` Lookup output does not store conversation content.
 

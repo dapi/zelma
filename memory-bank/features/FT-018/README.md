@@ -6,7 +6,7 @@ purpose: "Навигация по package фичи для recovery hints при 
 derived_from:
   - ../../dna/governance.md
   - brief.md
-status: draft
+status: active
 audience: humans_and_agents
 ---
 

@@ -8,7 +8,7 @@ derived_from:
   - ../../epics/EP-002/brief.md
   - ../../adr/ADR-001-mvp-cli-architecture.md
 status: active
-delivery_status: planned
+delivery_status: implemented
 audience: humans_and_agents
 must_not_define:
   - implementation_sequence

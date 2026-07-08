@@ -7,7 +7,7 @@ derived_from:
   - ../../product/roadmap.md
   - ../../product/context.md
   - ../../engineering/architecture.md
-status: draft
+status: active
 audience: humans_and_agents
 must_not_define:
   - implementation_sequence

@@ -6,7 +6,7 @@ purpose: "Навигация по draft package epic для repo-local registry 
 derived_from:
   - ../../dna/governance.md
   - brief.md
-status: draft
+status: active
 audience: humans_and_agents
 ---
 

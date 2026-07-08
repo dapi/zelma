@@ -55,11 +55,12 @@ feature scope and acceptance criteria remain in [brief.md](brief.md).
 - `zellij_session` and `zellij_pane` must be non-empty.
 - `zellij_tab` and `zellij_tab_name` are optional for backward compatibility
   with registry records created before tab metadata was stored.
-- `codex_session` and `opened_path` must be non-empty for
-  `active`, `stale`, `closed` and `archived` records.
-- `candidate` records may keep `codex_session` or `opened_path` empty because
-  required identity evidence is incomplete.
-- Non-empty `opened_path` values must be absolute and normalized.
+- `opened_path` must be non-empty, absolute and normalized for every persisted
+  registry record, including `candidate`.
+- `codex_session` must be non-empty for `active`, `stale`, `closed` and
+  `archived` records.
+- `candidate` records may keep `codex_session` empty because Codex identity
+  evidence is incomplete.
 - `state` must match a domain state from
   [../../domain/states.md](../../domain/states.md).
 - Two `active` records must not use the same

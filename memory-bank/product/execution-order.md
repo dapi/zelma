@@ -26,6 +26,25 @@ feature.
   merged contract, а не локальные предположения.
 - Review, CI и merge gates обязательны для каждой feature issue.
 
+## Волна 0: CLI And Registry Foundation
+
+Перед zellij/read/detect работами должны быть готовы базовые EP-001/EP-002
+контракты:
+
+- `FT-001`: Go Module Scaffold
+- `FT-002`: Cobra Command Tree
+- `FT-003`: Agent-First Help Templates
+- `FT-004`: Output And Error Contract Tests
+- `FT-005`: Repo Root Resolver
+- `FT-006`: Sessions Schema V1
+- `FT-007`: Atomic Registry Writes And Lock
+- `FT-008`: Registry Validation And Recovery
+- `FT-009`: Sessions List Output
+- `FT-031`: Zelma Setup Gitignore
+
+Результат волны: запускаемый CLI, repo root resolution, registry schema/read
+surface и setup behavior существуют как merged baseline для downstream issues.
+
 ## Волна 1: Zellij Read Path
 
 Можно запускать параллельно:
@@ -113,6 +132,7 @@ pane candidates и идемпотентно обновлять registry.
 
 ## Краткий Практический Порядок
 
+0. Завершить foundation baseline: `FT-001`...`FT-009`, `FT-031`.
 1. Параллельно: `#22`, `#23`, `#24`.
 2. Параллельно: `#25`, `#26`.
 3. Параллельно: `#27`, `#28`.

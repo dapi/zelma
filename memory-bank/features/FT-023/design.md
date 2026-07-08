@@ -9,8 +9,8 @@ derived_from:
   - ../../engineering/skill-contract.md
   - ../FT-024/brief.md
   - ../FT-025/brief.md
-status: draft
-delivery_status: planned
+status: active
+delivery_status: implemented
 audience: humans_and_agents
 ---
 

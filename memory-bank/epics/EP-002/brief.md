@@ -8,7 +8,7 @@ derived_from:
   - ../../domain/model.md
   - ../../domain/rules.md
   - ../../adr/ADR-001-mvp-cli-architecture.md
-status: draft
+status: active
 audience: humans_and_agents
 must_not_define:
   - implementation_sequence

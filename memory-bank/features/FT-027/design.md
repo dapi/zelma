@@ -5,7 +5,7 @@ doc_function: design
 purpose: "Фиксирует выбранный read-only contract для `sessions list --live`."
 derived_from:
   - brief.md
-status: draft
+status: active
 audience: humans_and_agents
 ---
 

@@ -7,7 +7,7 @@ derived_from:
   - brief.md
   - ../../engineering/architecture.md
   - ../../engineering/zellij-integration.md
-status: draft
+status: active
 audience: humans_and_agents
 ---
 

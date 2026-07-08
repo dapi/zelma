@@ -17,7 +17,7 @@ must_not_define:
 
 ## Goal
 
-Агент перед запуском работ проверяет, что repo root, `.zelma`, `.gitignore`, zellij, Codex command и registry доступны и дают предсказуемые diagnostics.
+Агент перед запуском работ проверяет, что repo root, `.gitignore`, zellij, Codex command и registry доступны и дают предсказуемые diagnostics.
 
 ## Primary Actor
 
@@ -35,7 +35,7 @@ Setup agent.
 ## Main Flow
 
 1. Агент вызывает `zelma setup --json`.
-2. Zelma создает/проверяет `.zelma` и добавляет `.zelma` в `.gitignore`.
+2. Zelma проверяет repo root и идемпотентно добавляет `.zelma` в `.gitignore`.
 3. Агент вызывает `zelma sessions list --json`.
 4. Агент вызывает `zelma sessions detect --json`.
 5. Агент получает summary готовности и warnings.
@@ -48,14 +48,16 @@ Setup agent.
 
 ## Postconditions
 
-- Репозиторий подготовлен к zelma workflow.
+- Репозиторий подготовлен к zelma workflow без неявного создания registry-файла.
 - Агент знает, можно ли запускать create/detect/supervisor.
 
 ## Business Rules
 
 - `BR-01` Setup должен быть идемпотентным.
 - `BR-02` `.zelma` должен быть исключен из git.
-- `BR-03` Сценарий должен иметь e2e-тест fresh repo setup plus repeated setup.
+- `BR-03` `zelma setup` не должен создавать `.zelma/sessions.json`; готовность
+  registry проверяется отдельным `sessions list --json`.
+- `BR-04` Сценарий должен иметь e2e-тест fresh repo setup plus repeated setup.
 
 ## Traceability
 

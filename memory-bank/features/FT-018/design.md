@@ -7,7 +7,7 @@ derived_from:
   - brief.md
   - ../FT-017/design.md
   - ../../engineering/architecture.md
-status: draft
+status: active
 audience: humans_and_agents
 ---
 

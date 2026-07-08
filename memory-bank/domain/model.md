@@ -31,7 +31,7 @@ canonical_for:
 | `CodexSessionRef` | value object / external ref | Идентификатор или ссылка на Codex session | Runs inside `ZellijPaneRef`; belongs to `ZelmaSession` record | Способ получения уточняется в implementation/ADR |
 | `OpenedPath` | value object | Нормализованный абсолютный путь, открытый в pane | Used to bind session to repo/worktree context | Не должен быть относительным в registry |
 | `SessionOrigin` | value object | Способ регистрации: `create` или `detect` | Attribute of `ZelmaSession` | Не равен lifecycle state |
-| `DetectionCandidate` | value object | Набор evidence о pane, который может содержать Codex session | May become `ZelmaSession` if required refs resolved | Не является active session |
+| `DetectionCandidate` | value object | Набор evidence о pane, который может содержать Codex session | May become a persisted `candidate` `ZelmaSession` after registry identity refs are known; may become `active` after `CodexSessionRef` resolves | Не является active session |
 | `SessionCommand` | actor/action | Команда пользователя или skill, меняющая/читающая registry | Invokes registry, zellij adapter, Codex identification | `list` read-only; `create`/`detect` write |
 
 ## Relationship Map
@@ -49,8 +49,10 @@ canonical_for:
   `ZellijSessionRef`.
 - `ZelmaSession` references exactly one `CodexSessionRef` when it is `active`.
 - `ZelmaSession` stores exactly one `OpenedPath`.
-- `DetectionCandidate` can become `ZelmaSession` only after required identity
-  evidence is resolved.
+- `DetectionCandidate` can become a persisted `candidate` `ZelmaSession` only
+  after `zellij session`, `zellij pane` and normalized `opened path` are known.
+- Persisted `candidate` `ZelmaSession` records become `active` only after
+  `CodexSessionRef` is resolved.
 - `SessionCommand` may read or mutate `SessionRegistry` only through documented
   CLI/domain operations.
 

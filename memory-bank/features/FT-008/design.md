@@ -7,7 +7,7 @@ derived_from:
   - brief.md
   - ../../domain/rules.md
   - ../../engineering/architecture.md
-status: draft
+status: active
 audience: humans_and_agents
 ---
 

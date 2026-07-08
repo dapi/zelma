@@ -7,7 +7,7 @@ derived_from:
   - ../../product/roadmap.md
   - ../../engineering/codex-runtime-identification.md
   - ../../domain/model.md
-status: draft
+status: active
 audience: humans_and_agents
 must_not_define:
   - implementation_sequence

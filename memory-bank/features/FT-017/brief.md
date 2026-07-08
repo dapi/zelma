@@ -8,8 +8,8 @@ derived_from:
   - ../../epics/EP-004/brief.md
   - ../../epics/EP-002/brief.md
   - ../../epics/EP-003/brief.md
-status: draft
-delivery_status: planned
+status: active
+delivery_status: implemented
 audience: humans_and_agents
 must_not_define:
   - implementation_sequence

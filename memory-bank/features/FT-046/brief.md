@@ -10,8 +10,8 @@ derived_from:
   - ../FT-019/brief.md
   - ../FT-043/brief.md
   - ../FT-044/brief.md
-status: draft
-delivery_status: planned
+status: active
+delivery_status: implemented
 audience: humans_and_agents
 must_not_define:
   - implementation_sequence

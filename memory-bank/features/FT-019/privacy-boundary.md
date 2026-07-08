@@ -8,7 +8,7 @@ derived_from:
   - design.md
   - ../../engineering/codex-runtime-identification.md
   - ../../engineering/testing-policy.md
-status: draft
+status: active
 audience: humans_and_agents
 ---
 
