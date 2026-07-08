@@ -92,3 +92,5 @@ audience: humans_and_agents
 - [FT-030: Lifecycle State Tests](FT-030/README.md) — lifecycle state test suite.
 - [FT-031: Zelma Setup Gitignore](FT-031/README.md) — команда `zelma setup`
   идемпотентно добавляет `.zelma` в `.gitignore`.
+- [FT-032: Supervisor Command And Zellij Launch](FT-032/README.md) — запуск
+  `start-issue` в zellij pane по умолчанию или tab по явному env/config override.
