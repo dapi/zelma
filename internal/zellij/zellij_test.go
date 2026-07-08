@@ -156,6 +156,9 @@ func TestListPanesMapsExitZeroSessionNotFoundToCommandFailure(t *testing.T) {
 	if strings.Contains(err.Error(), string(ErrorCodeInvalidOutput)) {
 		t.Fatalf("error = %q, must not report invalid output", err.Error())
 	}
+	if !IsSessionNotFound(err) {
+		t.Fatalf("IsSessionNotFound(%v) = false, want true", err)
+	}
 }
 
 func TestListPanesMapsMissingBinary(t *testing.T) {

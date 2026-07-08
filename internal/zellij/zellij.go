@@ -2,6 +2,7 @@ package zellij
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 )
@@ -183,6 +184,18 @@ func normalizeSessionNotFoundResult(command string, result commandResult) error 
 			RecoveryHint: "verify the target zellij session exists with zellij list-sessions --short --no-formatting, then retry",
 		},
 	}
+}
+
+func IsSessionNotFound(err error) bool {
+	var diagnosticErr *DiagnosticError
+	if !errors.As(err, &diagnosticErr) {
+		return false
+	}
+	if diagnosticErr.Diagnostic.Code != ErrorCodeCommandFailed {
+		return false
+	}
+	stderr := strings.ToLower(diagnosticErr.Diagnostic.Stderr)
+	return strings.Contains(stderr, "session") && strings.Contains(stderr, "not found")
 }
 
 func normalizeRunPaneSessionNotFoundResult(command string, result commandResult) error {

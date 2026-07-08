@@ -113,6 +113,39 @@ func TestDetectCandidatesSkipsPartialOrUnsafePaneEvidence(t *testing.T) {
 	}
 }
 
+func TestDetectCandidatesSkipsMissingZellijSession(t *testing.T) {
+	root := filepath.Clean(t.TempDir())
+	command := "/usr/local/bin/codex --cd " + root
+	sessionMissingErr := &zellij.DiagnosticError{
+		Diagnostic: zellij.Diagnostic{
+			Code:   zellij.ErrorCodeCommandFailed,
+			Stderr: "Session 'exited-session' not found. The following sessions are active:",
+		},
+	}
+	inventory := fakeInventory{
+		sessions: []zellij.Session{{Name: "exited-session"}, {Name: "zelma-main"}},
+		sessionErrs: map[string]error{
+			"exited-session": sessionMissingErr,
+		},
+		panes: map[string][]zellij.Pane{
+			"zelma-main": {
+				terminalPane(1, command, root),
+			},
+		},
+	}
+
+	got, err := DetectCandidates(context.Background(), root, inventory)
+	if err != nil {
+		t.Fatalf("DetectCandidates() error = %v, want nil", err)
+	}
+	if !reflect.DeepEqual(got.LiveSessions, []string{"zelma-main"}) {
+		t.Fatalf("LiveSessions = %+v, want only successful live session", got.LiveSessions)
+	}
+	if len(got.Candidates) != 1 || got.Candidates[0].ZellijSession != "zelma-main" {
+		t.Fatalf("Candidates = %+v, want candidate from remaining session", got.Candidates)
+	}
+}
+
 func TestDetectCandidatesStopsBeforePartialResultOnAdapterError(t *testing.T) {
 	wantErr := errors.New("list panes failed")
 	inventory := fakeInventory{
@@ -130,9 +163,10 @@ func TestDetectCandidatesStopsBeforePartialResultOnAdapterError(t *testing.T) {
 }
 
 type fakeInventory struct {
-	sessions []zellij.Session
-	panes    map[string][]zellij.Pane
-	err      error
+	sessions    []zellij.Session
+	panes       map[string][]zellij.Pane
+	sessionErrs map[string]error
+	err         error
 }
 
 func (inventory fakeInventory) ListSessions(context.Context) ([]zellij.Session, error) {
@@ -145,6 +179,9 @@ func (inventory fakeInventory) ListSessions(context.Context) ([]zellij.Session, 
 func (inventory fakeInventory) ListPanes(_ context.Context, session string) ([]zellij.Pane, error) {
 	if inventory.err != nil {
 		return nil, inventory.err
+	}
+	if err := inventory.sessionErrs[session]; err != nil {
+		return nil, err
 	}
 	return inventory.panes[session], nil
 }

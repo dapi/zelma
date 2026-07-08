@@ -28,11 +28,14 @@ func DetectCandidates(ctx context.Context, repoRoot string, inventory Inventory)
 
 	var result Result
 	for _, session := range sessions {
-		result.LiveSessions = append(result.LiveSessions, session.Name)
 		panes, err := inventory.ListPanes(ctx, session.Name)
 		if err != nil {
+			if zellij.IsSessionNotFound(err) {
+				continue
+			}
 			return Result{}, err
 		}
+		result.LiveSessions = append(result.LiveSessions, session.Name)
 		for _, pane := range panes {
 			if !pane.Exited {
 				result.LivePanes = append(result.LivePanes, registry.PaneRef{
