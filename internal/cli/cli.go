@@ -98,7 +98,8 @@ OUTPUT CONVENTIONS
   setup changed: stdout, exit 0, "changed: added .zelma to <path>".
   setup unchanged: stdout, exit 0, "already configured: <path> contains .zelma".
   sessions list: stdout, exit 0, table by default or schema v1 JSON with --json.
-  sessions detect: stdout, exit 0, summary or JSON with --json.
+  sessions detect: stdout, exit 0, summary with active/candidate counts or JSON
+  with --json.
   sessions create --dry-run: stdout, exit 0, launch contract text or JSON.
   sessions create: stdout, exit 0, created/registered/skipped summary.
   machine-readable session data: use "zelma sessions list --json".
@@ -151,7 +152,8 @@ OUTPUT CONVENTIONS
   list: stdout, exit 0, table by default or schema v1 JSON with --json.
   create --dry-run: stdout, exit 0, resolved Codex command/opened path.
   create: stdout, exit 0, created/registered/skipped summary.
-  detect: stdout, exit 0, added/unchanged/skipped summary or JSON with --json.
+  detect: stdout, exit 0, added/unchanged/skipped summary with
+  active/candidate counts or JSON with --json.
   sessions registry output: preserves zellij_session, zellij_pane,
   codex_session, opened_path and state fields.
 
@@ -214,12 +216,14 @@ Status:
   implemented: reads zellij panes and upserts candidate registry records.
 
 Output:
-  default: added/unchanged/skipped summary.
-  --json: stable summary object with added, unchanged and skipped counts.
+  default: added/unchanged/skipped summary with active/candidate counts.
+  --json: stable summary object with added, unchanged, skipped, active and
+  candidate counts.
 
 Notes:
-  Does not create panes, delete stale records or promote unresolved candidates
-  to active sessions.
+  Promotes detected panes to active only when Codex session evidence resolves
+  unambiguously; otherwise writes visible candidate records. Does not create
+  panes or delete stale records.
 `
 
 const helpCommandHelp = `Usage:
@@ -335,10 +339,11 @@ func newSessionsCreateCommand(stdout io.Writer) *cobra.Command {
 
 			summary := result.Summary
 			if result.Confirmed {
+				candidate := withSessionEvidence(result.Candidate)
 				path := registry.RegistryPath(root.Path)
 				var upsertSummary registry.DetectUpsertSummary
 				err = registry.UpdateFile(path, func(current registry.Registry) (registry.Registry, error) {
-					next, currentSummary := registry.UpsertDetectedCandidates(current, []registry.Session{result.Candidate})
+					next, currentSummary := registry.UpsertDetectedCandidates(current, []registry.Session{candidate})
 					upsertSummary = currentSummary
 					return next, nil
 				})
@@ -379,11 +384,12 @@ func newSessionsDetectCommand(stdout io.Writer) *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("%s: %w", cmd.CommandPath(), err)
 			}
+			candidates := withSessionEvidenceAll(detected.Candidates)
 
 			path := registry.RegistryPath(root.Path)
 			var summary registry.DetectUpsertSummary
 			err = registry.UpdateFile(path, func(current registry.Registry) (registry.Registry, error) {
-				next, upsertSummary := registry.UpsertDetectedCandidates(current, detected.Candidates)
+				next, upsertSummary := registry.UpsertDetectedCandidates(current, candidates)
 				upsertSummary.Skipped += detected.Skipped
 				summary = upsertSummary
 				return next, nil
@@ -395,7 +401,7 @@ func newSessionsDetectCommand(stdout io.Writer) *cobra.Command {
 			if jsonOutput {
 				return writeDetectSummaryJSON(stdout, summary)
 			}
-			_, err = fmt.Fprintf(stdout, "added=%d unchanged=%d skipped=%d\n", summary.Added, summary.Unchanged, summary.Skipped)
+			_, err = fmt.Fprintf(stdout, "added=%d unchanged=%d skipped=%d active=%d candidate=%d\n", summary.Added, summary.Unchanged, summary.Skipped, summary.Active, summary.Candidate)
 			return err
 		},
 	}
@@ -445,6 +451,28 @@ func writeCreateSummaryJSON(stdout io.Writer, summary create.Summary) error {
 	}
 	_, err = fmt.Fprintf(stdout, "%s\n", data)
 	return err
+}
+
+func withSessionEvidenceAll(sessions []registry.Session) []registry.Session {
+	enriched := make([]registry.Session, len(sessions))
+	for i, session := range sessions {
+		enriched[i] = withSessionEvidence(session)
+	}
+	return enriched
+}
+
+func withSessionEvidence(session registry.Session) registry.Session {
+	evidence, err := codex.FindSessionEvidenceForOpenedPath(session.OpenedPath, codex.MetadataDiscoveryOptions{
+		Env: map[string]string{
+			"CODEX_HOME": os.Getenv("CODEX_HOME"),
+		},
+	})
+	if err != nil || evidence.Verdict != codex.SessionEvidenceResolved || evidence.Ref == nil {
+		return session
+	}
+	session.CodexSession = evidence.Ref.SessionID
+	session.OpenedPath = evidence.Ref.Metadata.CWD
+	return session
 }
 
 func configuredZellijSession() string {
