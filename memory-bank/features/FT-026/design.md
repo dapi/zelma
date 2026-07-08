@@ -29,9 +29,9 @@ failures and adds a structured recovery response:
 | CLI reason or scenario | Action | Safe next command |
 | --- | --- | --- |
 | `unsupported repo`, `repo_not_ready`, `repo_not_prepared` | `setup` | `zelma setup` |
-| empty `sessions list --json` result while live panes are likely | `detect` | `zelma sessions list --json` |
-| `create_pane_unconfirmed`, `create_confirmation_failed` | `detect` | `zelma sessions list --json` |
-| `create_registry_write_failed` | `detect` | `zelma sessions list --json` |
+| empty `sessions list --json` result while live panes are likely | `detect` | `zelma sessions detect --json` |
+| `create_pane_unconfirmed`, `create_confirmation_failed` | `detect` | `zelma sessions detect --json` |
+| `create_registry_write_failed` | `detect` | `zelma sessions detect --json` |
 | `create_pane_launch_failed`, `zellij_missing_binary`, `zellij_command_failed` | `stop` | none |
 | `create_codex_missing_binary` | `stop` | none |
 | registry schema/validation reason codes | `stop` | none |

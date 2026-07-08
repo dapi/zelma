@@ -230,9 +230,9 @@ func TestListSessionsRejectsUnsupportedSchemaVersion(t *testing.T) {
 	assertCall(t, calls, root, "sessions", "list", "--json")
 }
 
-func TestCreatePartialFailureSuggestsListRecovery(t *testing.T) {
+func TestCreatePartialFailureSuggestsDetectRecovery(t *testing.T) {
 	root := t.TempDir()
-	stderr := writeFile(t, root, "stderr.txt", "zelma sessions create: create session: create_pane_unconfirmed: created pane could not be confirmed; recovery: run zelma sessions list --json\n")
+	stderr := writeFile(t, root, "stderr.txt", "zelma sessions create: create session: create_pane_unconfirmed: created pane could not be confirmed; recovery: run zelma sessions detect --json\n")
 	calls := filepath.Join(root, "calls.txt")
 	client := fakeCLIClient(t, root, "", stderr, "1", calls)
 
@@ -245,15 +245,15 @@ func TestCreatePartialFailureSuggestsListRecovery(t *testing.T) {
 	if commandErr.Recovery.Action != RecoveryActionDetect || commandErr.Recovery.ReasonCode != "create_pane_unconfirmed" {
 		t.Fatalf("Recovery = %+v, want detect for create_pane_unconfirmed", commandErr.Recovery)
 	}
-	assertRecoveryCommand(t, commandErr.Recovery, DefaultZelmaBinary, "sessions", "list", "--json")
+	assertRecoveryCommand(t, commandErr.Recovery, DefaultZelmaBinary, "sessions", "detect", "--json")
 }
 
 func TestRecoveryJSONUsesAgentContractFields(t *testing.T) {
 	data, err := json.Marshal(Recovery{
 		Action:      RecoveryActionDetect,
 		ReasonCode:  "create_pane_unconfirmed",
-		Message:     "reconcile through list",
-		NextCommand: []string{DefaultZelmaBinary, "sessions", "list", "--json"},
+		Message:     "reconcile through detect",
+		NextCommand: []string{DefaultZelmaBinary, "sessions", "detect", "--json"},
 	})
 	if err != nil {
 		t.Fatalf("Marshal(Recovery) error = %v", err)
@@ -310,7 +310,7 @@ func TestZellijUnavailableErrorStopsForEnvironmentFix(t *testing.T) {
 	}
 }
 
-func TestEmptyRegistryWithLikelyLivePanesSuggestsList(t *testing.T) {
+func TestEmptyRegistryWithLikelyLivePanesSuggestsDetect(t *testing.T) {
 	recovery := RecoveryForListResult(SessionsList{Version: SessionsSchemaVersion}, ListRecoveryOptions{
 		LivePanesLikely: true,
 	})
@@ -318,7 +318,7 @@ func TestEmptyRegistryWithLikelyLivePanesSuggestsList(t *testing.T) {
 	if recovery.Action != RecoveryActionDetect || recovery.ReasonCode != ReasonEmptyRegistryPanesLikely {
 		t.Fatalf("Recovery = %+v, want detect for likely live panes", recovery)
 	}
-	assertRecoveryCommand(t, recovery, DefaultZelmaBinary, "sessions", "list", "--json")
+	assertRecoveryCommand(t, recovery, DefaultZelmaBinary, "sessions", "detect", "--json")
 }
 
 func TestEmptyRegistryWithoutLikelyLivePanesHasNoRecovery(t *testing.T) {

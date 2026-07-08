@@ -111,7 +111,8 @@ The successful JSON summary is:
 New records are `candidate` unless Codex session evidence resolves
 unambiguously. If pane creation succeeds but confirmation or registry write
 fails, `zelma` does not claim to clean up the zellij pane; recovery should run
-`zelma sessions list --json` after the environment issue is understood.
+`zelma sessions detect --json` after the environment issue is understood. This
+explicit detect command bypasses the `sessions list` auto-detect cache.
 
 ### `zelma sessions create [path] --dry-run --json`
 
@@ -212,9 +213,9 @@ contains:
 | Registry JSON is invalid | `stop`; tell the user to restore valid schema v1 JSON before mutating commands. |
 | Codex binary is missing during create | `stop`; fix Codex installation or `ZELMA_CODEX_BIN`, then retry. |
 | zellij is unavailable or command execution fails | `stop`; fix zellij availability/session before retrying. |
-| Created pane cannot be confirmed | `detect`; run `zelma sessions list --json` and inspect the pane. |
-| Registry write fails after pane creation | `detect`; fix filesystem/lock issue, then run `zelma sessions list --json` before retrying create. |
-| Registry is empty but live panes are likely | `detect`; run `zelma sessions list --json`. |
+| Created pane cannot be confirmed | `detect`; run `zelma sessions detect --json` and inspect the pane. |
+| Registry write fails after pane creation | `detect`; fix filesystem/lock issue, then run `zelma sessions detect --json` before retrying create. |
+| Registry is empty but live panes are likely | `detect`; run `zelma sessions detect --json`. |
 | `list --live` or `detect` marks sessions stale | `inspect`; present stale records and use `cleanup --json` for proposal. |
 
 Recovery `next_command` values must stay within the public `zelma` CLI. They

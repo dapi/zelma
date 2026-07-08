@@ -28,8 +28,8 @@ func RecoveryForListResult(result SessionsList, options ListRecoveryOptions) Rec
 		return Recovery{
 			Action:      RecoveryActionDetect,
 			ReasonCode:  ReasonEmptyRegistryPanesLikely,
-			Message:     "Registry is empty, but live Codex panes are likely; reconcile them through zelma sessions list.",
-			NextCommand: listCommand(),
+			Message:     "Registry is empty, but live Codex panes are likely; force detection through zelma sessions detect.",
+			NextCommand: detectCommand(),
 		}
 	}
 	return Recovery{}
@@ -59,22 +59,22 @@ var recoveryRules = append([]recoveryRule{
 	{
 		reasonCode:  "create_pane_unconfirmed",
 		action:      RecoveryActionDetect,
-		message:     "Do not retry blindly; reconcile live Codex panes through sessions list before retrying create.",
-		nextCommand: listCommand(),
+		message:     "Do not retry blindly; force detection of live Codex panes before retrying create.",
+		nextCommand: detectCommand(),
 		needles:     []string{"create_pane_unconfirmed"},
 	},
 	{
 		reasonCode:  "create_confirmation_failed",
 		action:      RecoveryActionDetect,
-		message:     "Reconcile any live Codex panes through sessions list, then retry only after resolving the confirmation failure.",
-		nextCommand: listCommand(),
+		message:     "Force detection of any live Codex panes, then retry only after resolving the confirmation failure.",
+		nextCommand: detectCommand(),
 		needles:     []string{"create_confirmation_failed"},
 	},
 	{
 		reasonCode:  "create_registry_write_failed",
 		action:      RecoveryActionDetect,
-		message:     "Fix the registry write problem, then reconcile any created pane through sessions list before retrying create.",
-		nextCommand: listCommand(),
+		message:     "Fix the registry write problem, then force detection of any created pane before retrying create.",
+		nextCommand: detectCommand(),
 		needles:     []string{"create_registry_write_failed"},
 	},
 	{
@@ -231,8 +231,8 @@ func setupCommand() []string {
 	return []string{DefaultZelmaBinary, "setup"}
 }
 
-func listCommand() []string {
-	return []string{DefaultZelmaBinary, "sessions", "list", "--json"}
+func detectCommand() []string {
+	return []string{DefaultZelmaBinary, "sessions", "detect", "--json"}
 }
 
 func cleanupPreviewCommand() []string {
