@@ -94,3 +94,23 @@ audience: humans_and_agents
   идемпотентно добавляет `.zelma` в `.gitignore`.
 - [FT-032: Supervisor Command And Zellij Launch](FT-032/README.md) — запуск
   `start-issue` в zellij pane по умолчанию или tab по явному env/config override.
+- [FT-033: Agent Session Inventory E2E](FT-033/README.md) — e2e-покрытие
+  сценария инвентаризации active/stale zelma-сессий через `sessions list --live --json`.
+- [FT-034: Manual Pane Adoption E2E](FT-034/README.md) — e2e-покрытие
+  обнаружения вручную созданных Codex pane через `sessions detect --json`.
+- [FT-035: Managed Agent Launch E2E](FT-035/README.md) — e2e-покрытие
+  `sessions create --json` от запуска pane до записи registry.
+- [FT-036: Issue Supervisor Orchestration E2E](FT-036/README.md) — e2e-покрытие
+  `start-issue` supervisor flow для GitHub issue.
+- [FT-037: Agent Recovery E2E](FT-037/README.md) — e2e-покрытие
+  recovery diagnostics для типовых ошибок registry/zellij/create.
+- [FT-038: Stale Cleanup E2E](FT-038/README.md) — e2e-покрытие
+  proposal/confirm cleanup flow для stale registry entries.
+- [FT-039: Agent Handoff E2E](FT-039/README.md) — e2e-покрытие
+  восстановления картины active work новым агентом.
+- [FT-040: Multi-Agent Parallel Delivery E2E](FT-040/README.md) — e2e-покрытие
+  запуска и supervision нескольких independent issue agents.
+- [FT-041: Environment Smoke Diagnostics E2E](FT-041/README.md) — e2e-покрытие
+  `setup`, `.gitignore`, `list` и `detect` для fresh repo.
+- [FT-042: Agent Dashboard Status Backend](FT-042/README.md) — milestone-2
+  status backend для dashboard/agent UI поверх session registry и zellij state.

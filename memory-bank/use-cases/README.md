@@ -34,7 +34,16 @@ Use case нужен для сценария, который живет на ур
 
 | UC ID | Title | Status | Primary actor | Upstream PRD | Implemented by | Last updated |
 | --- | --- | --- | --- | --- | --- | --- |
-| `UC-XXX` | Название сценария | `draft` / `active` / `archived` | Кто запускает flow | `PRD-XXX` / `none` | `FT-XXX` | YYYY-MM-DD |
+| [`UC-001`](UC-001-agent-session-inventory.md) | Инвентаризация agent-сессий | `draft` | supervising agent | `none` | `FT-033` | 2026-07-08 |
+| [`UC-002`](UC-002-manual-pane-adoption.md) | Взятие вручную созданной pane под контроль | `draft` | supervising agent | `none` | `FT-034` | 2026-07-08 |
+| [`UC-003`](UC-003-managed-agent-launch.md) | Управляемый запуск новой agent-сессии | `draft` | supervising agent | `none` | `FT-035` | 2026-07-08 |
+| [`UC-004`](UC-004-issue-supervisor-orchestration.md) | Supervisor orchestration для GitHub issue | `draft` | shipping supervisor | `none` | `FT-036` | 2026-07-08 |
+| [`UC-005`](UC-005-agent-recovery.md) | Восстановление после ошибок agent-сессии | `draft` | supervising agent | `none` | `FT-037` | 2026-07-08 |
+| [`UC-006`](UC-006-stale-cleanup.md) | Очистка stale-сессий после завершения задачи | `draft` | supervising agent | `none` | `FT-038` | 2026-07-08 |
+| [`UC-007`](UC-007-agent-handoff.md) | Handoff между агентами | `draft` | incoming agent | `none` | `FT-039` | 2026-07-08 |
+| [`UC-008`](UC-008-multi-agent-parallel-delivery.md) | Параллельная доставка несколькими агентами | `draft` | shipping supervisor | `none` | `FT-040` | 2026-07-08 |
+| [`UC-009`](UC-009-environment-smoke-diagnostics.md) | Smoke-диагностика окружения | `draft` | setup agent | `none` | `FT-041` | 2026-07-08 |
+| [`UC-010`](UC-010-agent-dashboard-status-backend.md) | Dashboard/status backend для agent-сессий | `draft` | dashboard agent | `none` | `FT-042` | 2026-07-08 |
 
 ## Naming
 
