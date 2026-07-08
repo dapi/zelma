@@ -59,6 +59,7 @@ func NewRootCommand(stdout, stderr io.Writer) *cobra.Command {
 		newSessionsListCommand(stdout),
 		newSessionsCreateCommand(stdout),
 		newSessionsDetectCommand(stdout),
+		newSessionsCleanupCommand(stdout),
 	)
 	root.AddCommand(sessions)
 
@@ -79,6 +80,8 @@ func renderHelp(cmd *cobra.Command, args []string) {
 		fmt.Fprint(cmd.OutOrStdout(), sessionsCreateHelp)
 	case "zelma sessions detect":
 		fmt.Fprint(cmd.OutOrStdout(), sessionsDetectHelp)
+	case "zelma sessions cleanup":
+		fmt.Fprint(cmd.OutOrStdout(), sessionsCleanupHelp)
 	case "zelma help":
 		fmt.Fprint(cmd.OutOrStdout(), helpCommandHelp)
 	default:
@@ -93,6 +96,7 @@ const rootHelp = `COMMAND MAP
   zelma sessions list     List known zelma sessions. Status: implemented.
   zelma sessions create   Create and register a confirmed Codex pane. Status: implemented.
   zelma sessions detect   Detect existing Codex panes. Status: implemented.
+  zelma sessions cleanup  Propose or confirm stale record cleanup. Status: implemented.
 
 OUTPUT CONVENTIONS
   help output: stdout, exit 0, plain text.
@@ -102,6 +106,8 @@ OUTPUT CONVENTIONS
   add --live to include live/unreachable zellij status without registry writes.
   sessions detect: stdout, exit 0, summary with active/candidate/stale counts,
   stale reason lines when found, or JSON with --json.
+  sessions cleanup: stdout, exit 0, stale cleanup proposal by default; add
+  --confirm to remove proposed stale records.
   sessions create --dry-run: stdout, exit 0, launch contract text or JSON.
   sessions create: stdout, exit 0, created/registered/skipped summary.
   machine-readable session data: use "zelma sessions list --json".
@@ -148,6 +154,7 @@ const sessionsHelp = `COMMAND MAP
   zelma sessions list     List known zelma sessions. Status: implemented.
   zelma sessions create   Create and register a confirmed Codex pane. Status: implemented.
   zelma sessions detect   Detect existing Codex panes. Status: implemented.
+  zelma sessions cleanup  Propose or confirm stale record cleanup. Status: implemented.
 
 OUTPUT CONVENTIONS
   help output: stdout, exit 0, plain text.
@@ -157,6 +164,8 @@ OUTPUT CONVENTIONS
   create: stdout, exit 0, created/registered/skipped summary.
   detect: stdout, exit 0, added/unchanged/skipped summary with
   active/candidate/stale counts, stale reasons when found, or JSON with --json.
+  cleanup: stdout, exit 0, proposed/removed/kept summary with stale records;
+  without --confirm, does not mutate registry.
   sessions registry output: preserves zellij_session, zellij_pane,
   codex_session, opened_path and state fields.
 
@@ -168,7 +177,8 @@ RECOVERY HINTS
 HUMAN NOTES
   sessions list reads .zelma/sessions.json; --live checks current zellij panes
   without registry writes. detect inspects live zellij panes and only upserts
-  unresolved candidate records.
+  unresolved candidate records. cleanup removes stale records only after
+  explicit --confirm.
 
 Usage:
   zelma sessions [command]
@@ -232,6 +242,24 @@ Notes:
   unambiguously; otherwise writes visible candidate records. Marks active
   records stale only after successful live zellij inventory proves the zellij
   session or pane is missing. Does not create panes or delete stale records.
+`
+
+const sessionsCleanupHelp = `Usage:
+  zelma sessions cleanup [--confirm] [--json]
+
+Status:
+  implemented: proposes stale record cleanup and removes stale records only
+  after explicit --confirm.
+
+Output:
+  default: proposed/removed/kept summary followed by stale record lines.
+  --json: summary object with proposed, removed and kept counts plus
+  stale_records when found.
+
+Notes:
+  Without --confirm, reads the registry and prints a proposal without writes.
+  With --confirm, removes only records whose registry state is stale. Active,
+  candidate, closed and archived records are never removed by this command.
 `
 
 const helpCommandHelp = `Usage:
@@ -440,6 +468,68 @@ func newSessionsDetectCommand(stdout io.Writer) *cobra.Command {
 	return cmd
 }
 
+func newSessionsCleanupCommand(stdout io.Writer) *cobra.Command {
+	var confirm bool
+	var jsonOutput bool
+
+	cmd := &cobra.Command{
+		Use:   "cleanup",
+		Short: "Propose or confirm stale zelma session cleanup.",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if !confirm {
+				reg, err := readCurrentRegistry(cmd.CommandPath())
+				if err != nil {
+					return err
+				}
+				proposal := registry.ProposeCleanup(reg)
+				if jsonOutput {
+					return writeCleanupProposalJSON(stdout, proposal)
+				}
+				return writeCleanupProposal(stdout, proposal)
+			}
+
+			root, err := repo.ResolveRoot("")
+			if err != nil {
+				return errors.New(repo.Diagnostic(cmd.CommandPath(), err))
+			}
+
+			path := registry.RegistryPath(root.Path)
+			current, err := registry.ReadFile(path)
+			if errors.Is(err, os.ErrNotExist) {
+				proposal := registry.ProposeCleanup(registry.Registry{Version: registry.SchemaVersion, Sessions: []registry.Session{}})
+				if jsonOutput {
+					return writeCleanupProposalJSON(stdout, proposal)
+				}
+				return writeCleanupProposal(stdout, proposal)
+			}
+			if err != nil {
+				return fmt.Errorf("%s: %w", cmd.CommandPath(), err)
+			}
+
+			proposal := registry.ProposeCleanup(current)
+			if proposal.Summary.Proposed > 0 {
+				err = registry.UpdateFile(path, func(current registry.Registry) (registry.Registry, error) {
+					next, applied := registry.RemoveStale(current)
+					proposal = applied
+					return next, nil
+				})
+				if err != nil {
+					return fmt.Errorf("%s: %w", cmd.CommandPath(), err)
+				}
+			}
+
+			if jsonOutput {
+				return writeCleanupProposalJSON(stdout, proposal)
+			}
+			return writeCleanupProposal(stdout, proposal)
+		},
+	}
+	cmd.Flags().BoolVar(&confirm, "confirm", false, "Remove proposed stale records.")
+	cmd.Flags().BoolVar(&jsonOutput, "json", false, "Print cleanup proposal JSON.")
+	return cmd
+}
+
 func writeStaleCandidateLines(stdout io.Writer, candidates []registry.StaleCandidate) error {
 	for _, candidate := range candidates {
 		if _, err := fmt.Fprintf(
@@ -449,6 +539,25 @@ func writeStaleCandidateLines(stdout io.Writer, candidates []registry.StaleCandi
 			candidate.ZellijPane,
 			candidate.PreviousState,
 			candidate.Reason,
+		); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func writeCleanupProposal(stdout io.Writer, proposal registry.CleanupProposal) error {
+	if _, err := fmt.Fprintf(stdout, "proposed=%d removed=%d kept=%d\n", proposal.Summary.Proposed, proposal.Summary.Removed, proposal.Summary.Kept); err != nil {
+		return err
+	}
+	for _, session := range proposal.StaleRecords {
+		if _, err := fmt.Fprintf(
+			stdout,
+			"stale zellij_session=%s zellij_pane=%s codex_session=%s opened_path=%s\n",
+			session.ZellijSession,
+			session.ZellijPane,
+			session.CodexSession,
+			session.OpenedPath,
 		); err != nil {
 			return err
 		}
@@ -499,6 +608,15 @@ func writeDetectSummaryJSON(stdout io.Writer, summary registry.DetectUpsertSumma
 	data, err := json.MarshalIndent(output, "", "  ")
 	if err != nil {
 		return fmt.Errorf("encode detect summary JSON: %w", err)
+	}
+	_, err = fmt.Fprintf(stdout, "%s\n", data)
+	return err
+}
+
+func writeCleanupProposalJSON(stdout io.Writer, proposal registry.CleanupProposal) error {
+	data, err := json.MarshalIndent(proposal, "", "  ")
+	if err != nil {
+		return fmt.Errorf("encode cleanup proposal JSON: %w", err)
 	}
 	_, err = fmt.Fprintf(stdout, "%s\n", data)
 	return err

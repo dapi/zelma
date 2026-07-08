@@ -110,6 +110,11 @@ func TestHelpRoutes(t *testing.T) {
 			args:       []string{"sessions", "detect", "--help"},
 			wantOutput: []string{"Usage:", "zelma sessions detect"},
 		},
+		{
+			name:       "sessions cleanup",
+			args:       []string{"sessions", "cleanup", "--help"},
+			wantOutput: []string{"Usage:", "zelma sessions cleanup"},
+		},
 	}
 
 	for _, tt := range tests {
@@ -153,6 +158,11 @@ func TestCommandHelpSnapshots(t *testing.T) {
 			name: "sessions detect help",
 			args: []string{"sessions", "detect", "--help"},
 			want: sessionsDetectHelp,
+		},
+		{
+			name: "sessions cleanup help",
+			args: []string{"sessions", "cleanup", "--help"},
+			want: sessionsCleanupHelp,
 		},
 	}
 
@@ -309,6 +319,7 @@ const rootHelpSnapshot = `COMMAND MAP
   zelma sessions list     List known zelma sessions. Status: implemented.
   zelma sessions create   Create and register a confirmed Codex pane. Status: implemented.
   zelma sessions detect   Detect existing Codex panes. Status: implemented.
+  zelma sessions cleanup  Propose or confirm stale record cleanup. Status: implemented.
 
 OUTPUT CONVENTIONS
   help output: stdout, exit 0, plain text.
@@ -318,6 +329,8 @@ OUTPUT CONVENTIONS
   add --live to include live/unreachable zellij status without registry writes.
   sessions detect: stdout, exit 0, summary with active/candidate/stale counts,
   stale reason lines when found, or JSON with --json.
+  sessions cleanup: stdout, exit 0, stale cleanup proposal by default; add
+  --confirm to remove proposed stale records.
   sessions create --dry-run: stdout, exit 0, launch contract text or JSON.
   sessions create: stdout, exit 0, created/registered/skipped summary.
   machine-readable session data: use "zelma sessions list --json".
@@ -341,6 +354,7 @@ const sessionsHelpSnapshot = `COMMAND MAP
   zelma sessions list     List known zelma sessions. Status: implemented.
   zelma sessions create   Create and register a confirmed Codex pane. Status: implemented.
   zelma sessions detect   Detect existing Codex panes. Status: implemented.
+  zelma sessions cleanup  Propose or confirm stale record cleanup. Status: implemented.
 
 OUTPUT CONVENTIONS
   help output: stdout, exit 0, plain text.
@@ -350,6 +364,8 @@ OUTPUT CONVENTIONS
   create: stdout, exit 0, created/registered/skipped summary.
   detect: stdout, exit 0, added/unchanged/skipped summary with
   active/candidate/stale counts, stale reasons when found, or JSON with --json.
+  cleanup: stdout, exit 0, proposed/removed/kept summary with stale records;
+  without --confirm, does not mutate registry.
   sessions registry output: preserves zellij_session, zellij_pane,
   codex_session, opened_path and state fields.
 
@@ -361,7 +377,8 @@ RECOVERY HINTS
 HUMAN NOTES
   sessions list reads .zelma/sessions.json; --live checks current zellij panes
   without registry writes. detect inspects live zellij panes and only upserts
-  unresolved candidate records.
+  unresolved candidate records. cleanup removes stale records only after
+  explicit --confirm.
 
 Usage:
   zelma sessions [command]
@@ -1203,6 +1220,166 @@ func TestSessionsDetectJSONSummary(t *testing.T) {
   "stale": 0
 }
 `
+	if stdout.String() != want {
+		t.Fatalf("stdout mismatch\nwant:\n%s\ngot:\n%s", want, stdout.String())
+	}
+}
+
+func TestSessionsCleanupProposalDoesNotMutateRegistry(t *testing.T) {
+	root := newTestGitRepo(t)
+	openedPath := resolvedPath(t, root)
+	writeRegistryFile(t, root, fmt.Sprintf(`{
+  "version": 1,
+  "sessions": [
+    {
+      "zellij_session": "zelma-main",
+      "zellij_pane": "terminal_1",
+      "codex_session": "11111111-1111-4111-8111-111111111111",
+      "opened_path": %q,
+      "state": "stale"
+    },
+    {
+      "zellij_session": "zelma-main",
+      "zellij_pane": "terminal_2",
+      "codex_session": "22222222-2222-4222-8222-222222222222",
+      "opened_path": %q,
+      "state": "active"
+    }
+  ]
+}
+`, openedPath, openedPath))
+	registryPath := registry.RegistryPath(root)
+	before := readFile(t, registryPath)
+	t.Chdir(root)
+
+	var stdout, stderr bytes.Buffer
+
+	code := Run(context.Background(), []string{"sessions", "cleanup"}, &stdout, &stderr)
+
+	if code != 0 {
+		t.Fatalf("Run() code = %d, want 0; stderr = %q", code, stderr.String())
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("stderr = %q, want empty", stderr.String())
+	}
+	want := "proposed=1 removed=0 kept=2\n" +
+		"stale zellij_session=zelma-main zellij_pane=terminal_1 codex_session=11111111-1111-4111-8111-111111111111 opened_path=" + openedPath + "\n"
+	if stdout.String() != want {
+		t.Fatalf("stdout mismatch\nwant:\n%s\ngot:\n%s", want, stdout.String())
+	}
+	after := readFile(t, registryPath)
+	if after != before {
+		t.Fatalf("registry changed without --confirm\nbefore:\n%s\nafter:\n%s", before, after)
+	}
+}
+
+func TestSessionsCleanupConfirmRemovesOnlyStaleRecords(t *testing.T) {
+	root := newTestGitRepo(t)
+	openedPath := resolvedPath(t, root)
+	writeRegistryFile(t, root, fmt.Sprintf(`{
+  "version": 1,
+  "sessions": [
+    {
+      "zellij_session": "zelma-main",
+      "zellij_pane": "terminal_1",
+      "codex_session": "11111111-1111-4111-8111-111111111111",
+      "opened_path": %q,
+      "state": "stale"
+    },
+    {
+      "zellij_session": "zelma-main",
+      "zellij_pane": "terminal_2",
+      "codex_session": "22222222-2222-4222-8222-222222222222",
+      "opened_path": %q,
+      "state": "active"
+    },
+    {
+      "zellij_session": "zelma-main",
+      "zellij_pane": "terminal_3",
+      "codex_session": "",
+      "opened_path": %q,
+      "state": "candidate"
+    }
+  ]
+}
+`, openedPath, openedPath, openedPath))
+	t.Chdir(root)
+
+	var stdout, stderr bytes.Buffer
+
+	code := Run(context.Background(), []string{"sessions", "cleanup", "--confirm"}, &stdout, &stderr)
+
+	if code != 0 {
+		t.Fatalf("Run() code = %d, want 0; stderr = %q", code, stderr.String())
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("stderr = %q, want empty", stderr.String())
+	}
+	want := "proposed=1 removed=1 kept=2\n" +
+		"stale zellij_session=zelma-main zellij_pane=terminal_1 codex_session=11111111-1111-4111-8111-111111111111 opened_path=" + openedPath + "\n"
+	if stdout.String() != want {
+		t.Fatalf("stdout mismatch\nwant:\n%s\ngot:\n%s", want, stdout.String())
+	}
+
+	got := readRegistry(t, root)
+	if len(got.Sessions) != 2 {
+		t.Fatalf("len(Sessions) = %d, want 2", len(got.Sessions))
+	}
+	for _, session := range got.Sessions {
+		if session.State == registry.StateStale {
+			t.Fatalf("stale record was not removed: %+v", session)
+		}
+	}
+	if got.Sessions[0].State != registry.StateActive || got.Sessions[1].State != registry.StateCandidate {
+		t.Fatalf("sessions = %+v, want active and candidate kept", got.Sessions)
+	}
+}
+
+func TestSessionsCleanupJSONProposal(t *testing.T) {
+	root := newTestGitRepo(t)
+	openedPath := resolvedPath(t, root)
+	writeRegistryFile(t, root, fmt.Sprintf(`{
+  "version": 1,
+  "sessions": [
+    {
+      "zellij_session": "zelma-main",
+      "zellij_pane": "terminal_1",
+      "codex_session": "11111111-1111-4111-8111-111111111111",
+      "opened_path": %q,
+      "state": "stale"
+    }
+  ]
+}
+`, openedPath))
+	t.Chdir(root)
+
+	var stdout, stderr bytes.Buffer
+
+	code := Run(context.Background(), []string{"sessions", "cleanup", "--json"}, &stdout, &stderr)
+
+	if code != 0 {
+		t.Fatalf("Run() code = %d, want 0; stderr = %q", code, stderr.String())
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("stderr = %q, want empty", stderr.String())
+	}
+	want := fmt.Sprintf(`{
+  "summary": {
+    "proposed": 1,
+    "removed": 0,
+    "kept": 1
+  },
+  "stale_records": [
+    {
+      "zellij_session": "zelma-main",
+      "zellij_pane": "terminal_1",
+      "codex_session": "11111111-1111-4111-8111-111111111111",
+      "opened_path": %q,
+      "state": "stale"
+    }
+  ]
+}
+`, openedPath)
 	if stdout.String() != want {
 		t.Fatalf("stdout mismatch\nwant:\n%s\ngot:\n%s", want, stdout.String())
 	}
