@@ -31,7 +31,6 @@ func TestLaunchAndConfirmReturnsCandidateForConfirmedCodexPane(t *testing.T) {
 	}
 
 	got, err := LaunchAndConfirm(context.Background(), Request{
-		RepoRoot:      root,
 		ZellijSession: "zelma-main",
 		Contract:      contract,
 	}, &runtime)
@@ -69,6 +68,40 @@ func TestLaunchAndConfirmReturnsCandidateForConfirmedCodexPane(t *testing.T) {
 	}
 }
 
+func TestLaunchAndConfirmAcceptsConfiguredCodexWrapper(t *testing.T) {
+	root := filepath.Clean(t.TempDir())
+	contract := codex.LaunchContract{
+		Binary:           "/opt/tools/codex-wrapper",
+		Args:             []string{"--cd", root},
+		WorkingDirectory: root,
+		OpenedPath:       root,
+	}
+	runtime := fakeRuntime{
+		paneRef: zellij.PaneRef{
+			Session: "zelma-main",
+			PaneID:  zellij.PaneID{Kind: zellij.PaneKindTerminal, Number: 7},
+		},
+		panes: []zellij.Pane{
+			terminalPane(7, "/opt/tools/codex-wrapper --cd "+root, root),
+		},
+	}
+
+	got, err := LaunchAndConfirm(context.Background(), Request{
+		ZellijSession: "zelma-main",
+		Contract:      contract,
+	}, &runtime)
+
+	if err != nil {
+		t.Fatalf("LaunchAndConfirm() error = %v, want nil", err)
+	}
+	if !got.Confirmed {
+		t.Fatal("Confirmed = false, want true for configured launch binary")
+	}
+	if got.Candidate.OpenedPath != root || got.Candidate.ZellijPane != "terminal_7" {
+		t.Fatalf("Candidate = %+v, want configured wrapper pane candidate", got.Candidate)
+	}
+}
+
 func TestLaunchAndConfirmSkipsUnconfirmedPane(t *testing.T) {
 	root := filepath.Clean(t.TempDir())
 	contract := codex.LaunchContract{
@@ -88,7 +121,6 @@ func TestLaunchAndConfirmSkipsUnconfirmedPane(t *testing.T) {
 	}
 
 	got, err := LaunchAndConfirm(context.Background(), Request{
-		RepoRoot:      root,
 		ZellijSession: "zelma-main",
 		Contract:      contract,
 	}, &runtime)
@@ -119,7 +151,6 @@ func TestLaunchAndConfirmPropagatesReadErrorAfterCreate(t *testing.T) {
 	}
 
 	got, err := LaunchAndConfirm(context.Background(), Request{
-		RepoRoot:      root,
 		ZellijSession: "zelma-main",
 		Contract: codex.LaunchContract{
 			Binary:           "/usr/local/bin/codex",

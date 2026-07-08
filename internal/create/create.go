@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"path/filepath"
+	"strings"
 
 	"github.com/dapi/zelma/internal/codex"
 	"github.com/dapi/zelma/internal/detection"
@@ -22,7 +24,6 @@ type Runtime interface {
 }
 
 type Request struct {
-	RepoRoot      string
 	ZellijSession string
 	Contract      codex.LaunchContract
 }
@@ -72,7 +73,7 @@ func LaunchAndConfirm(ctx context.Context, request Request, runtime Runtime) (Re
 		return result, fmt.Errorf("confirm created pane: %w", err)
 	}
 
-	candidate, ok := ConfirmPane(request.RepoRoot, request.Contract.OpenedPath, ref, panes)
+	candidate, ok := ConfirmPane(request.Contract.OpenedPath, request.Contract.Binary, ref, panes)
 	if !ok {
 		result.Summary.Skipped = 1
 		return result, nil
@@ -83,17 +84,19 @@ func LaunchAndConfirm(ctx context.Context, request Request, runtime Runtime) (Re
 	return result, nil
 }
 
-func ConfirmPane(repoRoot, openedPath string, ref zellij.PaneRef, panes []zellij.Pane) (registry.Session, bool) {
+func ConfirmPane(openedPath, launchBinary string, ref zellij.PaneRef, panes []zellij.Pane) (registry.Session, bool) {
 	for _, pane := range panes {
 		if pane.ID.String() != ref.PaneID.String() {
 			continue
 		}
 
-		classification := detection.ClassifyPane(pane, repoRoot)
-		if classification.Verdict != detection.VerdictCandidate {
+		if pane.ID.Kind != zellij.PaneKindTerminal || pane.Exited {
 			return registry.Session{}, false
 		}
-		if classification.OpenedPath != openedPath {
+		if !paneCommandMatchesLaunch(pane.PaneCommand, launchBinary) {
+			return registry.Session{}, false
+		}
+		if normalizedPaneCWD(pane.PaneCWD) != openedPath {
 			return registry.Session{}, false
 		}
 
@@ -106,4 +109,28 @@ func ConfirmPane(repoRoot, openedPath string, ref zellij.PaneRef, panes []zellij
 		}, true
 	}
 	return registry.Session{}, false
+}
+
+func paneCommandMatchesLaunch(command *string, launchBinary string) bool {
+	if command == nil || strings.TrimSpace(launchBinary) == "" {
+		return false
+	}
+	executable := detection.CommandExecutable(*command)
+	if executable == "" {
+		return false
+	}
+	if executable == launchBinary {
+		return true
+	}
+	if filepath.IsAbs(executable) && filepath.IsAbs(launchBinary) {
+		return filepath.Clean(executable) == filepath.Clean(launchBinary)
+	}
+	return filepath.Base(executable) == filepath.Base(launchBinary)
+}
+
+func normalizedPaneCWD(cwd *string) string {
+	if cwd == nil || strings.TrimSpace(*cwd) == "" || !filepath.IsAbs(*cwd) {
+		return ""
+	}
+	return filepath.Clean(*cwd)
 }

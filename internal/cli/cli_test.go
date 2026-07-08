@@ -464,6 +464,31 @@ func TestSessionsCreateRegistersConfirmedCandidateRecord(t *testing.T) {
 	}
 }
 
+func TestSessionsCreateRegistersConfiguredCodexWrapper(t *testing.T) {
+	root := newTestGitRepo(t)
+	paneRoot := resolvedPath(t, root)
+	fakeCodex := writeFakeExecutable(t, "codex-wrapper")
+	t.Setenv("ZELMA_CODEX_BIN", fakeCodex)
+	t.Setenv("ZELMA_ZELLIJ_BIN", writeFakeCreateZellij(t, "terminal_8", panesJSONWithID(8, paneRoot, fakeCodex+" --cd "+paneRoot, true)))
+	t.Chdir(root)
+
+	var stdout, stderr bytes.Buffer
+
+	code := Run(context.Background(), []string{"sessions", "create"}, &stdout, &stderr)
+
+	if code != 0 {
+		t.Fatalf("Run() code = %d, want 0; stderr = %q", code, stderr.String())
+	}
+	if stdout.String() != "created=1 registered=1 skipped=0\n" {
+		t.Fatalf("stdout = %q, want create summary", stdout.String())
+	}
+
+	got := readRegistry(t, root)
+	if len(got.Sessions) != 1 || got.Sessions[0].ZellijPane != "terminal_8" {
+		t.Fatalf("sessions = %+v, want one terminal_8 candidate", got.Sessions)
+	}
+}
+
 func TestSessionsCreateUnconfirmedPaneDoesNotWriteRegistry(t *testing.T) {
 	root := newTestGitRepo(t)
 	paneRoot := resolvedPath(t, root)
@@ -1021,7 +1046,13 @@ exit 2
 func writeFakeCodex(t *testing.T) string {
 	t.Helper()
 
-	path := filepath.Join(t.TempDir(), "codex")
+	return writeFakeExecutable(t, "codex")
+}
+
+func writeFakeExecutable(t *testing.T, name string) string {
+	t.Helper()
+
+	path := filepath.Join(t.TempDir(), name)
 	script := "#!/bin/sh\nexit 0\n"
 	if err := os.WriteFile(path, []byte(script), 0o755); err != nil {
 		t.Fatal(err)

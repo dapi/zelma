@@ -44,7 +44,8 @@ The created pane is confirmed when all conditions are true:
 
 - `RunPane` returned a terminal typed pane id such as `terminal_7`;
 - `ListPanes` for the same zellij session contains that typed pane id;
-- pane classification identifies a terminal, non-exited Codex command pane;
+- pane is terminal and non-exited;
+- observed command executable matches the configured Codex launch binary;
 - observed pane cwd normalizes to the requested opened path.
 
 If the pane cannot be confirmed after a successful create call, the command

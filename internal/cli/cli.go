@@ -326,7 +326,6 @@ func newSessionsCreateCommand(stdout io.Writer) *cobra.Command {
 			zellijSession := configuredZellijSession()
 			client := zellij.New(zellij.WithBinary(os.Getenv("ZELMA_ZELLIJ_BIN")))
 			result, err := create.LaunchAndConfirm(cmd.Context(), create.Request{
-				RepoRoot:      root.Path,
 				ZellijSession: zellijSession,
 				Contract:      contract,
 			}, client)
