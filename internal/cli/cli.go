@@ -23,6 +23,7 @@ import (
 	"github.com/dapi/zelma/internal/setup"
 	"github.com/dapi/zelma/internal/zellij"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 )
 
 var paneProcessEvidenceResolverFactory = func() codex.PaneProcessEvidenceResolver {
@@ -40,8 +41,12 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 			fmt.Fprintln(stderr, err)
 			return 1
 		}
-		if command, ok := jsonCommandForArgs(root, args); ok {
-			fmt.Fprintln(stderr, jsonArgumentFailure(command.CommandPath(), err))
+		if command, ok := jsonFallbackCommandForArgs(root, args); ok {
+			if isCobraValidationError(err) {
+				fmt.Fprintln(stderr, jsonArgumentFailure(command.CommandPath(), err))
+				return 1
+			}
+			fmt.Fprintln(stderr, commandFailure(command.CommandPath(), err, true))
 			return 1
 		}
 		fmt.Fprintln(stderr, err)
@@ -1000,19 +1005,59 @@ func commandFailure(command string, err error, jsonOutput bool) error {
 	}
 }
 
-func jsonCommandForArgs(root *cobra.Command, args []string) (*cobra.Command, bool) {
-	command, _, err := root.Find(args)
-	if err != nil || command == nil {
+func jsonFallbackCommandForArgs(root *cobra.Command, args []string) (*cobra.Command, bool) {
+	if !rawJSONRequested(args) {
 		return nil, false
 	}
+	command := rawCommandForArgs(root, args)
 	if command.Flags().Lookup("json") == nil {
 		return nil, false
 	}
-	jsonOutput, err := command.Flags().GetBool("json")
-	if err != nil || !jsonOutput {
-		return nil, false
-	}
 	return command, true
+}
+
+func rawJSONRequested(args []string) bool {
+	for _, arg := range args {
+		if arg == "--json" {
+			return true
+		}
+		value, ok := strings.CutPrefix(arg, "--json=")
+		if !ok {
+			continue
+		}
+		parsed, err := strconv.ParseBool(value)
+		return err != nil || parsed
+	}
+	return false
+}
+
+func rawCommandForArgs(root *cobra.Command, args []string) *cobra.Command {
+	command := root
+	for _, arg := range args {
+		if arg == "--" || strings.HasPrefix(arg, "-") {
+			return command
+		}
+		next, _, err := command.Find([]string{arg})
+		if err != nil || next == command {
+			return command
+		}
+		command = next
+	}
+	return command
+}
+
+func isCobraValidationError(err error) bool {
+	var notExistErr *pflag.NotExistError
+	if errors.As(err, &notExistErr) {
+		return true
+	}
+	var valueRequiredErr *pflag.ValueRequiredError
+	if errors.As(err, &valueRequiredErr) {
+		return true
+	}
+	message := err.Error()
+	return strings.Contains(message, "arg(s)") &&
+		(strings.HasPrefix(message, "accepts ") || strings.HasPrefix(message, "requires "))
 }
 
 func jsonArgumentFailure(command string, err error) error {

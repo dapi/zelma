@@ -511,6 +511,12 @@ func TestMachineReadableArgumentValidationDiagnostics(t *testing.T) {
 			commandPath: "zelma sessions create",
 			wantMessage: "accepts at most 1 arg(s), received 2",
 		},
+		{
+			name:        "list unknown flag before json",
+			args:        []string{"sessions", "list", "--bad", "--json"},
+			commandPath: "zelma sessions list",
+			wantMessage: "unknown flag: --bad",
+		},
 	}
 
 	for _, tt := range tests {
@@ -563,6 +569,33 @@ func TestExplicitJSONFalseKeepsHumanArgumentValidationDiagnostic(t *testing.T) {
 	if !strings.Contains(stderr.String(), "accepts 1 arg(s), received 0") {
 		t.Fatalf("stderr = %q, want Cobra argument validation diagnostic", stderr.String())
 	}
+}
+
+func TestMachineReadableExecutionFailureUsesGenericDiagnostic(t *testing.T) {
+	root := newTestGitRepo(t)
+	t.Chdir(root)
+
+	var stderr bytes.Buffer
+
+	code := Run(context.Background(), []string{"sessions", "list", "--no-detect", "--json"}, failingWriter{}, &stderr)
+
+	if code != 1 {
+		t.Fatalf("Run() code = %d, want 1", code)
+	}
+	diagnostic := decodeSkillRecoveryDiagnostic(t, stderr.Bytes())
+	if diagnostic.Code != "unknown_cli_error" ||
+		diagnostic.CommandPath != "zelma sessions list" ||
+		diagnostic.Retryable ||
+		!diagnostic.ManualActionRequired ||
+		!strings.Contains(diagnostic.Message, "synthetic stdout failure") {
+		t.Fatalf("diagnostic = %+v, want generic execution failure diagnostic", diagnostic)
+	}
+}
+
+type failingWriter struct{}
+
+func (failingWriter) Write([]byte) (int, error) {
+	return 0, fmt.Errorf("synthetic stdout failure")
 }
 
 type skillRecoveryDiagnostic struct {
