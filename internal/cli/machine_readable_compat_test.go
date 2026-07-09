@@ -9,6 +9,9 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/dapi/zelma/internal/registry"
+	"github.com/gofrs/flock"
 )
 
 func TestMachineReadableOutputCompatibilityExamples(t *testing.T) {
@@ -410,6 +413,130 @@ func TestMachineReadableDiagnosticCompatibility(t *testing.T) {
 			t.Fatalf("stderr = %q, want substring %q", stderr.String(), want)
 		}
 	}
+}
+
+func TestMachineReadableRegistryLockDiagnosticCompatibility(t *testing.T) {
+	root := newTestGitRepo(t)
+	openedPath := resolvedPath(t, root)
+	writeRegistryFile(t, root, fmt.Sprintf(`{
+  "version": 1,
+  "sessions": [
+    {
+      "id": 1,
+      "zellij_session": "zelma-main",
+      "zellij_pane": "terminal_1",
+      "codex_session": "11111111-1111-4111-8111-111111111111",
+      "opened_path": %q,
+      "state": "stale"
+    }
+  ]
+}
+`, openedPath))
+	t.Chdir(root)
+
+	lock := flock.New(registry.RegistryPath(root) + ".lock")
+	locked, err := lock.TryLock()
+	if err != nil {
+		t.Fatalf("TryLock() error = %v", err)
+	}
+	if !locked {
+		t.Fatal("TryLock() locked = false, want true")
+	}
+	defer lock.Unlock()
+
+	var stdout, stderr bytes.Buffer
+
+	code := Run(context.Background(), []string{"sessions", "cleanup", "--confirm", "--json"}, &stdout, &stderr)
+
+	if code != 1 {
+		t.Fatalf("Run() code = %d, want 1", code)
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("stdout = %q, want empty", stdout.String())
+	}
+	diagnostic := decodeSkillRecoveryDiagnostic(t, stderr.Bytes())
+	if diagnostic.Code != "registry_locked" ||
+		!diagnostic.Retryable ||
+		diagnostic.ManualActionRequired ||
+		diagnostic.CommandPath != "zelma sessions cleanup" {
+		t.Fatalf("diagnostic = %+v, want retryable registry_locked cleanup diagnostic", diagnostic)
+	}
+	if len(diagnostic.NextCommand) != 0 {
+		t.Fatalf("next_command = %#v, want empty for retry", diagnostic.NextCommand)
+	}
+}
+
+func TestMachineReadableArgumentValidationDiagnostics(t *testing.T) {
+	tests := []struct {
+		name        string
+		args        []string
+		commandPath string
+		wantMessage string
+	}{
+		{
+			name:        "focus missing id",
+			args:        []string{"sessions", "focus", "--json"},
+			commandPath: "zelma sessions focus",
+			wantMessage: "accepts 1 arg(s), received 0",
+		},
+		{
+			name:        "create too many args",
+			args:        []string{"sessions", "create", "a", "b", "--json"},
+			commandPath: "zelma sessions create",
+			wantMessage: "accepts at most 1 arg(s), received 2",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			root := newTestGitRepo(t)
+			t.Chdir(root)
+
+			var stdout, stderr bytes.Buffer
+
+			code := Run(context.Background(), tt.args, &stdout, &stderr)
+
+			if code != 1 {
+				t.Fatalf("Run() code = %d, want 1", code)
+			}
+			if stdout.Len() != 0 {
+				t.Fatalf("stdout = %q, want empty", stdout.String())
+			}
+			diagnostic := decodeSkillRecoveryDiagnostic(t, stderr.Bytes())
+			if diagnostic.Code != "cli_invalid_arguments" ||
+				diagnostic.CommandPath != tt.commandPath ||
+				diagnostic.Retryable ||
+				!diagnostic.ManualActionRequired ||
+				!strings.Contains(diagnostic.Message, tt.wantMessage) {
+				t.Fatalf("diagnostic = %+v, want stable invalid argument diagnostic for %s", diagnostic, tt.commandPath)
+			}
+			if len(diagnostic.NextCommand) != 0 {
+				t.Fatalf("next_command = %#v, want empty for invalid arguments", diagnostic.NextCommand)
+			}
+		})
+	}
+}
+
+type skillRecoveryDiagnostic struct {
+	Code                 string   `json:"code"`
+	CommandPath          string   `json:"command_path"`
+	Message              string   `json:"message"`
+	HumanMessage         string   `json:"human_message"`
+	Retryable            bool     `json:"retryable"`
+	ManualActionRequired bool     `json:"manual_action_required"`
+	RecoveryHint         string   `json:"recovery_hint"`
+	NextCommand          []string `json:"next_command"`
+}
+
+func decodeSkillRecoveryDiagnostic(t *testing.T, data []byte) skillRecoveryDiagnostic {
+	t.Helper()
+
+	var output skillRecoveryDiagnostic
+	decodeStrict(t, data, &output)
+	if output.Code == "" || output.CommandPath == "" || output.Message == "" || output.HumanMessage == "" || output.RecoveryHint == "" {
+		t.Fatalf("diagnostic = %+v, want stable code, command, messages and recovery hint", output)
+	}
+	return output
 }
 
 func parseSkillSetupResult(t *testing.T, data []byte) {

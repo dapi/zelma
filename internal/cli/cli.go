@@ -35,6 +35,15 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	root := NewRootCommand(stdout, stderr)
 	root.SetArgs(args)
 	if err := root.ExecuteContext(ctx); err != nil {
+		var jsonErr *jsonCommandDiagnosticError
+		if errors.As(err, &jsonErr) {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+		if command, ok := jsonCommandForArgs(root, args); ok {
+			fmt.Fprintln(stderr, jsonArgumentFailure(command.CommandPath(), err))
+			return 1
+		}
 		fmt.Fprintln(stderr, err)
 		return 1
 	}
@@ -991,6 +1000,38 @@ func commandFailure(command string, err error, jsonOutput bool) error {
 	}
 }
 
+func jsonCommandForArgs(root *cobra.Command, args []string) (*cobra.Command, bool) {
+	command, _, err := root.Find(args)
+	if err != nil || command == nil {
+		return nil, false
+	}
+	if command.Flags().Lookup("json") == nil {
+		return nil, false
+	}
+	for _, arg := range args {
+		if arg == "--json" || strings.HasPrefix(arg, "--json=") {
+			return command, true
+		}
+	}
+	return nil, false
+}
+
+func jsonArgumentFailure(command string, err error) error {
+	return &jsonCommandDiagnosticError{
+		Diagnostic: recoveryDiagnosticJSON{
+			Code:                 "cli_invalid_arguments",
+			CommandPath:          command,
+			Message:              err.Error(),
+			HumanMessage:         legacyCommandDiagnostic(command, err).Error(),
+			Retryable:            false,
+			ManualActionRequired: true,
+			RecoveryHint:         "fix the command arguments and retry the same zelma command",
+			NextCommand:          []string{},
+		},
+		Err: err,
+	}
+}
+
 func legacyCommandDiagnostic(command string, err error) error {
 	if err == nil {
 		return nil
@@ -1039,6 +1080,16 @@ func recoveryDiagnosticForError(command string, err error) recoveryDiagnosticJSO
 		diagnostic.RegistryPath = registryDiagnostic.Path
 		diagnostic.RecoveryHint = registryDiagnostic.RecoveryHint
 		diagnostic.NextCommand = nextCommandForCode(diagnostic.Code)
+		return diagnostic
+	}
+
+	if errors.Is(err, registry.ErrRegistryLocked) {
+		diagnostic.Code = "registry_locked"
+		diagnostic.Message = "sessions registry is locked by another writer"
+		diagnostic.Retryable = true
+		diagnostic.ManualActionRequired = false
+		diagnostic.RecoveryHint = "retry after the other registry writer finishes; do not edit the registry directly"
+		diagnostic.NextCommand = []string{}
 		return diagnostic
 	}
 
