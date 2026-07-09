@@ -15,6 +15,7 @@ type OutputKind string
 const (
 	OutputKindPanes  OutputKind = "panes"
 	OutputKindPaneID OutputKind = "pane_id"
+	OutputKindTabID  OutputKind = "tab_id"
 )
 
 type ParseErrorCode string
@@ -117,6 +118,35 @@ func ParsePaneID(value string) (PaneID, error) {
 		return PaneID{}, parseError(OutputKindPaneID, ParseErrorInvalidField, "stdout", "pane id number must be non-negative", nil)
 	}
 	return PaneID{Kind: kind, Number: number}, nil
+}
+
+func ParseTabIDOutput(data []byte) (int, error) {
+	if len(data) == 0 {
+		return 0, parseError(OutputKindTabID, ParseErrorInvalidField, "stdout", "tab id output is empty", nil)
+	}
+	if !utf8.Valid(data) {
+		return 0, parseError(OutputKindTabID, ParseErrorInvalidField, "stdout", "tab id output is not valid UTF-8", nil)
+	}
+	if bytes.Contains(data, []byte{0}) {
+		return 0, parseError(OutputKindTabID, ParseErrorInvalidField, "stdout", "tab id output contains NUL byte", nil)
+	}
+
+	value := strings.TrimSpace(string(data))
+	if value == "" {
+		return 0, parseError(OutputKindTabID, ParseErrorInvalidField, "stdout", "tab id output is blank", nil)
+	}
+	if containsControl(value) {
+		return 0, parseError(OutputKindTabID, ParseErrorInvalidField, "stdout", "tab id output contains control character", nil)
+	}
+
+	id, err := strconv.Atoi(value)
+	if err != nil {
+		return 0, parseError(OutputKindTabID, ParseErrorInvalidField, "stdout", "tab id must be an integer", err)
+	}
+	if id < 0 {
+		return 0, parseError(OutputKindTabID, ParseErrorInvalidField, "stdout", "tab id must be non-negative", nil)
+	}
+	return id, nil
 }
 
 type Pane struct {

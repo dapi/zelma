@@ -123,6 +123,16 @@ func TestHelpRoutes(t *testing.T) {
 			args:       []string{"sessions", "cleanup", "--help"},
 			wantOutput: []string{"Usage:", "zelma sessions cleanup"},
 		},
+		{
+			name:       "supervisor",
+			args:       []string{"supervisor", "--help"},
+			wantOutput: []string{"COMMAND MAP", "zelma supervisor start-issue", "implemented"},
+		},
+		{
+			name:       "supervisor start issue",
+			args:       []string{"supervisor", "start-issue", "--help"},
+			wantOutput: []string{"Usage:", "zelma supervisor start-issue"},
+		},
 	}
 
 	for _, tt := range tests {
@@ -176,6 +186,16 @@ func TestCommandHelpSnapshots(t *testing.T) {
 			name: "sessions cleanup help",
 			args: []string{"sessions", "cleanup", "--help"},
 			want: sessionsCleanupHelp,
+		},
+		{
+			name: "supervisor help",
+			args: []string{"supervisor", "--help"},
+			want: supervisorHelp,
+		},
+		{
+			name: "supervisor start issue help",
+			args: []string{"supervisor", "start-issue", "--help"},
+			want: supervisorStartIssueHelp,
 		},
 	}
 
@@ -334,6 +354,8 @@ const rootHelpSnapshot = `COMMAND MAP
   zelma sessions detect   Detect existing Codex panes. Status: implemented.
   zelma sessions focus    Focus a known zellij pane by zelma session ID. Status: implemented.
   zelma sessions cleanup  Propose or confirm stale record cleanup. Status: implemented.
+  zelma supervisor help   Show the supervisor command map.
+  zelma supervisor start-issue  Launch and supervise start-issue. Status: implemented.
 
 OUTPUT CONVENTIONS
   help output: stdout, exit 0, plain text.
@@ -350,12 +372,15 @@ OUTPUT CONVENTIONS
   --confirm to remove proposed stale records.
   sessions create --dry-run: stdout, exit 0, launch contract text or JSON.
   sessions create: stdout, exit 0, created/registered/skipped summary.
+  supervisor start-issue: stdout, exit 0, terminal status summary by default
+  or schema v1 supervisor JSON with launch, polling, review and cleanup state.
   machine-readable session data: use "zelma sessions list --json".
 
 RECOVERY HINTS
   unknown command: run "zelma help".
   session inventory task: run "zelma sessions list --json".
   setup task: run "zelma setup" from inside a git repository.
+  issue supervision task: run "zelma supervisor start-issue <issue> --repo owner/name --base main --json".
 
 HUMAN NOTES
   zelma manages Codex sessions in zellij panes. sessions list is the primary

@@ -446,6 +446,99 @@ func TestRunPaneMapsExitZeroSessionNotFoundToCommandFailure(t *testing.T) {
 	}
 }
 
+func TestRunTabRunsExplicitSessionCommandAndReturnsReference(t *testing.T) {
+	var gotArgs []string
+	var gotDeadline bool
+	client := New(WithBinary("fake-zellij"), WithTimeout(time.Minute))
+	client.run = func(ctx context.Context, binary string, args []string) commandResult {
+		_, gotDeadline = ctx.Deadline()
+		if binary != "fake-zellij" {
+			t.Fatalf("binary = %q, want fake-zellij", binary)
+		}
+		gotArgs = append([]string(nil), args...)
+		return commandResult{stdout: []byte("8\n")}
+	}
+
+	got, err := client.RunTab(context.Background(), RunTabRequest{
+		Session: "zelma-main",
+		CWD:     "/workspace/zelma",
+		Name:    "issue-67",
+		Command: []string{"start-issue", "67", "--repo", "dapi/zelma", "--base", "main"},
+	})
+
+	if err != nil {
+		t.Fatalf("RunTab() error = %v, want nil", err)
+	}
+	wantArgs := []string{"--session", "zelma-main", "action", "new-tab", "--cwd", "/workspace/zelma", "--name", "issue-67", "--", "start-issue", "67", "--repo", "dapi/zelma", "--base", "main"}
+	if !reflect.DeepEqual(gotArgs, wantArgs) {
+		t.Fatalf("args = %#v, want %#v", gotArgs, wantArgs)
+	}
+	if !gotDeadline {
+		t.Fatal("runner context has no deadline, want adapter timeout")
+	}
+	if got.Session != "zelma-main" || got.TabID != 8 {
+		t.Fatalf("tab ref = %+v, want session zelma-main and tab 8", got)
+	}
+}
+
+func TestRunTabMapsInvalidTabReferenceOutput(t *testing.T) {
+	client := New()
+	client.run = func(context.Context, string, []string) commandResult {
+		return commandResult{stdout: []byte("tab_1\n")}
+	}
+
+	_, err := client.RunTab(context.Background(), RunTabRequest{
+		Session: "zelma-main",
+		Command: []string{"start-issue", "67"},
+	})
+
+	diagnostic := requireDiagnostic(t, err, ErrorCodeInvalidOutput)
+	if diagnostic.Command != "zellij --session zelma-main action new-tab -- start-issue 67" {
+		t.Fatalf("command = %q, want new-tab command", diagnostic.Command)
+	}
+	if !strings.Contains(err.Error(), "tab id") {
+		t.Fatalf("error = %q, want tab id parse detail", err.Error())
+	}
+}
+
+func TestPaneObservationActionsRunExpectedCommands(t *testing.T) {
+	var gotArgs [][]string
+	client := New(WithBinary("fake-zellij"), WithTimeout(time.Minute))
+	client.run = func(ctx context.Context, binary string, args []string) commandResult {
+		if binary != "fake-zellij" {
+			t.Fatalf("binary = %q, want fake-zellij", binary)
+		}
+		gotArgs = append(gotArgs, append([]string(nil), args...))
+		if args[2] == "action" && args[3] == "dump-screen" {
+			return commandResult{stdout: []byte("screen\n")}
+		}
+		return commandResult{}
+	}
+
+	screen, err := client.DumpScreen(context.Background(), DumpScreenRequest{Session: "zelma-main", PaneID: "terminal_7", Full: true})
+	if err != nil {
+		t.Fatalf("DumpScreen() error = %v, want nil", err)
+	}
+	if screen != "screen\n" {
+		t.Fatalf("screen = %q, want fixture output", screen)
+	}
+	if err := client.WriteChars(context.Background(), WriteCharsRequest{Session: "zelma-main", PaneID: "terminal_7", Chars: "/review\n"}); err != nil {
+		t.Fatalf("WriteChars() error = %v, want nil", err)
+	}
+	if err := client.ClosePane(context.Background(), ClosePaneRequest{Session: "zelma-main", PaneID: "terminal_7"}); err != nil {
+		t.Fatalf("ClosePane() error = %v, want nil", err)
+	}
+
+	wantArgs := [][]string{
+		{"--session", "zelma-main", "action", "dump-screen", "--pane-id", "terminal_7", "--full"},
+		{"--session", "zelma-main", "action", "write-chars", "--pane-id", "terminal_7", "/review\n"},
+		{"--session", "zelma-main", "action", "close-pane", "--pane-id", "terminal_7"},
+	}
+	if !reflect.DeepEqual(gotArgs, wantArgs) {
+		t.Fatalf("args = %#v, want %#v", gotArgs, wantArgs)
+	}
+}
+
 func TestFocusPaneRunsTabThenPaneActions(t *testing.T) {
 	tabID := 6
 	var gotBinary []string

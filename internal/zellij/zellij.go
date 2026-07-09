@@ -19,7 +19,30 @@ type PaneFocuser interface {
 	FocusPane(ctx context.Context, request FocusPaneRequest) error
 }
 
+type TabRunner interface {
+	RunTab(ctx context.Context, request RunTabRequest) (TabRef, error)
+}
+
+type PaneDumper interface {
+	DumpScreen(ctx context.Context, request DumpScreenRequest) (string, error)
+}
+
+type PaneWriter interface {
+	WriteChars(ctx context.Context, request WriteCharsRequest) error
+}
+
+type PaneCloser interface {
+	ClosePane(ctx context.Context, request ClosePaneRequest) error
+}
+
 type RunPaneRequest struct {
+	Session string
+	CWD     string
+	Name    string
+	Command []string
+}
+
+type RunTabRequest struct {
 	Session string
 	CWD     string
 	Name    string
@@ -32,9 +55,31 @@ type FocusPaneRequest struct {
 	PaneID  string
 }
 
+type DumpScreenRequest struct {
+	Session string
+	PaneID  string
+	Full    bool
+}
+
+type WriteCharsRequest struct {
+	Session string
+	PaneID  string
+	Chars   string
+}
+
+type ClosePaneRequest struct {
+	Session string
+	PaneID  string
+}
+
 type PaneRef struct {
 	Session string
 	PaneID  PaneID
+}
+
+type TabRef struct {
+	Session string
+	TabID   int
 }
 
 func (client Client) ListPanes(ctx context.Context, session string) ([]Pane, error) {
@@ -151,6 +196,63 @@ func (client Client) RunPane(ctx context.Context, request RunPaneRequest) (PaneR
 	return PaneRef{Session: request.Session, PaneID: paneID}, nil
 }
 
+func (client Client) RunTab(ctx context.Context, request RunTabRequest) (TabRef, error) {
+	if request.Session == "" {
+		return TabRef{}, &DiagnosticError{
+			Diagnostic: Diagnostic{
+				Code:         ErrorCodeInvalidInput,
+				Command:      "zellij --session <name> action new-tab -- <command>",
+				ExitCode:     -1,
+				Message:      "zellij session name is required",
+				RecoveryHint: "pass an explicit zellij session name before creating a tab; zelma did not write registry state",
+			},
+		}
+	}
+	if len(request.Command) == 0 || request.Command[0] == "" {
+		return TabRef{}, &DiagnosticError{
+			Diagnostic: Diagnostic{
+				Code:         ErrorCodeInvalidInput,
+				Command:      "zellij --session <name> action new-tab -- <command>",
+				ExitCode:     -1,
+				Message:      "command is required",
+				RecoveryHint: "pass an explicit command vector for the new zellij tab; zelma did not write registry state",
+			},
+		}
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	client = client.withDefaults()
+
+	runCtx, cancel := withTimeout(ctx, client.timeout)
+	defer cancel()
+
+	args := runTabArgs(request)
+	result := client.run(runCtx, client.binary, args)
+	command := commandString(client.binary, args)
+	if result.err != nil {
+		return TabRef{}, normalizeRunPaneCommandError(command, result)
+	}
+	if isSessionNotFoundResult(result) {
+		return TabRef{}, normalizeRunPaneSessionNotFoundResult(command, result)
+	}
+
+	tabID, err := ParseTabIDOutput(result.stdout)
+	if err != nil {
+		return TabRef{}, &DiagnosticError{
+			Diagnostic: Diagnostic{
+				Code:         ErrorCodeInvalidOutput,
+				Command:      command,
+				ExitCode:     -1,
+				Message:      fmt.Sprintf("parse new-tab output: %v", err),
+				RecoveryHint: "capture current zellij new-tab output and update adapter fixtures or compatibility rules; zelma did not write registry state",
+			},
+			Err: err,
+		}
+	}
+	return TabRef{Session: request.Session, TabID: tabID}, nil
+}
+
 func (client Client) FocusPane(ctx context.Context, request FocusPaneRequest) error {
 	if request.Session == "" {
 		return &DiagnosticError{
@@ -202,6 +304,140 @@ func (client Client) FocusPane(ctx context.Context, request FocusPaneRequest) er
 	return client.runFocusAction(runCtx, focusPaneArgs(request.Session, request.PaneID))
 }
 
+func (client Client) DumpScreen(ctx context.Context, request DumpScreenRequest) (string, error) {
+	if request.Session == "" {
+		return "", &DiagnosticError{
+			Diagnostic: Diagnostic{
+				Code:         ErrorCodeInvalidInput,
+				Command:      "zellij --session <name> action dump-screen --pane-id <pane_id>",
+				ExitCode:     -1,
+				Message:      "zellij session name is required",
+				RecoveryHint: "pass an explicit zellij session name before dumping a pane screen",
+			},
+		}
+	}
+	if request.PaneID == "" {
+		return "", &DiagnosticError{
+			Diagnostic: Diagnostic{
+				Code:         ErrorCodeInvalidInput,
+				Command:      "zellij --session <name> action dump-screen --pane-id <pane_id>",
+				ExitCode:     -1,
+				Message:      "zellij pane id is required",
+				RecoveryHint: "pass an explicit zellij pane id before dumping a pane screen",
+			},
+		}
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	client = client.withDefaults()
+
+	runCtx, cancel := withTimeout(ctx, client.timeout)
+	defer cancel()
+
+	args := dumpScreenArgs(request)
+	result := client.run(runCtx, client.binary, args)
+	command := commandString(client.binary, args)
+	if result.err != nil {
+		return "", normalizeCommandErrorWithRecovery(
+			command,
+			result,
+			"install zellij or configure the adapter binary path, then verify with zellij --version",
+			"verify the target zellij session and pane still exist, then retry observation",
+		)
+	}
+	if isSessionNotFoundResult(result) {
+		return "", normalizeSessionNotFoundResult(command, result)
+	}
+	return string(result.stdout), nil
+}
+
+func (client Client) WriteChars(ctx context.Context, request WriteCharsRequest) error {
+	if request.Session == "" {
+		return &DiagnosticError{
+			Diagnostic: Diagnostic{
+				Code:         ErrorCodeInvalidInput,
+				Command:      "zellij --session <name> action write-chars --pane-id <pane_id> <chars>",
+				ExitCode:     -1,
+				Message:      "zellij session name is required",
+				RecoveryHint: "pass an explicit zellij session name before writing to a pane",
+			},
+		}
+	}
+	if request.PaneID == "" {
+		return &DiagnosticError{
+			Diagnostic: Diagnostic{
+				Code:         ErrorCodeInvalidInput,
+				Command:      "zellij --session <name> action write-chars --pane-id <pane_id> <chars>",
+				ExitCode:     -1,
+				Message:      "zellij pane id is required",
+				RecoveryHint: "pass an explicit zellij pane id before writing to a pane",
+			},
+		}
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	client = client.withDefaults()
+
+	runCtx, cancel := withTimeout(ctx, client.timeout)
+	defer cancel()
+
+	args := writeCharsArgs(request)
+	result := client.run(runCtx, client.binary, args)
+	command := commandString(client.binary, args)
+	if result.err != nil {
+		return normalizeFocusCommandError(command, result)
+	}
+	if isSessionNotFoundResult(result) {
+		return normalizeFocusSessionNotFoundResult(command, result)
+	}
+	return nil
+}
+
+func (client Client) ClosePane(ctx context.Context, request ClosePaneRequest) error {
+	if request.Session == "" {
+		return &DiagnosticError{
+			Diagnostic: Diagnostic{
+				Code:         ErrorCodeInvalidInput,
+				Command:      "zellij --session <name> action close-pane --pane-id <pane_id>",
+				ExitCode:     -1,
+				Message:      "zellij session name is required",
+				RecoveryHint: "pass an explicit zellij session name before closing a pane",
+			},
+		}
+	}
+	if request.PaneID == "" {
+		return &DiagnosticError{
+			Diagnostic: Diagnostic{
+				Code:         ErrorCodeInvalidInput,
+				Command:      "zellij --session <name> action close-pane --pane-id <pane_id>",
+				ExitCode:     -1,
+				Message:      "zellij pane id is required",
+				RecoveryHint: "pass an explicit zellij pane id before closing a pane",
+			},
+		}
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	client = client.withDefaults()
+
+	runCtx, cancel := withTimeout(ctx, client.timeout)
+	defer cancel()
+
+	args := closePaneArgs(request)
+	result := client.run(runCtx, client.binary, args)
+	command := commandString(client.binary, args)
+	if result.err != nil {
+		return normalizeFocusCommandError(command, result)
+	}
+	if isSessionNotFoundResult(result) {
+		return normalizeFocusSessionNotFoundResult(command, result)
+	}
+	return nil
+}
+
 func (client Client) runFocusAction(ctx context.Context, args []string) error {
 	result := client.run(ctx, client.binary, args)
 	command := commandString(client.binary, args)
@@ -231,12 +467,41 @@ func runPaneArgs(request RunPaneRequest) []string {
 	return args
 }
 
+func runTabArgs(request RunTabRequest) []string {
+	args := []string{"--session", request.Session, "action", "new-tab"}
+	if request.CWD != "" {
+		args = append(args, "--cwd", request.CWD)
+	}
+	if request.Name != "" {
+		args = append(args, "--name", request.Name)
+	}
+	args = append(args, "--")
+	args = append(args, request.Command...)
+	return args
+}
+
 func focusTabArgs(session string, tabID int) []string {
 	return []string{"--session", session, "action", "go-to-tab-by-id", fmt.Sprint(tabID)}
 }
 
 func focusPaneArgs(session, paneID string) []string {
 	return []string{"--session", session, "action", "focus-pane-id", paneID}
+}
+
+func dumpScreenArgs(request DumpScreenRequest) []string {
+	args := []string{"--session", request.Session, "action", "dump-screen", "--pane-id", request.PaneID}
+	if request.Full {
+		args = append(args, "--full")
+	}
+	return args
+}
+
+func writeCharsArgs(request WriteCharsRequest) []string {
+	return []string{"--session", request.Session, "action", "write-chars", "--pane-id", request.PaneID, request.Chars}
+}
+
+func closePaneArgs(request ClosePaneRequest) []string {
+	return []string{"--session", request.Session, "action", "close-pane", "--pane-id", request.PaneID}
 }
 
 func isSessionNotFoundResult(result commandResult) bool {
