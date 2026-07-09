@@ -12,6 +12,7 @@ derived_from:
   - ../features/FT-028/brief.md
   - ../features/FT-029/brief.md
   - ../features/FT-047/brief.md
+  - ../features/FT-035/brief.md
 status: active
 audience: humans_and_agents
 ---
@@ -98,13 +99,27 @@ record only after confirmation. Omit `path` to open the repository root. If
 `path` is present, it must be an existing directory equal to or inside the repo
 root.
 
-The successful JSON summary is:
+The successful JSON object includes the stable create counters plus the
+registered session row returned by the registry upsert. `session` is the
+matching `active` record when one exists for the zellij pane key; otherwise it
+is the matching `candidate` record. Historical `closed` and `stale` records are
+not returned as the create result session.
 
 ```json
 {
   "created": 1,
   "registered": 1,
-  "skipped": 0
+  "skipped": 0,
+  "session": {
+    "id": 1,
+    "zellij_session": "zelma-main",
+    "zellij_tab": "tab_1",
+    "zellij_tab_name": "work",
+    "zellij_pane": "terminal_7",
+    "codex_session": "11111111-1111-4111-8111-111111111111",
+    "opened_path": "/workspace/zelma",
+    "state": "active"
+  }
 }
 ```
 
