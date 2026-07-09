@@ -1062,7 +1062,7 @@ func recoveryDiagnosticForError(command string, err error) recoveryDiagnosticJSO
 		diagnostic.CauseCode = createDiagnostic.CauseCode
 		diagnostic.Message = createDiagnostic.Message
 		diagnostic.Retryable = createDiagnostic.Retryable
-		diagnostic.ManualActionRequired = !createDiagnostic.Retryable
+		diagnostic.ManualActionRequired = manualActionRequiredForCreateDiagnostic(createDiagnostic)
 		diagnostic.RecoveryHint = createDiagnostic.RecoveryHint
 		if !createDiagnostic.Summary.IsZero() {
 			summary := createDiagnostic.Summary
@@ -1126,6 +1126,19 @@ func recoveryDiagnosticForError(command string, err error) recoveryDiagnosticJSO
 		diagnostic.NextCommand = []string{"zelma", "setup"}
 	}
 	return diagnostic
+}
+
+func manualActionRequiredForCreateDiagnostic(diagnostic create.Diagnostic) bool {
+	switch diagnostic.Code {
+	case create.ReasonPaneLaunchFailed:
+		return true
+	case create.ReasonPaneUnconfirmed, create.ReasonConfirmationFailed, create.ReasonRegistryWriteFailed:
+		return true
+	case create.ReasonCodexMissingBinary, create.ReasonCodexInvalidInput, create.ReasonInvalidRequest:
+		return true
+	default:
+		return !diagnostic.Retryable
+	}
 }
 
 func nextCommandForCode(code string) []string {
