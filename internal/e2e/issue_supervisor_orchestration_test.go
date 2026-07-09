@@ -27,7 +27,7 @@ func TestIssueSupervisorStartIssueReviewFixCleanupE2E(t *testing.T) {
 		t,
 		bin,
 		repoRoot,
-		isolatedZelmaEnv(t, fakeZellij),
+		append(isolatedZelmaEnv(t, fakeZellij), "ZELMA_START_ISSUE_ZELLIJ_SURFACE="),
 		"supervisor",
 		"start-issue",
 		"67",

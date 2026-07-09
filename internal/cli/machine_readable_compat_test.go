@@ -52,6 +52,7 @@ func TestMachineReadableOutputCompatibilityExamples(t *testing.T) {
 				root := newTestGitRepo(t)
 				statePath := filepath.Join(t.TempDir(), "supervisor-state")
 				t.Setenv("ZELMA_ZELLIJ_BIN", writeFakeSupervisorZellij(t, statePath))
+				t.Setenv(config.StartIssueSurfaceEnvVar, "")
 				t.Chdir(root)
 				return resolvedPath(t, root)
 			},

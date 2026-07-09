@@ -194,7 +194,7 @@ func StartIssue(ctx context.Context, request Request) (Result, error) {
 
 	var awaitingFix bool
 	var lastPhase string
-	var processedMarkers int
+	var observedMarkers []string
 	nextSnapshotSequence := 1
 	for poll := 1; poll <= maxPolls; poll++ {
 		screen, err := request.Runtime.DumpScreen(ctx, zellij.DumpScreenRequest{
@@ -207,11 +207,8 @@ func StartIssue(ctx context.Context, request Request) (Result, error) {
 		}
 
 		markers := screenMarkers(screen)
-		newMarkers := markers
-		if processedMarkers <= len(markers) {
-			newMarkers = markers[processedMarkers:]
-		}
-		processedMarkers = len(markers)
+		newMarkers := newMarkerEvents(observedMarkers, markers)
+		observedMarkers = append(observedMarkers[:0], markers...)
 		if len(newMarkers) == 0 {
 			newMarkers = []string{""}
 		}
@@ -302,6 +299,20 @@ func StartIssue(ctx context.Context, request Request) (Result, error) {
 	}
 
 	return Result{}, maxPollsFailure(maxPolls)
+}
+
+func newMarkerEvents(previous, current []string) []string {
+	if len(current) == 0 {
+		return nil
+	}
+
+	sharedPrefix := 0
+	for sharedPrefix < len(previous) &&
+		sharedPrefix < len(current) &&
+		previous[sharedPrefix] == current[sharedPrefix] {
+		sharedPrefix++
+	}
+	return current[sharedPrefix:]
 }
 
 func validateRequest(request Request) error {

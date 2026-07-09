@@ -100,6 +100,31 @@ func TestStartIssueProcessesCleanAndMergeFromSameFullDump(t *testing.T) {
 	}
 }
 
+func TestStartIssueProcessesNonAccumulatingMarkers(t *testing.T) {
+	runtime := &fakeRuntime{
+		screens: []string{
+			"ZELMA_SUPERVISOR: implementation_complete\n",
+			"ZELMA_SUPERVISOR: review_findings\n",
+			"ZELMA_SUPERVISOR: fix_complete\n",
+			"ZELMA_SUPERVISOR: review_clean\n",
+			"ZELMA_SUPERVISOR: merge_simulated\n",
+		},
+	}
+
+	got, err := StartIssue(context.Background(), validRequest(runtime))
+
+	if err != nil {
+		t.Fatalf("StartIssue() error = %v, want nil", err)
+	}
+	if got.Status != StatusMergedSimulated || got.Review.Cycles != 2 || got.Review.FindingsFixed != 1 || !got.Review.Clean {
+		t.Fatalf("result = %+v, want non-accumulating markers to reach merge", got)
+	}
+	wantWrites := []string{"/review\n", fixInstruction(67), "/review\n"}
+	if !reflect.DeepEqual(runtime.writes, wantWrites) {
+		t.Fatalf("writes = %#v, want %#v", runtime.writes, wantWrites)
+	}
+}
+
 func TestClassifyScreenUsesLatestRecognizedMarker(t *testing.T) {
 	phase, marker := classifyScreen(`
 ZELMA_SUPERVISOR: implementation_complete
