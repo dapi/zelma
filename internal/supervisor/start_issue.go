@@ -192,11 +192,11 @@ func StartIssue(ctx context.Context, request Request) (Result, error) {
 		Cleanup: CleanupState{Registry: "simulated_no_registry_records"},
 	}
 
-	var initialReviewSent bool
-	var fixRequested bool
-	var rereviewSent bool
+	var awaitingFix bool
 	var lastPhase string
-	for sequence := 1; sequence <= maxPolls; sequence++ {
+	var processedMarkers int
+	nextSnapshotSequence := 1
+	for poll := 1; poll <= maxPolls; poll++ {
 		screen, err := request.Runtime.DumpScreen(ctx, zellij.DumpScreenRequest{
 			Session: launch.ZellijSession,
 			PaneID:  launch.ZellijPane,
@@ -206,80 +206,93 @@ func StartIssue(ctx context.Context, request Request) (Result, error) {
 			return Result{}, err
 		}
 
-		phase, marker := classifyScreen(screen)
-		result.Polling.Snapshots = append(result.Polling.Snapshots, Snapshot{
-			Sequence:       sequence,
-			Phase:          phase,
-			Marker:         marker,
-			ElapsedSeconds: (sequence - 1) * result.Polling.IntervalSeconds,
-		})
-
+		markers := screenMarkers(screen)
+		newMarkers := markers
+		if processedMarkers <= len(markers) {
+			newMarkers = markers[processedMarkers:]
+		}
+		processedMarkers = len(markers)
+		if len(newMarkers) == 0 {
+			newMarkers = []string{""}
+		}
 		actionTaken := false
-		switch phase {
-		case PhaseImplementationComplete:
-			if !initialReviewSent {
-				if result.Review.Cycles >= maxReviews {
-					return Result{}, maxReviewsFailure(maxReviews)
+		for _, marker := range newMarkers {
+			phase := phaseForMarker(marker)
+			result.Polling.Snapshots = append(result.Polling.Snapshots, Snapshot{
+				Sequence:       nextSnapshotSequence,
+				Phase:          phase,
+				Marker:         marker,
+				ElapsedSeconds: (poll - 1) * result.Polling.IntervalSeconds,
+			})
+			nextSnapshotSequence++
+
+			switch phase {
+			case PhaseImplementationComplete:
+				if result.Review.Cycles == 0 {
+					if result.Review.Cycles >= maxReviews {
+						return Result{}, maxReviewsFailure(maxReviews)
+					}
+					if err := request.Runtime.WriteChars(ctx, zellij.WriteCharsRequest{
+						Session: launch.ZellijSession,
+						PaneID:  launch.ZellijPane,
+						Chars:   "/review\n",
+					}); err != nil {
+						return Result{}, err
+					}
+					result.Review.Cycles++
+					actionTaken = true
 				}
-				if err := request.Runtime.WriteChars(ctx, zellij.WriteCharsRequest{
+			case PhaseReviewFindings:
+				if result.Review.Cycles > 0 && !awaitingFix {
+					if err := request.Runtime.WriteChars(ctx, zellij.WriteCharsRequest{
+						Session: launch.ZellijSession,
+						PaneID:  launch.ZellijPane,
+						Chars:   fixInstruction(request.Issue),
+					}); err != nil {
+						return Result{}, err
+					}
+					result.Review.FindingsFixed++
+					result.Review.Clean = false
+					awaitingFix = true
+					actionTaken = true
+				}
+			case PhaseFixComplete:
+				if awaitingFix {
+					if result.Review.Cycles >= maxReviews {
+						return Result{}, maxReviewsFailure(maxReviews)
+					}
+					if err := request.Runtime.WriteChars(ctx, zellij.WriteCharsRequest{
+						Session: launch.ZellijSession,
+						PaneID:  launch.ZellijPane,
+						Chars:   "/review\n",
+					}); err != nil {
+						return Result{}, err
+					}
+					result.Review.Cycles++
+					awaitingFix = false
+					actionTaken = true
+				}
+			case PhaseReviewClean:
+				if result.Review.Cycles > 0 && !awaitingFix {
+					result.Review.Clean = true
+				}
+			case PhaseMergeSimulated:
+				if !result.Review.Clean || result.Review.Cycles < 1 {
+					return Result{}, invalidInputFailure("merge simulation appeared before a clean review")
+				}
+				if err := request.Runtime.ClosePane(ctx, zellij.ClosePaneRequest{
 					Session: launch.ZellijSession,
 					PaneID:  launch.ZellijPane,
-					Chars:   "/review\n",
 				}); err != nil {
 					return Result{}, err
 				}
-				result.Review.Cycles++
-				initialReviewSent = true
-				actionTaken = true
+				result.Cleanup.PaneClosed = true
+				result.Status = StatusMergedSimulated
+				return result, nil
 			}
-		case PhaseReviewFindings:
-			if initialReviewSent && !fixRequested {
-				if err := request.Runtime.WriteChars(ctx, zellij.WriteCharsRequest{
-					Session: launch.ZellijSession,
-					PaneID:  launch.ZellijPane,
-					Chars:   fixInstruction(request.Issue),
-				}); err != nil {
-					return Result{}, err
-				}
-				result.Review.FindingsFixed++
-				fixRequested = true
-				actionTaken = true
-			}
-		case PhaseFixComplete:
-			if fixRequested && !rereviewSent {
-				if result.Review.Cycles >= maxReviews {
-					return Result{}, maxReviewsFailure(maxReviews)
-				}
-				if err := request.Runtime.WriteChars(ctx, zellij.WriteCharsRequest{
-					Session: launch.ZellijSession,
-					PaneID:  launch.ZellijPane,
-					Chars:   "/review\n",
-				}); err != nil {
-					return Result{}, err
-				}
-				result.Review.Cycles++
-				rereviewSent = true
-				actionTaken = true
-			}
-		case PhaseReviewClean:
-			if initialReviewSent || rereviewSent {
-				result.Review.Clean = true
-			}
-		case PhaseMergeSimulated:
-			if !result.Review.Clean || result.Review.Cycles < 1 {
-				return Result{}, invalidInputFailure("merge simulation appeared before a clean review")
-			}
-			if err := request.Runtime.ClosePane(ctx, zellij.ClosePaneRequest{
-				Session: launch.ZellijSession,
-				PaneID:  launch.ZellijPane,
-			}); err != nil {
-				return Result{}, err
-			}
-			result.Cleanup.PaneClosed = true
-			result.Status = StatusMergedSimulated
-			return result, nil
 		}
 
+		phase := phaseForMarker(newMarkers[len(newMarkers)-1])
 		if !actionTaken && phase == lastPhase {
 			if err := sleep(ctx, pollInterval); err != nil {
 				return Result{}, err
@@ -404,7 +417,8 @@ func findStartedPane(ctx context.Context, runtime Runtime, session string, tabID
 	}
 }
 
-func classifyScreen(screen string) (phase, marker string) {
+func screenMarkers(screen string) []string {
+	var markers []string
 	for _, line := range strings.Split(screen, "\n") {
 		value := strings.TrimSpace(line)
 		if !strings.HasPrefix(value, MarkerPrefix) {
@@ -412,22 +426,37 @@ func classifyScreen(screen string) (phase, marker string) {
 		}
 		candidate := strings.TrimSpace(strings.TrimPrefix(value, MarkerPrefix))
 		switch candidate {
-		case MarkerImplementationComplete:
-			phase, marker = PhaseImplementationComplete, candidate
-		case MarkerReviewFindings:
-			phase, marker = PhaseReviewFindings, candidate
-		case MarkerFixComplete:
-			phase, marker = PhaseFixComplete, candidate
-		case MarkerReviewClean:
-			phase, marker = PhaseReviewClean, candidate
-		case MarkerMergeSimulated:
-			phase, marker = PhaseMergeSimulated, candidate
+		case MarkerImplementationComplete, MarkerReviewFindings, MarkerFixComplete, MarkerReviewClean, MarkerMergeSimulated:
+			markers = append(markers, candidate)
 		}
 	}
-	if phase == "" {
+	return markers
+}
+
+func classifyScreen(screen string) (phase, marker string) {
+	markers := screenMarkers(screen)
+	if len(markers) == 0 {
 		return PhaseWorking, ""
 	}
-	return phase, marker
+	marker = markers[len(markers)-1]
+	return phaseForMarker(marker), marker
+}
+
+func phaseForMarker(marker string) string {
+	switch marker {
+	case MarkerImplementationComplete:
+		return PhaseImplementationComplete
+	case MarkerReviewFindings:
+		return PhaseReviewFindings
+	case MarkerFixComplete:
+		return PhaseFixComplete
+	case MarkerReviewClean:
+		return PhaseReviewClean
+	case MarkerMergeSimulated:
+		return PhaseMergeSimulated
+	default:
+		return PhaseWorking
+	}
 }
 
 func fixInstruction(issue int) string {

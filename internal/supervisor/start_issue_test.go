@@ -52,6 +52,54 @@ func TestStartIssueMergesAfterCleanFirstReview(t *testing.T) {
 	}
 }
 
+func TestStartIssueSupportsMultipleReviewFixCycles(t *testing.T) {
+	runtime := &fakeRuntime{
+		screens: []string{
+			"ZELMA_SUPERVISOR: implementation_complete\n",
+			"ZELMA_SUPERVISOR: implementation_complete\nZELMA_SUPERVISOR: review_findings\n",
+			"ZELMA_SUPERVISOR: implementation_complete\nZELMA_SUPERVISOR: review_findings\nZELMA_SUPERVISOR: fix_complete\n",
+			"ZELMA_SUPERVISOR: implementation_complete\nZELMA_SUPERVISOR: review_findings\nZELMA_SUPERVISOR: fix_complete\nZELMA_SUPERVISOR: review_findings\n",
+			"ZELMA_SUPERVISOR: implementation_complete\nZELMA_SUPERVISOR: review_findings\nZELMA_SUPERVISOR: fix_complete\nZELMA_SUPERVISOR: review_findings\nZELMA_SUPERVISOR: fix_complete\n",
+			"ZELMA_SUPERVISOR: implementation_complete\nZELMA_SUPERVISOR: review_findings\nZELMA_SUPERVISOR: fix_complete\nZELMA_SUPERVISOR: review_findings\nZELMA_SUPERVISOR: fix_complete\nZELMA_SUPERVISOR: review_clean\n",
+			"ZELMA_SUPERVISOR: implementation_complete\nZELMA_SUPERVISOR: review_findings\nZELMA_SUPERVISOR: fix_complete\nZELMA_SUPERVISOR: review_findings\nZELMA_SUPERVISOR: fix_complete\nZELMA_SUPERVISOR: review_clean\nZELMA_SUPERVISOR: merge_simulated\n",
+		},
+	}
+
+	got, err := StartIssue(context.Background(), validRequest(runtime))
+
+	if err != nil {
+		t.Fatalf("StartIssue() error = %v, want nil", err)
+	}
+	if got.Review.Cycles != 3 || got.Review.FindingsFixed != 2 || !got.Review.Clean {
+		t.Fatalf("review = %+v, want two fix passes and clean third review", got.Review)
+	}
+	wantWrites := []string{"/review\n", fixInstruction(67), "/review\n", fixInstruction(67), "/review\n"}
+	if !reflect.DeepEqual(runtime.writes, wantWrites) {
+		t.Fatalf("writes = %#v, want %#v", runtime.writes, wantWrites)
+	}
+}
+
+func TestStartIssueProcessesCleanAndMergeFromSameFullDump(t *testing.T) {
+	runtime := &fakeRuntime{
+		screens: []string{
+			"ZELMA_SUPERVISOR: implementation_complete\n",
+			"ZELMA_SUPERVISOR: implementation_complete\nZELMA_SUPERVISOR: review_clean\nZELMA_SUPERVISOR: merge_simulated\n",
+		},
+	}
+
+	got, err := StartIssue(context.Background(), validRequest(runtime))
+
+	if err != nil {
+		t.Fatalf("StartIssue() error = %v, want nil", err)
+	}
+	if got.Status != StatusMergedSimulated || got.Review.Cycles != 1 || !got.Review.Clean || !got.Cleanup.PaneClosed {
+		t.Fatalf("result = %+v, want clean first review and merged cleanup from same poll", got)
+	}
+	if len(got.Polling.Snapshots) != 3 || got.Polling.Snapshots[1].Phase != PhaseReviewClean || got.Polling.Snapshots[2].Phase != PhaseMergeSimulated {
+		t.Fatalf("snapshots = %+v, want ordered clean then merge events", got.Polling.Snapshots)
+	}
+}
+
 func TestClassifyScreenUsesLatestRecognizedMarker(t *testing.T) {
 	phase, marker := classifyScreen(`
 ZELMA_SUPERVISOR: implementation_complete
@@ -62,6 +110,27 @@ ZELMA_SUPERVISOR: fix_complete
 
 	if phase != PhaseFixComplete || marker != MarkerFixComplete {
 		t.Fatalf("classifyScreen() = %q/%q, want latest fix_complete", phase, marker)
+	}
+}
+
+func validRequest(runtime Runtime) Request {
+	return Request{
+		Issue:         67,
+		Repository:    "dapi/zelma",
+		Base:          "main",
+		RepoRoot:      "/workspace/zelma",
+		ZellijSession: "zelma-main",
+		Surface: config.StartIssueSurfaceResolution{
+			Surface: config.StartIssueSurfacePane,
+			Source:  config.StartIssueSurfaceSourceDefault,
+		},
+		PollInterval: time.Second,
+		MaxPolls:     10,
+		MaxReviews:   5,
+		Runtime:      runtime,
+		Sleep: func(context.Context, time.Duration) error {
+			return nil
+		},
 	}
 }
 
