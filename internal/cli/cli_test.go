@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -863,6 +864,66 @@ func TestSessionsCreateJSONSkipsDuplicateWrapperSessionWithoutCurrentCodexBinary
 	}
 }
 
+func TestSessionsCreateJSONSkipsDuplicateLiveCodexPaneWithoutArgvUUID(t *testing.T) {
+	root := newTestGitRepo(t)
+	paneRoot := resolvedPath(t, root)
+	writeRegistryFile(t, root, `{
+  "version": 1,
+  "sessions": [
+    {
+      "id": 4,
+      "zellij_session": "zelma-main",
+      "zellij_tab": "tab_1",
+      "zellij_tab_name": "work",
+      "zellij_pane": "terminal_3",
+      "codex_session": "11111111-1111-4111-8111-111111111111",
+      "opened_path": "`+paneRoot+`",
+      "state": "active"
+    }
+  ]
+}
+`)
+	before := readFile(t, registry.RegistryPath(root))
+	callsPath := filepath.Join(t.TempDir(), "zellij-calls.txt")
+	missingCodex := filepath.Join(t.TempDir(), "missing-codex")
+	t.Setenv("ZELMA_CODEX_BIN", missingCodex)
+	t.Setenv("ZELMA_ZELLIJ_BIN", writeFakeHandoffZellij(t, callsPath, "zelma-main\n", panesJSONWithID(3, paneRoot, "/usr/local/bin/codex --cd "+paneRoot, true)))
+	t.Chdir(root)
+
+	var stdout, stderr bytes.Buffer
+
+	code := Run(context.Background(), []string{"sessions", "create", "--json"}, &stdout, &stderr)
+
+	if code != 0 {
+		t.Fatalf("Run() code = %d, want 0; stderr = %q", code, stderr.String())
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("stderr = %q, want empty", stderr.String())
+	}
+	var got struct {
+		Created    int              `json:"created"`
+		Registered int              `json:"registered"`
+		Skipped    int              `json:"skipped"`
+		Session    registry.Session `json:"session"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &got); err != nil {
+		t.Fatalf("decode create JSON: %v; stdout = %q", err, stdout.String())
+	}
+	if got.Created != 0 || got.Registered != 0 || got.Skipped != 1 {
+		t.Fatalf("summary = %+v, want duplicate guard skipped active Codex pane without argv UUID", got)
+	}
+	if got.Session.ID != 4 || got.Session.ZellijPane != "terminal_3" || got.Session.OpenedPath != paneRoot || got.Session.State != registry.StateActive {
+		t.Fatalf("session = %+v, want existing active session", got.Session)
+	}
+	if after := readFile(t, registry.RegistryPath(root)); after != before {
+		t.Fatalf("registry changed by no-argv-UUID duplicate create guard\nbefore:\n%s\nafter:\n%s", before, after)
+	}
+	calls := readFile(t, callsPath)
+	if strings.Contains(calls, " run ") {
+		t.Fatalf("fake zellij calls = %q, must not launch duplicate no-argv-UUID pane", calls)
+	}
+}
+
 func TestSessionsCreateJSONDoesNotSkipSameCWDNonCodexPane(t *testing.T) {
 	root := newTestGitRepo(t)
 	paneRoot := resolvedPath(t, root)
@@ -919,6 +980,67 @@ func TestSessionsCreateJSONDoesNotSkipSameCWDNonCodexPane(t *testing.T) {
 	calls := readFile(t, callsPath)
 	if !strings.Contains(calls, "--session zelma-main run --cwd "+paneRoot+" --name codex -- "+fakeCodex+" --cd "+paneRoot) {
 		t.Fatalf("fake zellij calls = %q, want create run after rejecting same-CWD non-Codex pane", calls)
+	}
+}
+
+func TestSessionsCreateJSONDoesNotTreatArbitraryUUIDArgAsCodexEvidence(t *testing.T) {
+	root := newTestGitRepo(t)
+	paneRoot := resolvedPath(t, root)
+	writeRegistryFile(t, root, `{
+  "version": 1,
+  "sessions": [
+    {
+      "id": 4,
+      "zellij_session": "zelma-main",
+      "zellij_tab": "tab_1",
+      "zellij_tab_name": "work",
+      "zellij_pane": "terminal_3",
+      "codex_session": "11111111-1111-4111-8111-111111111111",
+      "opened_path": "`+paneRoot+`",
+      "state": "active"
+    }
+  ]
+}
+`)
+	callsPath := filepath.Join(t.TempDir(), "zellij-calls.txt")
+	fakeCodex := writeFakeCodex(t)
+	arbitraryCommand := "/bin/zsh -lc echo 11111111-1111-4111-8111-111111111111"
+	panesJSON := reusedPaneKeyPanesJSON(t, paneRoot, fakeCodex+" --cd "+paneRoot, paneRoot)
+	panesJSON = strings.Replace(panesJSON, `"pane_command": "/bin/zsh"`, `"pane_command": `+strconv.Quote(arbitraryCommand), 1)
+	t.Setenv("ZELMA_CODEX_BIN", fakeCodex)
+	t.Setenv("ZELMA_ZELLIJ_BIN", writeFakeHandoffCreateZellij(t, callsPath, panesJSON, "terminal_7"))
+	t.Chdir(root)
+
+	var stdout, stderr bytes.Buffer
+
+	code := Run(context.Background(), []string{"sessions", "create", "--json"}, &stdout, &stderr)
+
+	if code != 0 {
+		t.Fatalf("Run() code = %d, want 0; stderr = %q", code, stderr.String())
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("stderr = %q, want empty", stderr.String())
+	}
+	var got struct {
+		Created    int              `json:"created"`
+		Registered int              `json:"registered"`
+		Skipped    int              `json:"skipped"`
+		Session    registry.Session `json:"session"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &got); err != nil {
+		t.Fatalf("decode create JSON: %v; stdout = %q", err, stdout.String())
+	}
+	if got.Created != 1 || got.Registered != 1 || got.Skipped != 0 {
+		t.Fatalf("summary = %+v, want new create after rejecting arbitrary UUID arg", got)
+	}
+	if got.Session.ZellijPane != "terminal_7" ||
+		got.Session.OpenedPath != paneRoot ||
+		got.Session.State != registry.StateCandidate {
+		t.Fatalf("session = %+v, want newly registered terminal_7 candidate", got.Session)
+	}
+	calls := readFile(t, callsPath)
+	if !strings.Contains(calls, "--session zelma-main run --cwd "+paneRoot+" --name codex -- "+fakeCodex+" --cd "+paneRoot) {
+		t.Fatalf("fake zellij calls = %q, want create run after rejecting arbitrary UUID arg", calls)
 	}
 }
 

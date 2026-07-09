@@ -27,6 +27,13 @@ func FindCommandSessionEvidence(command string) SessionEvidenceResult {
 	return insufficient("Codex command does not contain resume UUID or external session UUID")
 }
 
+func FindExternalCommandSessionEvidence(command string) SessionEvidenceResult {
+	if sessionID := externalSessionUUID(command); sessionID != "" {
+		return commandEvidence(sessionID, CodexSessionRefSourceArgvExternalSessionUUID)
+	}
+	return insufficient("command does not contain external session UUID")
+}
+
 func CodexCommandEntrypoint(command string) string {
 	entrypoint, _, ok := CodexCommandEntrypointAndArgs(command)
 	if !ok {

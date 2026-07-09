@@ -585,26 +585,30 @@ func livePaneCommandMatchesActiveSession(command *string, codexSession string) b
 	if command == nil || strings.TrimSpace(*command) == "" {
 		return false
 	}
+	hasCodexEntrypoint := detection.CodexCommandEntrypoint(*command) != ""
 	commandSession := codexSessionFromLivePaneCommand(*command)
 	if codexSession != "" {
 		if commandSession != "" {
 			return commandSession == codexSession
 		}
-		return commandContainsCodexSession(*command, codexSession)
+		if externalSession := externalSessionFromLivePaneCommand(*command); externalSession != "" {
+			return externalSession == codexSession
+		}
+		return hasCodexEntrypoint
 	}
-	return commandSession != "" || detection.CodexCommandEntrypoint(*command) != ""
-}
-
-func commandContainsCodexSession(command, codexSession string) bool {
-	codexSession = strings.ToLower(strings.TrimSpace(codexSession))
-	if codexSession == "" {
-		return false
-	}
-	return strings.Contains(strings.ToLower(command), codexSession)
+	return commandSession != "" || hasCodexEntrypoint
 }
 
 func codexSessionFromLivePaneCommand(command string) string {
 	evidence := codex.FindCommandSessionEvidence(command)
+	if evidence.Verdict != codex.SessionEvidenceResolved || evidence.Ref == nil {
+		return ""
+	}
+	return evidence.Ref.SessionID
+}
+
+func externalSessionFromLivePaneCommand(command string) string {
+	evidence := codex.FindExternalCommandSessionEvidence(command)
 	if evidence.Verdict != codex.SessionEvidenceResolved || evidence.Ref == nil {
 		return ""
 	}
