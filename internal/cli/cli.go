@@ -434,7 +434,7 @@ func newSessionsCreateCommand(stdout io.Writer) *cobra.Command {
 				if err != nil {
 					return err
 				}
-				existingSession, exists, err := findLiveActiveSessionForOpenedPath(cmd.Context(), current, openedPath, client)
+				existingSession, exists, err := findLiveActiveSessionForOpenedPath(cmd.Context(), current, openedPath, os.Getenv("ZELMA_CODEX_BIN"), client)
 				if err != nil {
 					return fmt.Errorf("%s: %w", cmd.CommandPath(), err)
 				}
@@ -511,7 +511,7 @@ func newSessionsCreateCommand(stdout io.Writer) *cobra.Command {
 	return cmd
 }
 
-func findLiveActiveSessionForOpenedPath(ctx context.Context, reg registry.Registry, openedPath string, client live.Inventory) (registry.Session, bool, error) {
+func findLiveActiveSessionForOpenedPath(ctx context.Context, reg registry.Registry, openedPath, configuredCodexBinary string, client live.Inventory) (registry.Session, bool, error) {
 	var matches []registry.Session
 	for _, session := range reg.Sessions {
 		if session.State != registry.StateActive {
@@ -553,7 +553,7 @@ func findLiveActiveSessionForOpenedPath(ctx context.Context, reg registry.Regist
 			if pane.ID.String() != session.ZellijPane {
 				continue
 			}
-			if livePaneMatchesActiveSession(session, pane, openedPath) {
+			if livePaneMatchesActiveSession(session, pane, openedPath, configuredCodexBinary) {
 				return session, true, nil
 			}
 		}
@@ -561,14 +561,14 @@ func findLiveActiveSessionForOpenedPath(ctx context.Context, reg registry.Regist
 	return registry.Session{}, false, nil
 }
 
-func livePaneMatchesActiveSession(session registry.Session, pane zellij.Pane, openedPath string) bool {
+func livePaneMatchesActiveSession(session registry.Session, pane zellij.Pane, openedPath, configuredCodexBinary string) bool {
 	if pane.ID.Kind != zellij.PaneKindTerminal || pane.Exited {
 		return false
 	}
 	if normalizedLivePaneCWD(pane.PaneCWD) != openedPath {
 		return false
 	}
-	if !livePaneCommandMatchesActiveSession(pane.PaneCommand, session.CodexSession) {
+	if !livePaneCommandMatchesActiveSession(pane.PaneCommand, session.CodexSession, configuredCodexBinary) {
 		return false
 	}
 	return true
@@ -581,11 +581,12 @@ func normalizedLivePaneCWD(cwd *string) string {
 	return filepath.Clean(*cwd)
 }
 
-func livePaneCommandMatchesActiveSession(command *string, codexSession string) bool {
+func livePaneCommandMatchesActiveSession(command *string, codexSession, configuredCodexBinary string) bool {
 	if command == nil || strings.TrimSpace(*command) == "" {
 		return false
 	}
-	hasCodexEntrypoint := detection.CodexCommandEntrypoint(*command) != ""
+	hasCodexLaunchEvidence := detection.CodexCommandEntrypoint(*command) != "" ||
+		livePaneCommandMatchesConfiguredBinary(*command, configuredCodexBinary)
 	commandSession := codexSessionFromLivePaneCommand(*command)
 	if codexSession != "" {
 		if commandSession != "" {
@@ -594,9 +595,26 @@ func livePaneCommandMatchesActiveSession(command *string, codexSession string) b
 		if externalSession := externalSessionFromLivePaneCommand(*command); externalSession != "" {
 			return externalSession == codexSession
 		}
-		return hasCodexEntrypoint
+		return hasCodexLaunchEvidence
 	}
-	return commandSession != "" || hasCodexEntrypoint
+	return commandSession != "" || hasCodexLaunchEvidence
+}
+
+func livePaneCommandMatchesConfiguredBinary(command, configuredCodexBinary string) bool {
+	if strings.TrimSpace(configuredCodexBinary) == "" {
+		return false
+	}
+	executable := detection.CommandExecutable(command)
+	if executable == "" {
+		return false
+	}
+	if executable == configuredCodexBinary {
+		return true
+	}
+	if filepath.IsAbs(executable) && filepath.IsAbs(configuredCodexBinary) {
+		return filepath.Clean(executable) == filepath.Clean(configuredCodexBinary)
+	}
+	return filepath.Base(executable) == filepath.Base(configuredCodexBinary)
 }
 
 func codexSessionFromLivePaneCommand(command string) string {

@@ -864,6 +864,66 @@ func TestSessionsCreateJSONSkipsDuplicateWrapperSessionWithoutCurrentCodexBinary
 	}
 }
 
+func TestSessionsCreateJSONSkipsDuplicateConfiguredWrapperWithoutArgvUUID(t *testing.T) {
+	root := newTestGitRepo(t)
+	paneRoot := resolvedPath(t, root)
+	writeRegistryFile(t, root, `{
+  "version": 1,
+  "sessions": [
+    {
+      "id": 4,
+      "zellij_session": "zelma-main",
+      "zellij_tab": "tab_1",
+      "zellij_tab_name": "work",
+      "zellij_pane": "terminal_3",
+      "codex_session": "11111111-1111-4111-8111-111111111111",
+      "opened_path": "`+paneRoot+`",
+      "state": "active"
+    }
+  ]
+}
+`)
+	before := readFile(t, registry.RegistryPath(root))
+	callsPath := filepath.Join(t.TempDir(), "zellij-calls.txt")
+	wrapperCommand := "/opt/tools/codex-wrapper --cd " + paneRoot
+	t.Setenv("ZELMA_CODEX_BIN", "/opt/tools/codex-wrapper")
+	t.Setenv("ZELMA_ZELLIJ_BIN", writeFakeHandoffZellij(t, callsPath, "zelma-main\n", panesJSONWithID(3, paneRoot, wrapperCommand, true)))
+	t.Chdir(root)
+
+	var stdout, stderr bytes.Buffer
+
+	code := Run(context.Background(), []string{"sessions", "create", "--json"}, &stdout, &stderr)
+
+	if code != 0 {
+		t.Fatalf("Run() code = %d, want 0; stderr = %q", code, stderr.String())
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("stderr = %q, want empty", stderr.String())
+	}
+	var got struct {
+		Created    int              `json:"created"`
+		Registered int              `json:"registered"`
+		Skipped    int              `json:"skipped"`
+		Session    registry.Session `json:"session"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &got); err != nil {
+		t.Fatalf("decode create JSON: %v; stdout = %q", err, stdout.String())
+	}
+	if got.Created != 0 || got.Registered != 0 || got.Skipped != 1 {
+		t.Fatalf("summary = %+v, want configured wrapper duplicate guard skipped create", got)
+	}
+	if got.Session.ID != 4 || got.Session.ZellijPane != "terminal_3" || got.Session.OpenedPath != paneRoot || got.Session.State != registry.StateActive {
+		t.Fatalf("session = %+v, want existing configured wrapper active session", got.Session)
+	}
+	if after := readFile(t, registry.RegistryPath(root)); after != before {
+		t.Fatalf("registry changed by configured wrapper duplicate create guard\nbefore:\n%s\nafter:\n%s", before, after)
+	}
+	calls := readFile(t, callsPath)
+	if strings.Contains(calls, " run ") {
+		t.Fatalf("fake zellij calls = %q, must not launch duplicate configured wrapper pane", calls)
+	}
+}
+
 func TestSessionsCreateJSONSkipsDuplicateLiveCodexPaneWithoutArgvUUID(t *testing.T) {
 	root := newTestGitRepo(t)
 	paneRoot := resolvedPath(t, root)
