@@ -21,6 +21,7 @@ import (
 	"github.com/dapi/zelma/internal/registry"
 	"github.com/dapi/zelma/internal/repo"
 	"github.com/dapi/zelma/internal/setup"
+	statusbackend "github.com/dapi/zelma/internal/status"
 	"github.com/dapi/zelma/internal/supervisor"
 	"github.com/dapi/zelma/internal/zellij"
 	"github.com/spf13/cobra"
@@ -72,6 +73,7 @@ func NewRootCommand(stdout, stderr io.Writer) *cobra.Command {
 	root.CompletionOptions.DisableDefaultCmd = true
 
 	root.AddCommand(newSetupCommand(stdout))
+	root.AddCommand(newStatusCommand(stdout))
 
 	supervisorCommand := &cobra.Command{
 		Use:   "supervisor",
@@ -108,6 +110,8 @@ func renderHelp(cmd *cobra.Command, args []string) {
 		fmt.Fprint(cmd.OutOrStdout(), rootHelp)
 	case "zelma setup":
 		fmt.Fprint(cmd.OutOrStdout(), setupHelp)
+	case "zelma status":
+		fmt.Fprint(cmd.OutOrStdout(), statusHelp)
 	case "zelma sessions":
 		fmt.Fprint(cmd.OutOrStdout(), sessionsHelp)
 	case "zelma sessions list":
@@ -134,6 +138,7 @@ func renderHelp(cmd *cobra.Command, args []string) {
 const rootHelp = `COMMAND MAP
   zelma help              Show this command map.
   zelma setup             Add .zelma to this repository .gitignore. Status: implemented.
+  zelma status            Print dashboard status snapshot. Status: implemented.
   zelma sessions help     Show the sessions command map.
   zelma sessions list     List known zelma sessions. Status: implemented.
   zelma sessions create   Create and register a confirmed Codex pane. Status: implemented.
@@ -158,6 +163,7 @@ OUTPUT CONVENTIONS
   --confirm to remove proposed stale records.
   sessions create --dry-run: stdout, exit 0, launch contract text or JSON.
   sessions create: stdout, exit 0, created/registered/skipped summary.
+  status: stdout, exit 0, schema v1 dashboard snapshot JSON.
   supervisor start-issue: stdout, exit 0, terminal status summary by default
   or schema v1 supervisor JSON with launch, polling, review and cleanup state.
   machine-readable session data: use "zelma sessions list --json".
@@ -165,6 +171,7 @@ OUTPUT CONVENTIONS
 RECOVERY HINTS
   unknown command: run "zelma help".
   session inventory task: run "zelma sessions list --json".
+  dashboard task: run "zelma status --json".
   setup task: run "zelma setup" from inside a git repository.
   issue supervision task: run "zelma supervisor start-issue <issue> --repo owner/name --base main --json".
 
@@ -172,7 +179,8 @@ HUMAN NOTES
   zelma manages Codex sessions in zellij panes. sessions list is the primary
   inventory command and auto-detects fresh-enough manual panes before rendering
   the repository-local registry. setup creates .zelma and configures
-  repository-local ignore rules.
+  repository-local ignore rules. status is the dashboard/backend snapshot
+  command and does not mutate the sessions registry.
 
 Usage:
   zelma [command]
@@ -200,6 +208,22 @@ HUMAN NOTES
 
 Usage:
   zelma setup [--json]
+`
+
+const statusHelp = `Usage:
+  zelma status --json
+
+Status:
+  implemented: emits a versioned dashboard status snapshot over zelma sessions.
+
+Output:
+  --json: schema v1 status snapshot with summary, session status, live status
+  and recovery hints. The command does not mutate .zelma/sessions.json.
+
+Notes:
+  The backend reads the sessions registry and attempts live zellij reconciliation.
+  If zellij is unavailable, the command still returns a degraded snapshot with
+  recovery hints for dashboard and agent automation.
 `
 
 const sessionsHelp = `COMMAND MAP
@@ -428,6 +452,34 @@ func newSetupCommand(stdout io.Writer) *cobra.Command {
 		},
 	}
 	cmd.Flags().BoolVar(&jsonOutput, "json", false, "Print setup result JSON.")
+	return cmd
+}
+
+func newStatusCommand(stdout io.Writer) *cobra.Command {
+	var jsonOutput bool
+
+	cmd := &cobra.Command{
+		Use:   "status",
+		Short: "Print dashboard status snapshot.",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if !jsonOutput {
+				return commandFailure(cmd.CommandPath(), errors.New("status output is currently available only with --json"), jsonOutput)
+			}
+			root, err := repo.ResolveRoot("")
+			if err != nil {
+				return commandFailure(cmd.CommandPath(), errors.New(repo.Diagnostic(cmd.CommandPath(), err)), jsonOutput)
+			}
+			reg, err := readRegistryForRoot(cmd.CommandPath(), root.Path)
+			if err != nil {
+				return commandFailure(cmd.CommandPath(), err, jsonOutput)
+			}
+			client := zellij.New(zellij.WithBinary(os.Getenv("ZELMA_ZELLIJ_BIN")))
+			snapshot := statusbackend.Build(cmd.Context(), reg, client)
+			return writeStatusSnapshotJSON(stdout, snapshot)
+		},
+	}
+	cmd.Flags().BoolVar(&jsonOutput, "json", false, "Print schema v1 dashboard status snapshot JSON.")
 	return cmd
 }
 
@@ -1182,6 +1234,15 @@ func writeLiveSessionsJSON(stdout io.Writer, reg live.Registry) error {
 	data, err := json.MarshalIndent(reg, "", "  ")
 	if err != nil {
 		return fmt.Errorf("encode live sessions JSON: %w", err)
+	}
+	_, err = fmt.Fprintf(stdout, "%s\n", data)
+	return err
+}
+
+func writeStatusSnapshotJSON(stdout io.Writer, snapshot statusbackend.Snapshot) error {
+	data, err := json.MarshalIndent(snapshot, "", "  ")
+	if err != nil {
+		return fmt.Errorf("encode status snapshot JSON: %w", err)
 	}
 	_, err = fmt.Fprintf(stdout, "%s\n", data)
 	return err

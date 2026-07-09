@@ -5,8 +5,8 @@ doc_function: canonical
 purpose: "Канонический brief для milestone-2 status backend поверх zelma-сессий."
 derived_from:
   - ../../use-cases/UC-010-agent-dashboard-status-backend.md
-status: draft
-delivery_status: planned
+status: active
+delivery_status: implemented
 milestone: milestone-2
 audience: humans_and_agents
 must_not_define:
@@ -24,7 +24,9 @@ Dashboard и внешние agent UI не должны зависеть от в�
 
 ### Результат
 
-В milestone-2 появляется status backend/command, который агрегирует registry, live zellij state, task metadata и recovery hints в один machine-readable snapshot.
+В milestone-2 появляется `zelma status --json`, который агрегирует registry,
+live zellij state и recovery hints в один machine-readable snapshot. Task
+metadata остается future input, а текущая реализация не меняет registry states.
 
 ### Объем Работ
 

@@ -99,6 +99,11 @@ func TestHelpRoutes(t *testing.T) {
 			wantOutput: []string{"COMMAND MAP", "STATUS", "OUTPUT CONVENTIONS", "RECOVERY HINTS", "zelma setup", "implemented"},
 		},
 		{
+			name:       "status",
+			args:       []string{"status", "--help"},
+			wantOutput: []string{"Usage:", "zelma status --json"},
+		},
+		{
 			name:       "sessions list",
 			args:       []string{"sessions", "list", "--help"},
 			wantOutput: []string{"Usage:", "zelma sessions list"},
@@ -166,6 +171,11 @@ func TestCommandHelpSnapshots(t *testing.T) {
 			name: "sessions list help",
 			args: []string{"sessions", "list", "--help"},
 			want: sessionsListHelp,
+		},
+		{
+			name: "status help",
+			args: []string{"status", "--help"},
+			want: statusHelp,
 		},
 		{
 			name: "sessions create help",
@@ -348,6 +358,7 @@ func assertBefore(t *testing.T, output, first, second string) {
 const rootHelpSnapshot = `COMMAND MAP
   zelma help              Show this command map.
   zelma setup             Add .zelma to this repository .gitignore. Status: implemented.
+  zelma status            Print dashboard status snapshot. Status: implemented.
   zelma sessions help     Show the sessions command map.
   zelma sessions list     List known zelma sessions. Status: implemented.
   zelma sessions create   Create and register a confirmed Codex pane. Status: implemented.
@@ -372,6 +383,7 @@ OUTPUT CONVENTIONS
   --confirm to remove proposed stale records.
   sessions create --dry-run: stdout, exit 0, launch contract text or JSON.
   sessions create: stdout, exit 0, created/registered/skipped summary.
+  status: stdout, exit 0, schema v1 dashboard snapshot JSON.
   supervisor start-issue: stdout, exit 0, terminal status summary by default
   or schema v1 supervisor JSON with launch, polling, review and cleanup state.
   machine-readable session data: use "zelma sessions list --json".
@@ -379,6 +391,7 @@ OUTPUT CONVENTIONS
 RECOVERY HINTS
   unknown command: run "zelma help".
   session inventory task: run "zelma sessions list --json".
+  dashboard task: run "zelma status --json".
   setup task: run "zelma setup" from inside a git repository.
   issue supervision task: run "zelma supervisor start-issue <issue> --repo owner/name --base main --json".
 
@@ -386,7 +399,8 @@ HUMAN NOTES
   zelma manages Codex sessions in zellij panes. sessions list is the primary
   inventory command and auto-detects fresh-enough manual panes before rendering
   the repository-local registry. setup creates .zelma and configures
-  repository-local ignore rules.
+  repository-local ignore rules. status is the dashboard/backend snapshot
+  command and does not mutate the sessions registry.
 
 Usage:
   zelma [command]
@@ -2041,6 +2055,87 @@ func TestSessionsListLiveJSONOutput(t *testing.T) {
       "opened_path": %q,
       "state": "candidate",
       "live_status": "unreachable"
+    }
+  ]
+}
+`, paneRoot, paneRoot)
+	if stdout.String() != want {
+		t.Fatalf("stdout mismatch\nwant:\n%s\ngot:\n%s", want, stdout.String())
+	}
+}
+
+func TestStatusJSONOutput(t *testing.T) {
+	root := newTestGitRepo(t)
+	paneRoot := resolvedPath(t, root)
+	writeRegistryFile(t, root, fmt.Sprintf(`{
+  "version": 1,
+  "sessions": [
+    {
+      "id": 1,
+      "zellij_session": "zelma-main",
+      "zellij_pane": "terminal_1",
+      "codex_session": "codex-live",
+      "opened_path": %q,
+      "state": "active"
+    },
+    {
+      "id": 2,
+      "zellij_session": "zelma-main",
+      "zellij_pane": "terminal_9",
+      "codex_session": "codex-stale",
+      "opened_path": %q,
+      "state": "stale"
+    }
+  ]
+}
+`, paneRoot, paneRoot))
+	t.Setenv("ZELMA_ZELLIJ_BIN", writeFakeZellij(t, panesJSON(paneRoot, true)))
+	t.Chdir(root)
+
+	var stdout, stderr bytes.Buffer
+
+	code := Run(context.Background(), []string{"status", "--json"}, &stdout, &stderr)
+
+	if code != 0 {
+		t.Fatalf("Run() code = %d, want 0; stderr = %q", code, stderr.String())
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("stderr = %q, want empty", stderr.String())
+	}
+	want := fmt.Sprintf(`{
+  "version": 1,
+  "degraded": false,
+  "summary": {
+    "total": 2,
+    "active": 1,
+    "stale": 1,
+    "blocked": 0,
+    "completed": 0,
+    "live": 1,
+    "unreachable": 1,
+    "unknown": 0
+  },
+  "sessions": [
+    {
+      "id": 1,
+      "state": "active",
+      "dashboard_status": "active",
+      "live_status": "live",
+      "zellij_session": "zelma-main",
+      "zellij_pane": "terminal_1",
+      "codex_session": "codex-live",
+      "opened_path": %q
+    },
+    {
+      "id": 2,
+      "state": "stale",
+      "dashboard_status": "stale",
+      "live_status": "unreachable",
+      "zellij_session": "zelma-main",
+      "zellij_pane": "terminal_9",
+      "codex_session": "codex-stale",
+      "opened_path": %q,
+      "recovery_hint": "inspect zellij session and pane reachability; run zelma sessions detect or cleanup to reconcile stale records"
     }
   ]
 }

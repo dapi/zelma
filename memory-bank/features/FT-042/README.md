@@ -6,7 +6,7 @@ purpose: "Навигация по milestone-2 package фичи для status bac
 derived_from:
   - ../../use-cases/UC-010-agent-dashboard-status-backend.md
   - brief.md
-status: draft
+status: active
 audience: humans_and_agents
 ---
 
