@@ -23,6 +23,7 @@ import (
 	"github.com/dapi/zelma/internal/setup"
 	"github.com/dapi/zelma/internal/zellij"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 )
 
 var paneProcessEvidenceResolverFactory = func() codex.PaneProcessEvidenceResolver {
@@ -35,6 +36,19 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	root := NewRootCommand(stdout, stderr)
 	root.SetArgs(args)
 	if err := root.ExecuteContext(ctx); err != nil {
+		var jsonErr *jsonCommandDiagnosticError
+		if errors.As(err, &jsonErr) {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+		if command, ok := jsonFallbackCommandForArgs(root, args); ok {
+			if isCobraValidationError(err) {
+				fmt.Fprintln(stderr, jsonArgumentFailure(command.CommandPath(), err))
+				return 1
+			}
+			fmt.Fprintln(stderr, commandFailure(command.CommandPath(), err, true))
+			return 1
+		}
 		fmt.Fprintln(stderr, err)
 		return 1
 	}
@@ -331,9 +345,9 @@ func newSetupCommand(stdout io.Writer) *cobra.Command {
 			if err != nil {
 				var gitignoreErr *setup.GitignoreError
 				if errors.As(err, &gitignoreErr) {
-					return fmt.Errorf("%s: failed to configure .gitignore: %w", cmd.CommandPath(), err)
+					return commandFailure(cmd.CommandPath(), fmt.Errorf("%s: failed to configure .gitignore: %w", cmd.CommandPath(), err), jsonOutput)
 				}
-				return errors.New(repo.Diagnostic(cmd.CommandPath(), err))
+				return commandFailure(cmd.CommandPath(), errors.New(repo.Diagnostic(cmd.CommandPath(), err)), jsonOutput)
 			}
 			if jsonOutput {
 				return writeSetupJSON(stdout, result)
@@ -363,17 +377,17 @@ func newSessionsListCommand(stdout io.Writer) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			root, err := repo.ResolveRoot("")
 			if err != nil {
-				return errors.New(repo.Diagnostic(cmd.CommandPath(), err))
+				return commandFailure(cmd.CommandPath(), errors.New(repo.Diagnostic(cmd.CommandPath(), err)), jsonOutput)
 			}
 			if !noDetect {
 				if err := ensureAutoDetectFresh(cmd.Context(), cmd.CommandPath(), root.Path); err != nil {
-					return err
+					return commandFailure(cmd.CommandPath(), err, jsonOutput)
 				}
 			}
 
 			reg, err := readRegistryForRoot(cmd.CommandPath(), root.Path)
 			if err != nil {
-				return err
+				return commandFailure(cmd.CommandPath(), err, jsonOutput)
 			}
 			if liveOutput {
 				client := zellij.New(zellij.WithBinary(os.Getenv("ZELMA_ZELLIJ_BIN")))
@@ -382,7 +396,7 @@ func newSessionsListCommand(stdout io.Writer) *cobra.Command {
 				}
 				liveReg, err := live.Reconcile(cmd.Context(), reg, client)
 				if err != nil {
-					return fmt.Errorf("%s: %w", cmd.CommandPath(), err)
+					return commandFailure(cmd.CommandPath(), fmt.Errorf("%s: %w", cmd.CommandPath(), err), jsonOutput)
 				}
 				if jsonOutput {
 					return writeLiveSessionsJSON(stdout, liveReg)
@@ -416,7 +430,7 @@ func newSessionsCreateCommand(stdout io.Writer) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			root, err := repo.ResolveRoot("")
 			if err != nil {
-				return errors.New(repo.Diagnostic(cmd.CommandPath(), err))
+				return commandFailure(cmd.CommandPath(), errors.New(repo.Diagnostic(cmd.CommandPath(), err)), jsonOutput)
 			}
 
 			requestedPath := ""
@@ -425,7 +439,7 @@ func newSessionsCreateCommand(stdout io.Writer) *cobra.Command {
 			}
 			openedPath, err := codex.ResolveOpenedPath(root.Path, requestedPath)
 			if err != nil {
-				return fmt.Errorf("%s: %w", cmd.CommandPath(), create.PreflightFailure(err))
+				return commandFailure(cmd.CommandPath(), create.PreflightFailure(err), jsonOutput)
 			}
 
 			contract, err := codex.PrepareLaunchContract(codex.LaunchRequest{
@@ -433,7 +447,7 @@ func newSessionsCreateCommand(stdout io.Writer) *cobra.Command {
 				OpenedPath: openedPath,
 			})
 			if err != nil {
-				return fmt.Errorf("%s: %w", cmd.CommandPath(), create.PreflightFailure(err))
+				return commandFailure(cmd.CommandPath(), create.PreflightFailure(err), jsonOutput)
 			}
 
 			if dryRun {
@@ -457,7 +471,7 @@ func newSessionsCreateCommand(stdout io.Writer) *cobra.Command {
 				Contract:      contract,
 			}, client)
 			if err != nil {
-				return fmt.Errorf("%s: %w", cmd.CommandPath(), err)
+				return commandFailure(cmd.CommandPath(), err, jsonOutput)
 			}
 
 			summary := result.Summary
@@ -474,7 +488,7 @@ func newSessionsCreateCommand(stdout io.Writer) *cobra.Command {
 					return next, nil
 				})
 				if err != nil {
-					return fmt.Errorf("%s: %w", cmd.CommandPath(), create.RegistryWriteFailure(summary, path, err))
+					return commandFailure(cmd.CommandPath(), create.RegistryWriteFailure(summary, path, err), jsonOutput)
 				}
 				summary.Registered = upsertSummary.Added + upsertSummary.Unchanged
 				summary.Skipped += upsertSummary.Skipped
@@ -503,13 +517,13 @@ func newSessionsDetectCommand(stdout io.Writer) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			root, err := repo.ResolveRoot("")
 			if err != nil {
-				return errors.New(repo.Diagnostic(cmd.CommandPath(), err))
+				return commandFailure(cmd.CommandPath(), errors.New(repo.Diagnostic(cmd.CommandPath(), err)), jsonOutput)
 			}
 
 			client := zellij.New(zellij.WithBinary(os.Getenv("ZELMA_ZELLIJ_BIN")))
 			summary, staleCandidates, explanations, err := detectIntoRegistry(cmd.Context(), cmd.CommandPath(), root.Path, client)
 			if err != nil {
-				return err
+				return commandFailure(cmd.CommandPath(), err, jsonOutput)
 			}
 
 			if jsonOutput {
@@ -593,21 +607,21 @@ func newSessionsFocusCommand(stdout io.Writer) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			id, err := parseSessionIDArg(args[0])
 			if err != nil {
-				return fmt.Errorf("%s: %w", cmd.CommandPath(), err)
+				return commandFailure(cmd.CommandPath(), err, jsonOutput)
 			}
 
 			reg, err := readCurrentRegistry(cmd.CommandPath())
 			if err != nil {
-				return err
+				return commandFailure(cmd.CommandPath(), err, jsonOutput)
 			}
 			session, ok := findSessionByID(reg, id)
 			if !ok {
-				return fmt.Errorf("%s: session id %d not found; run zelma sessions list", cmd.CommandPath(), id)
+				return commandFailure(cmd.CommandPath(), fmt.Errorf("session id %d not found; run zelma sessions list", id), jsonOutput)
 			}
 
 			tabID, hasTab, err := parseZellijTabRef(session.ZellijTab)
 			if err != nil {
-				return fmt.Errorf("%s: %w", cmd.CommandPath(), err)
+				return commandFailure(cmd.CommandPath(), err, jsonOutput)
 			}
 			request := zellij.FocusPaneRequest{
 				Session: session.ZellijSession,
@@ -619,7 +633,7 @@ func newSessionsFocusCommand(stdout io.Writer) *cobra.Command {
 
 			client := zellij.New(zellij.WithBinary(os.Getenv("ZELMA_ZELLIJ_BIN")))
 			if err := client.FocusPane(cmd.Context(), request); err != nil {
-				return fmt.Errorf("%s: %w", cmd.CommandPath(), err)
+				return commandFailure(cmd.CommandPath(), err, jsonOutput)
 			}
 
 			if jsonOutput {
@@ -653,7 +667,7 @@ func newSessionsCleanupCommand(stdout io.Writer) *cobra.Command {
 			if !confirm {
 				reg, err := readCurrentRegistry(cmd.CommandPath())
 				if err != nil {
-					return err
+					return commandFailure(cmd.CommandPath(), err, jsonOutput)
 				}
 				proposal := registry.ProposeCleanup(reg)
 				if jsonOutput {
@@ -664,7 +678,7 @@ func newSessionsCleanupCommand(stdout io.Writer) *cobra.Command {
 
 			root, err := repo.ResolveRoot("")
 			if err != nil {
-				return errors.New(repo.Diagnostic(cmd.CommandPath(), err))
+				return commandFailure(cmd.CommandPath(), errors.New(repo.Diagnostic(cmd.CommandPath(), err)), jsonOutput)
 			}
 
 			path := registry.RegistryPath(root.Path)
@@ -677,7 +691,7 @@ func newSessionsCleanupCommand(stdout io.Writer) *cobra.Command {
 				return writeCleanupProposal(stdout, proposal)
 			}
 			if err != nil {
-				return fmt.Errorf("%s: %w", cmd.CommandPath(), err)
+				return commandFailure(cmd.CommandPath(), err, jsonOutput)
 			}
 
 			proposal := registry.ProposeCleanup(current)
@@ -688,7 +702,7 @@ func newSessionsCleanupCommand(stdout io.Writer) *cobra.Command {
 					return next, nil
 				})
 				if err != nil {
-					return fmt.Errorf("%s: %w", cmd.CommandPath(), err)
+					return commandFailure(cmd.CommandPath(), err, jsonOutput)
 				}
 			}
 
@@ -932,6 +946,264 @@ type setupResultJSON struct {
 	Changed          bool   `json:"changed"`
 	GitignoreChanged bool   `json:"gitignore_changed"`
 	ZelmaDirCreated  bool   `json:"zelma_dir_created"`
+}
+
+type recoveryDiagnosticJSON struct {
+	Code                 string          `json:"code"`
+	CauseCode            string          `json:"cause_code,omitempty"`
+	CommandPath          string          `json:"command_path"`
+	Message              string          `json:"message"`
+	HumanMessage         string          `json:"human_message"`
+	Retryable            bool            `json:"retryable"`
+	ManualActionRequired bool            `json:"manual_action_required"`
+	RecoveryHint         string          `json:"recovery_hint"`
+	NextCommand          []string        `json:"next_command"`
+	Summary              *create.Summary `json:"summary,omitempty"`
+	RegistryPath         string          `json:"registry_path,omitempty"`
+	AdapterCommand       string          `json:"adapter_command,omitempty"`
+	AdapterExitCode      *int            `json:"adapter_exit_code,omitempty"`
+	AdapterStderr        string          `json:"adapter_stderr,omitempty"`
+}
+
+type jsonCommandDiagnosticError struct {
+	Diagnostic recoveryDiagnosticJSON
+	Err        error
+}
+
+func (err *jsonCommandDiagnosticError) Error() string {
+	if err == nil {
+		return ""
+	}
+	data, marshalErr := json.MarshalIndent(err.Diagnostic, "", "  ")
+	if marshalErr != nil {
+		return legacyCommandDiagnostic(err.Diagnostic.CommandPath, err.Err).Error()
+	}
+	return string(data)
+}
+
+func (err *jsonCommandDiagnosticError) Unwrap() error {
+	if err == nil {
+		return nil
+	}
+	return err.Err
+}
+
+func commandFailure(command string, err error, jsonOutput bool) error {
+	if err == nil {
+		return nil
+	}
+	if !jsonOutput {
+		return legacyCommandDiagnostic(command, err)
+	}
+	var jsonErr *jsonCommandDiagnosticError
+	if errors.As(err, &jsonErr) {
+		return err
+	}
+	return &jsonCommandDiagnosticError{
+		Diagnostic: recoveryDiagnosticForError(command, err),
+		Err:        err,
+	}
+}
+
+func jsonFallbackCommandForArgs(root *cobra.Command, args []string) (*cobra.Command, bool) {
+	if !rawJSONRequested(args) {
+		return nil, false
+	}
+	command := rawCommandForArgs(root, args)
+	if command.Flags().Lookup("json") == nil {
+		return nil, false
+	}
+	return command, true
+}
+
+func rawJSONRequested(args []string) bool {
+	for _, arg := range args {
+		if arg == "--json" {
+			return true
+		}
+		value, ok := strings.CutPrefix(arg, "--json=")
+		if !ok {
+			continue
+		}
+		parsed, err := strconv.ParseBool(value)
+		return err != nil || parsed
+	}
+	return false
+}
+
+func rawCommandForArgs(root *cobra.Command, args []string) *cobra.Command {
+	command := root
+	for _, arg := range args {
+		if arg == "--" || strings.HasPrefix(arg, "-") {
+			return command
+		}
+		next, _, err := command.Find([]string{arg})
+		if err != nil || next == command {
+			return command
+		}
+		command = next
+	}
+	return command
+}
+
+func isCobraValidationError(err error) bool {
+	var notExistErr *pflag.NotExistError
+	if errors.As(err, &notExistErr) {
+		return true
+	}
+	var valueRequiredErr *pflag.ValueRequiredError
+	if errors.As(err, &valueRequiredErr) {
+		return true
+	}
+	message := err.Error()
+	return strings.Contains(message, "arg(s)") &&
+		(strings.HasPrefix(message, "accepts ") || strings.HasPrefix(message, "requires "))
+}
+
+func jsonArgumentFailure(command string, err error) error {
+	return &jsonCommandDiagnosticError{
+		Diagnostic: recoveryDiagnosticJSON{
+			Code:                 "cli_invalid_arguments",
+			CommandPath:          command,
+			Message:              err.Error(),
+			HumanMessage:         legacyCommandDiagnostic(command, err).Error(),
+			Retryable:            false,
+			ManualActionRequired: true,
+			RecoveryHint:         "fix the command arguments and retry the same zelma command",
+			NextCommand:          []string{},
+		},
+		Err: err,
+	}
+}
+
+func legacyCommandDiagnostic(command string, err error) error {
+	if err == nil {
+		return nil
+	}
+	message := err.Error()
+	if command == "" || strings.HasPrefix(message, command+":") {
+		return err
+	}
+	return fmt.Errorf("%s: %w", command, err)
+}
+
+func recoveryDiagnosticForError(command string, err error) recoveryDiagnosticJSON {
+	diagnostic := recoveryDiagnosticJSON{
+		Code:                 "unknown_cli_error",
+		CommandPath:          command,
+		Message:              err.Error(),
+		HumanMessage:         legacyCommandDiagnostic(command, err).Error(),
+		Retryable:            false,
+		ManualActionRequired: true,
+		RecoveryHint:         "preserve this diagnostic and inspect the command failure before retrying",
+		NextCommand:          []string{},
+	}
+
+	var createErr *create.DiagnosticError
+	if errors.As(err, &createErr) {
+		createDiagnostic := createErr.Diagnostic
+		diagnostic.Code = string(createDiagnostic.Code)
+		diagnostic.CauseCode = createDiagnostic.CauseCode
+		diagnostic.Message = createDiagnostic.Message
+		diagnostic.Retryable = createDiagnostic.Retryable
+		diagnostic.ManualActionRequired = manualActionRequiredForCreateDiagnostic(createDiagnostic)
+		diagnostic.RecoveryHint = createDiagnostic.RecoveryHint
+		if !createDiagnostic.Summary.IsZero() {
+			summary := createDiagnostic.Summary
+			diagnostic.Summary = &summary
+		}
+		diagnostic.NextCommand = nextCommandForCode(diagnostic.Code)
+		return diagnostic
+	}
+
+	var registryErr *registry.DiagnosticError
+	if errors.As(err, &registryErr) {
+		registryDiagnostic := registryErr.Diagnostic
+		diagnostic.Code = string(registryDiagnostic.Code)
+		diagnostic.Message = registryDiagnostic.Message
+		if isRegistryFilePath(registryDiagnostic.Path) {
+			diagnostic.RegistryPath = registryDiagnostic.Path
+		}
+		diagnostic.RecoveryHint = registryDiagnostic.RecoveryHint
+		diagnostic.NextCommand = nextCommandForCode(diagnostic.Code)
+		return diagnostic
+	}
+
+	if errors.Is(err, registry.ErrRegistryLocked) {
+		diagnostic.Code = "registry_locked"
+		diagnostic.Message = "sessions registry is locked by another writer"
+		diagnostic.Retryable = true
+		diagnostic.ManualActionRequired = false
+		diagnostic.RecoveryHint = "retry after the other registry writer finishes; do not edit the registry directly"
+		diagnostic.NextCommand = []string{}
+		return diagnostic
+	}
+
+	var zellijErr *zellij.DiagnosticError
+	if errors.As(err, &zellijErr) {
+		zellijDiagnostic := zellijErr.Diagnostic
+		diagnostic.Code = string(zellijDiagnostic.Code)
+		diagnostic.Message = zellijDiagnostic.Message
+		diagnostic.RecoveryHint = zellijDiagnostic.RecoveryHint
+		diagnostic.AdapterCommand = zellijDiagnostic.Command
+		diagnostic.AdapterExitCode = intPtr(zellijDiagnostic.ExitCode)
+		diagnostic.AdapterStderr = zellijDiagnostic.Stderr
+		diagnostic.Retryable = false
+		diagnostic.ManualActionRequired = true
+		diagnostic.NextCommand = nextCommandForCode(diagnostic.Code)
+		return diagnostic
+	}
+
+	var codexErr *codex.DiagnosticError
+	if errors.As(err, &codexErr) {
+		codexDiagnostic := codexErr.Diagnostic
+		diagnostic.Code = string(codexDiagnostic.Code)
+		diagnostic.Message = codexDiagnostic.Message
+		diagnostic.RecoveryHint = codexDiagnostic.RecoveryHint
+		diagnostic.NextCommand = nextCommandForCode(diagnostic.Code)
+		return diagnostic
+	}
+
+	lower := strings.ToLower(err.Error())
+	if strings.Contains(lower, "unsupported repo") || strings.Contains(lower, "no git worktree found") {
+		diagnostic.Code = "unsupported_repo"
+		diagnostic.Message = err.Error()
+		diagnostic.RecoveryHint = "run zelma setup from inside the target git repository before managing sessions"
+		diagnostic.NextCommand = []string{"zelma", "setup"}
+	}
+	return diagnostic
+}
+
+func manualActionRequiredForCreateDiagnostic(diagnostic create.Diagnostic) bool {
+	switch diagnostic.Code {
+	case create.ReasonPaneLaunchFailed:
+		return true
+	case create.ReasonPaneUnconfirmed, create.ReasonConfirmationFailed, create.ReasonRegistryWriteFailed:
+		return true
+	case create.ReasonCodexMissingBinary, create.ReasonCodexInvalidInput, create.ReasonInvalidRequest:
+		return true
+	default:
+		return !diagnostic.Retryable
+	}
+}
+
+func isRegistryFilePath(path string) bool {
+	return filepath.Base(path) == registry.RegistryFileName
+}
+
+func nextCommandForCode(code string) []string {
+	switch code {
+	case string(create.ReasonPaneUnconfirmed), string(create.ReasonConfirmationFailed), string(create.ReasonRegistryWriteFailed):
+		return []string{"zelma", "sessions", "detect", "--json"}
+	case "repo_not_ready", "repo_not_prepared", "unsupported_repo":
+		return []string{"zelma", "setup"}
+	default:
+		return []string{}
+	}
+}
+
+func intPtr(value int) *int {
+	return &value
 }
 
 type createResultJSON struct {

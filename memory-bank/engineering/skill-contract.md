@@ -55,7 +55,17 @@ records.
 
 All commands run from inside the target git worktree. Successful agent-facing
 commands write data to stdout and exit `0`. Failures write diagnostics to stderr
-and exit non-zero.
+and exit non-zero. For commands invoked with `--json`, failure diagnostics on
+stderr are a stable JSON object with:
+
+- `code`: machine-readable failure code;
+- `retryable`: whether the same operation can be retried without required
+  manual repair;
+- `manual_action_required`: whether a person or environment repair is required
+  before continuing safely;
+- `recovery_hint`: human-readable recovery guidance;
+- `next_command`: safe public `zelma` command to run next, or an empty array
+  when no automatic command is safe.
 
 ### `zelma sessions list --json`
 

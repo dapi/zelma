@@ -645,6 +645,46 @@ func TestSessionsCreateRunFailureReportsRetryableDiagnostic(t *testing.T) {
 	}
 }
 
+func TestSessionsCreateJSONRunFailureRequiresManualActionAndKeepsRetryable(t *testing.T) {
+	root := newTestGitRepo(t)
+	fakeCodex := writeFakeCodex(t)
+	t.Setenv("ZELMA_CODEX_BIN", fakeCodex)
+	t.Setenv("ZELMA_ZELLIJ_BIN", writeFakeCreateZellijRunFailure(t))
+	t.Chdir(root)
+
+	var stdout, stderr bytes.Buffer
+
+	code := Run(context.Background(), []string{"sessions", "create", "--json"}, &stdout, &stderr)
+
+	if code != 1 {
+		t.Fatalf("Run() code = %d, want 1", code)
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("stdout = %q, want empty", stdout.String())
+	}
+	var diagnostic struct {
+		Code                 string `json:"code"`
+		CauseCode            string `json:"cause_code"`
+		CommandPath          string `json:"command_path"`
+		Message              string `json:"message"`
+		HumanMessage         string `json:"human_message"`
+		Retryable            bool   `json:"retryable"`
+		ManualActionRequired bool   `json:"manual_action_required"`
+		RecoveryHint         string `json:"recovery_hint"`
+		NextCommand          []any  `json:"next_command"`
+	}
+	decodeStrict(t, stderr.Bytes(), &diagnostic)
+	if diagnostic.Code != "create_pane_launch_failed" ||
+		diagnostic.CauseCode != "zellij_command_failed" ||
+		!diagnostic.Retryable ||
+		!diagnostic.ManualActionRequired {
+		t.Fatalf("diagnostic = %+v, want retryable create_pane_launch_failed requiring manual action", diagnostic)
+	}
+	if _, err := os.Stat(registry.RegistryPath(root)); !os.IsNotExist(err) {
+		t.Fatalf("registry path stat error = %v, want not exist", err)
+	}
+}
+
 func TestSessionsCreateRegistryWriteFailureReportsRecoveryHint(t *testing.T) {
 	root := newTestGitRepo(t)
 	paneRoot := resolvedPath(t, root)
