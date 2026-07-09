@@ -24,8 +24,13 @@ func TestManualPaneAdoptionDetectE2E(t *testing.T) {
 		paneJSONWithID(2, resolvedRepoRoot, "/bin/zsh", false),
 	)
 	zellij := writeFakeZellij(t, panes)
+	env := []string{
+		"ZELMA_ZELLIJ_BIN=" + zellij,
+		"HOME=" + t.TempDir(),
+		"CODEX_HOME=" + t.TempDir(),
+	}
 
-	first := runZelma(t, bin, repoRoot, []string{"ZELMA_ZELLIJ_BIN=" + zellij}, "sessions", "detect", "--json")
+	first := runZelma(t, bin, repoRoot, env, "sessions", "detect", "--json")
 	if first.code != 0 {
 		t.Fatalf("first detect code = %d, want 0; stderr = %q", first.code, first.stderr)
 	}
@@ -46,7 +51,7 @@ func TestManualPaneAdoptionDetectE2E(t *testing.T) {
 		t.Fatalf("registry after first detect contains skipped non-Codex pane: %s", afterFirst)
 	}
 
-	second := runZelma(t, bin, repoRoot, []string{"ZELMA_ZELLIJ_BIN=" + zellij}, "sessions", "detect", "--json")
+	second := runZelma(t, bin, repoRoot, env, "sessions", "detect", "--json")
 	if second.code != 0 {
 		t.Fatalf("second detect code = %d, want 0; stderr = %q", second.code, second.stderr)
 	}
