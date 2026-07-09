@@ -168,11 +168,11 @@ if [ "$1" = "--session" ] && [ "$2" = "zelma-main" ] && [ "$3" = "action" ] && [
   printf '%s\n' "$count" > ` + shellQuote(statePath) + `
   case "$count" in
     1) printf 'ZELMA_SUPERVISOR: implementation_complete\n' ;;
-    2) printf 'ZELMA_SUPERVISOR: review_findings\n' ;;
-    3) printf 'ZELMA_SUPERVISOR: fix_complete\n' ;;
-    4) printf 'ZELMA_SUPERVISOR: review_clean\n' ;;
-    5) printf 'ZELMA_SUPERVISOR: merge_simulated\n' ;;
-    *) printf 'ZELMA_SUPERVISOR: merge_simulated\n' ;;
+    2) printf 'ZELMA_SUPERVISOR: implementation_complete\nZELMA_SUPERVISOR: review_findings\n' ;;
+    3) printf 'ZELMA_SUPERVISOR: implementation_complete\nZELMA_SUPERVISOR: review_findings\nZELMA_SUPERVISOR: fix_complete\n' ;;
+    4) printf 'ZELMA_SUPERVISOR: implementation_complete\nZELMA_SUPERVISOR: review_findings\nZELMA_SUPERVISOR: fix_complete\nZELMA_SUPERVISOR: review_clean\n' ;;
+    5) printf 'ZELMA_SUPERVISOR: implementation_complete\nZELMA_SUPERVISOR: review_findings\nZELMA_SUPERVISOR: fix_complete\nZELMA_SUPERVISOR: review_clean\nZELMA_SUPERVISOR: merge_simulated\n' ;;
+    *) printf 'ZELMA_SUPERVISOR: implementation_complete\nZELMA_SUPERVISOR: review_findings\nZELMA_SUPERVISOR: fix_complete\nZELMA_SUPERVISOR: review_clean\nZELMA_SUPERVISOR: merge_simulated\n' ;;
   esac
   exit 0
 fi

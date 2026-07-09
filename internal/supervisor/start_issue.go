@@ -262,12 +262,12 @@ func StartIssue(ctx context.Context, request Request) (Result, error) {
 				actionTaken = true
 			}
 		case PhaseReviewClean:
-			if rereviewSent {
+			if initialReviewSent || rereviewSent {
 				result.Review.Clean = true
 			}
 		case PhaseMergeSimulated:
-			if !result.Review.Clean || result.Review.Cycles < 2 || result.Review.FindingsFixed < 1 {
-				return Result{}, invalidInputFailure("merge simulation appeared before a clean re-review after fixes")
+			if !result.Review.Clean || result.Review.Cycles < 1 {
+				return Result{}, invalidInputFailure("merge simulation appeared before a clean review")
 			}
 			if err := request.Runtime.ClosePane(ctx, zellij.ClosePaneRequest{
 				Session: launch.ZellijSession,
@@ -410,21 +410,24 @@ func classifyScreen(screen string) (phase, marker string) {
 		if !strings.HasPrefix(value, MarkerPrefix) {
 			continue
 		}
-		marker := strings.TrimSpace(strings.TrimPrefix(value, MarkerPrefix))
-		switch marker {
+		candidate := strings.TrimSpace(strings.TrimPrefix(value, MarkerPrefix))
+		switch candidate {
 		case MarkerImplementationComplete:
-			return PhaseImplementationComplete, marker
+			phase, marker = PhaseImplementationComplete, candidate
 		case MarkerReviewFindings:
-			return PhaseReviewFindings, marker
+			phase, marker = PhaseReviewFindings, candidate
 		case MarkerFixComplete:
-			return PhaseFixComplete, marker
+			phase, marker = PhaseFixComplete, candidate
 		case MarkerReviewClean:
-			return PhaseReviewClean, marker
+			phase, marker = PhaseReviewClean, candidate
 		case MarkerMergeSimulated:
-			return PhaseMergeSimulated, marker
+			phase, marker = PhaseMergeSimulated, candidate
 		}
 	}
-	return PhaseWorking, ""
+	if phase == "" {
+		return PhaseWorking, ""
+	}
+	return phase, marker
 }
 
 func fixInstruction(issue int) string {
