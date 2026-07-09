@@ -241,7 +241,7 @@ Output:
   --dry-run: launch contract text.
   --dry-run --json: launch contract JSON.
   default: created/registered/skipped summary.
-  --json: summary JSON.
+  --json: created/registered/skipped summary plus registered session JSON.
 
 Contract:
   default opened path: repository root.
@@ -461,6 +461,7 @@ func newSessionsCreateCommand(stdout io.Writer) *cobra.Command {
 			}
 
 			summary := result.Summary
+			var registeredSession registry.Session
 			if result.Confirmed {
 				candidates, _ := withSessionEvidenceAll(cmd.Context(), []registry.Session{result.Candidate}, nil, codex.UnsupportedPaneProcessEvidenceResolver{})
 				candidate := candidates[0]
@@ -469,6 +470,7 @@ func newSessionsCreateCommand(stdout io.Writer) *cobra.Command {
 				err = registry.UpdateFile(path, func(current registry.Registry) (registry.Registry, error) {
 					next, currentSummary := registry.UpsertDetectedCandidates(current, []registry.Session{candidate})
 					upsertSummary = currentSummary
+					registeredSession = findSessionByPane(next, candidate.ZellijSession, candidate.ZellijPane)
 					return next, nil
 				})
 				if err != nil {
@@ -479,7 +481,7 @@ func newSessionsCreateCommand(stdout io.Writer) *cobra.Command {
 			}
 
 			if jsonOutput {
-				return writeCreateSummaryJSON(stdout, summary)
+				return writeCreateResultJSON(stdout, summary, registeredSession)
 			}
 			_, err = fmt.Fprintf(stdout, "created=%d registered=%d skipped=%d\n", summary.Created, summary.Registered, summary.Skipped)
 			return err
@@ -932,10 +934,23 @@ type setupResultJSON struct {
 	ZelmaDirCreated  bool   `json:"zelma_dir_created"`
 }
 
-func writeCreateSummaryJSON(stdout io.Writer, summary create.Summary) error {
-	data, err := json.MarshalIndent(summary, "", "  ")
+type createResultJSON struct {
+	Created    int              `json:"created"`
+	Registered int              `json:"registered"`
+	Skipped    int              `json:"skipped"`
+	Session    registry.Session `json:"session"`
+}
+
+func writeCreateResultJSON(stdout io.Writer, summary create.Summary, session registry.Session) error {
+	output := createResultJSON{
+		Created:    summary.Created,
+		Registered: summary.Registered,
+		Skipped:    summary.Skipped,
+		Session:    session,
+	}
+	data, err := json.MarshalIndent(output, "", "  ")
 	if err != nil {
-		return fmt.Errorf("encode create summary JSON: %w", err)
+		return fmt.Errorf("encode create result JSON: %w", err)
 	}
 	_, err = fmt.Fprintf(stdout, "%s\n", data)
 	return err
@@ -1066,6 +1081,15 @@ func findSessionByID(reg registry.Registry, id int) (registry.Session, bool) {
 		}
 	}
 	return registry.Session{}, false
+}
+
+func findSessionByPane(reg registry.Registry, zellijSession, zellijPane string) registry.Session {
+	for _, session := range reg.Sessions {
+		if session.ZellijSession == zellijSession && session.ZellijPane == zellijPane {
+			return session
+		}
+	}
+	return registry.Session{}
 }
 
 func parseZellijTabRef(ref string) (int, bool, error) {

@@ -16,7 +16,7 @@ func TestStaleCleanupProposalConfirmAndRepeatE2E(t *testing.T) {
 	repoRoot := t.TempDir()
 	runCommand(t, repoRoot, "git", "init", "--quiet")
 
-	openedPath := resolvedPath(t, repoRoot)
+	openedPath := resolvedCleanupPath(t, repoRoot)
 	registryPath := filepath.Join(repoRoot, ".zelma", "sessions.json")
 	initialRegistry := cleanupRegistryJSON(t, cleanupTestRegistry{
 		Version: 1,
@@ -189,7 +189,7 @@ func writeE2EFile(t *testing.T, path, content string) {
 	}
 }
 
-func resolvedPath(t *testing.T, path string) string {
+func resolvedCleanupPath(t *testing.T, path string) string {
 	t.Helper()
 
 	resolved, err := filepath.EvalSymlinks(path)

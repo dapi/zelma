@@ -700,7 +700,17 @@ func TestSessionsCreateJSONSummary(t *testing.T) {
 	want := `{
   "created": 1,
   "registered": 1,
-  "skipped": 0
+  "skipped": 0,
+  "session": {
+    "id": 1,
+    "zellij_session": "zelma-main",
+    "zellij_tab": "tab_1",
+    "zellij_tab_name": "work",
+    "zellij_pane": "terminal_3",
+    "codex_session": "",
+    "opened_path": "` + paneRoot + `",
+    "state": "candidate"
+  }
 }
 `
 	if stdout.String() != want {
