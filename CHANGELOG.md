@@ -5,8 +5,28 @@
 ### Next Roadmap Candidates
 
 - Follow-up hardening from real Codex/zellij usage.
-- Autonomous issue shipping supervisor implementation.
-- Dashboard/status backend for multi-agent work.
+- Future autonomous issue shipping supervisor improvements.
+- Further dashboard/status backend refinement for multi-agent work.
+
+## v0.3.0 - Dashboard and supervisor expansion
+
+### Added
+
+- `zelma status` dashboard snapshot command for session state and recovery hints.
+- `zelma supervisor start-issue` orchestration flow for issue-driven agent work.
+- Supervisor launch, polling, review and cleanup state in machine-readable output.
+- Multi-agent delivery e2e coverage for supervisor flows.
+- Dashboard backend that reconciles registry state with live zellij status.
+- New help and output contracts for the dashboard and supervisor surfaces.
+
+### Fixed
+
+- Session detection and recovery paths now tolerate more real-world zellij and Codex evidence shapes.
+- E2E coverage now exercises the managed agent launch, recovery and handoff flows more directly.
+
+### Documentation
+
+- Synchronized help output and release docs with the implemented dashboard and supervisor commands.
 
 ## v0.2.0 - Session operations hardening
 
