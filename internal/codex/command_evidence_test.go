@@ -65,6 +65,16 @@ func TestFindCommandSessionEvidenceFromEnvAssignment(t *testing.T) {
 	}
 }
 
+func TestFindExternalEnvCommandSessionEvidenceRejectsPromptText(t *testing.T) {
+	command := `sh -lc 'echo External session UUID: 019f3d81-b070-7a91-9a6f-9f50f1cba355'`
+
+	got := FindExternalEnvCommandSessionEvidence(command)
+
+	if got.Verdict != SessionEvidenceInsufficient {
+		t.Fatalf("evidence = %+v, want insufficient for non-env prompt text", got)
+	}
+}
+
 func TestFindCommandSessionEvidenceRejectsNonCodexCommand(t *testing.T) {
 	got := FindCommandSessionEvidence("grep resume 019f3d81-b070-7a91-9a6f-9f50f1cba355 README.md")
 

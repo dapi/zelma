@@ -442,6 +442,26 @@ func newSessionsCreateCommand(stdout io.Writer) *cobra.Command {
 				return commandFailure(cmd.CommandPath(), create.PreflightFailure(err), jsonOutput)
 			}
 
+			client := zellij.New(zellij.WithBinary(os.Getenv("ZELMA_ZELLIJ_BIN")))
+			if !dryRun {
+				current, err := readRegistryForRoot(cmd.CommandPath(), root.Path)
+				if err != nil {
+					return err
+				}
+				existingSession, exists, err := findLiveActiveSessionForOpenedPath(cmd.Context(), current, openedPath, os.Getenv("ZELMA_CODEX_BIN"), client)
+				if err != nil {
+					return fmt.Errorf("%s: %w", cmd.CommandPath(), create.LiveCheckFailure(err))
+				}
+				if exists {
+					summary := create.Summary{Skipped: 1}
+					if jsonOutput {
+						return writeCreateResultJSON(stdout, summary, existingSession)
+					}
+					_, err = fmt.Fprintf(stdout, "created=%d registered=%d skipped=%d\n", summary.Created, summary.Registered, summary.Skipped)
+					return err
+				}
+			}
+
 			contract, err := codex.PrepareLaunchContract(codex.LaunchRequest{
 				Binary:     os.Getenv("ZELMA_CODEX_BIN"),
 				OpenedPath: openedPath,
@@ -465,7 +485,6 @@ func newSessionsCreateCommand(stdout io.Writer) *cobra.Command {
 			}
 
 			zellijSession := configuredZellijSession()
-			client := zellij.New(zellij.WithBinary(os.Getenv("ZELMA_ZELLIJ_BIN")))
 			result, err := create.LaunchAndConfirm(cmd.Context(), create.Request{
 				ZellijSession: zellijSession,
 				Contract:      contract,
@@ -504,6 +523,133 @@ func newSessionsCreateCommand(stdout io.Writer) *cobra.Command {
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Print the resolved Codex launch contract without creating a pane.")
 	cmd.Flags().BoolVar(&jsonOutput, "json", false, "Print JSON output.")
 	return cmd
+}
+
+func findLiveActiveSessionForOpenedPath(ctx context.Context, reg registry.Registry, openedPath, configuredCodexBinary string, client live.Inventory) (registry.Session, bool, error) {
+	var matches []registry.Session
+	for _, session := range reg.Sessions {
+		if session.State != registry.StateActive {
+			continue
+		}
+		if filepath.Clean(session.OpenedPath) != openedPath {
+			continue
+		}
+		matches = append(matches, session)
+	}
+	if len(matches) == 0 {
+		return registry.Session{}, false, nil
+	}
+
+	liveSessions, err := client.ListSessions(ctx)
+	if err != nil {
+		return registry.Session{}, false, err
+	}
+	sessionNames := make(map[string]struct{}, len(liveSessions))
+	for _, session := range liveSessions {
+		sessionNames[session.Name] = struct{}{}
+	}
+
+	panesBySession := make(map[string][]zellij.Pane)
+	for _, session := range matches {
+		if _, ok := sessionNames[session.ZellijSession]; !ok {
+			continue
+		}
+		panes, ok := panesBySession[session.ZellijSession]
+		if !ok {
+			var err error
+			panes, err = client.ListPanes(ctx, session.ZellijSession)
+			if err != nil {
+				return registry.Session{}, false, err
+			}
+			panesBySession[session.ZellijSession] = panes
+		}
+		for _, pane := range panes {
+			if pane.ID.String() != session.ZellijPane {
+				continue
+			}
+			if livePaneMatchesActiveSession(session, pane, openedPath, configuredCodexBinary) {
+				return session, true, nil
+			}
+		}
+	}
+	return registry.Session{}, false, nil
+}
+
+func livePaneMatchesActiveSession(session registry.Session, pane zellij.Pane, openedPath, configuredCodexBinary string) bool {
+	if pane.ID.Kind != zellij.PaneKindTerminal || pane.Exited {
+		return false
+	}
+	if normalizedLivePaneCWD(pane.PaneCWD) != openedPath {
+		return false
+	}
+	if !livePaneCommandMatchesActiveSession(pane.PaneCommand, session.CodexSession, configuredCodexBinary) {
+		return false
+	}
+	return true
+}
+
+func normalizedLivePaneCWD(cwd *string) string {
+	if cwd == nil || strings.TrimSpace(*cwd) == "" || !filepath.IsAbs(*cwd) {
+		return ""
+	}
+	return filepath.Clean(*cwd)
+}
+
+func livePaneCommandMatchesActiveSession(command *string, codexSession, configuredCodexBinary string) bool {
+	if command == nil || strings.TrimSpace(*command) == "" {
+		return false
+	}
+	hasCodexLaunchEvidence := detection.CodexCommandEntrypoint(*command) != "" ||
+		livePaneCommandMatchesConfiguredBinary(*command, configuredCodexBinary)
+	commandSession := codexSessionFromLivePaneCommand(*command)
+	if codexSession != "" {
+		if commandSession != "" {
+			return commandSession == codexSession
+		}
+		if externalSession := externalSessionFromLivePaneCommand(*command, hasCodexLaunchEvidence); externalSession != "" {
+			return externalSession == codexSession
+		}
+		return hasCodexLaunchEvidence
+	}
+	return commandSession != "" || hasCodexLaunchEvidence
+}
+
+func livePaneCommandMatchesConfiguredBinary(command, configuredCodexBinary string) bool {
+	if strings.TrimSpace(configuredCodexBinary) == "" {
+		return false
+	}
+	executable := detection.CommandExecutable(command)
+	if executable == "" {
+		return false
+	}
+	if executable == configuredCodexBinary {
+		return true
+	}
+	if filepath.IsAbs(executable) && filepath.IsAbs(configuredCodexBinary) {
+		return filepath.Clean(executable) == filepath.Clean(configuredCodexBinary)
+	}
+	return filepath.Base(executable) == filepath.Base(configuredCodexBinary)
+}
+
+func codexSessionFromLivePaneCommand(command string) string {
+	evidence := codex.FindCommandSessionEvidence(command)
+	if evidence.Verdict != codex.SessionEvidenceResolved || evidence.Ref == nil {
+		return ""
+	}
+	return evidence.Ref.SessionID
+}
+
+func externalSessionFromLivePaneCommand(command string, hasCodexLaunchEvidence bool) string {
+	var evidence codex.SessionEvidenceResult
+	if hasCodexLaunchEvidence {
+		evidence = codex.FindExternalCommandSessionEvidence(command)
+	} else {
+		evidence = codex.FindExternalEnvCommandSessionEvidence(command)
+	}
+	if evidence.Verdict != codex.SessionEvidenceResolved || evidence.Ref == nil {
+		return ""
+	}
+	return evidence.Ref.SessionID
 }
 
 func newSessionsDetectCommand(stdout io.Writer) *cobra.Command {

@@ -8,6 +8,7 @@ import (
 )
 
 var externalSessionUUIDPattern = regexp.MustCompile(`(?i)(?:\bCODEX_EXTERNAL_SESSION_UUID=|External session UUID:\s*)([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})`)
+var externalSessionEnvUUIDPattern = regexp.MustCompile(`(?i)\bCODEX_EXTERNAL_SESSION_UUID=([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})`)
 
 func FindCommandSessionEvidence(command string) SessionEvidenceResult {
 	entrypoint, args, ok := CodexCommandEntrypointAndArgs(command)
@@ -25,6 +26,20 @@ func FindCommandSessionEvidence(command string) SessionEvidenceResult {
 		return insufficient("command does not identify Codex")
 	}
 	return insufficient("Codex command does not contain resume UUID or external session UUID")
+}
+
+func FindExternalCommandSessionEvidence(command string) SessionEvidenceResult {
+	if sessionID := externalSessionUUID(command); sessionID != "" {
+		return commandEvidence(sessionID, CodexSessionRefSourceArgvExternalSessionUUID)
+	}
+	return insufficient("command does not contain external session UUID")
+}
+
+func FindExternalEnvCommandSessionEvidence(command string) SessionEvidenceResult {
+	if sessionID := externalSessionEnvUUID(command); sessionID != "" {
+		return commandEvidence(sessionID, CodexSessionRefSourceArgvExternalSessionUUID)
+	}
+	return insufficient("command does not contain external session environment UUID")
 }
 
 func CodexCommandEntrypoint(command string) string {
@@ -209,6 +224,14 @@ func resumeSessionID(args []string) string {
 
 func externalSessionUUID(command string) string {
 	match := externalSessionUUIDPattern.FindStringSubmatch(command)
+	if len(match) != 2 {
+		return ""
+	}
+	return normalizeSessionID(match[1])
+}
+
+func externalSessionEnvUUID(command string) string {
+	match := externalSessionEnvUUIDPattern.FindStringSubmatch(command)
 	if len(match) != 2 {
 		return ""
 	}
