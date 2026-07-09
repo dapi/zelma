@@ -428,6 +428,26 @@ func newSessionsCreateCommand(stdout io.Writer) *cobra.Command {
 				return fmt.Errorf("%s: %w", cmd.CommandPath(), create.PreflightFailure(err))
 			}
 
+			client := zellij.New(zellij.WithBinary(os.Getenv("ZELMA_ZELLIJ_BIN")))
+			if !dryRun {
+				current, err := readRegistryForRoot(cmd.CommandPath(), root.Path)
+				if err != nil {
+					return err
+				}
+				existingSession, exists, err := findLiveActiveSessionForOpenedPath(cmd.Context(), current, openedPath, client)
+				if err != nil {
+					return fmt.Errorf("%s: %w", cmd.CommandPath(), err)
+				}
+				if exists {
+					summary := create.Summary{Skipped: 1}
+					if jsonOutput {
+						return writeCreateResultJSON(stdout, summary, existingSession)
+					}
+					_, err = fmt.Fprintf(stdout, "created=%d registered=%d skipped=%d\n", summary.Created, summary.Registered, summary.Skipped)
+					return err
+				}
+			}
+
 			contract, err := codex.PrepareLaunchContract(codex.LaunchRequest{
 				Binary:     os.Getenv("ZELMA_CODEX_BIN"),
 				OpenedPath: openedPath,
@@ -447,24 +467,6 @@ func newSessionsCreateCommand(stdout io.Writer) *cobra.Command {
 					contract.WorkingDirectory,
 					contract.CommandLine(),
 				)
-				return err
-			}
-
-			client := zellij.New(zellij.WithBinary(os.Getenv("ZELMA_ZELLIJ_BIN")))
-			current, err := readRegistryForRoot(cmd.CommandPath(), root.Path)
-			if err != nil {
-				return err
-			}
-			existingSession, exists, err := findLiveActiveSessionForOpenedPath(cmd.Context(), current, openedPath, client)
-			if err != nil {
-				return fmt.Errorf("%s: %w", cmd.CommandPath(), err)
-			}
-			if exists {
-				summary := create.Summary{Skipped: 1}
-				if jsonOutput {
-					return writeCreateResultJSON(stdout, summary, existingSession)
-				}
-				_, err = fmt.Fprintf(stdout, "created=%d registered=%d skipped=%d\n", summary.Created, summary.Registered, summary.Skipped)
 				return err
 			}
 

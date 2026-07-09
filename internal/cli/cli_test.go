@@ -727,7 +727,7 @@ func TestSessionsCreateJSONSummary(t *testing.T) {
 	}
 }
 
-func TestSessionsCreateJSONSkipsDuplicateLiveActiveSession(t *testing.T) {
+func TestSessionsCreateJSONSkipsDuplicateLiveActiveSessionWithMissingCodex(t *testing.T) {
 	root := newTestGitRepo(t)
 	paneRoot := resolvedPath(t, root)
 	writeRegistryFile(t, root, `{
@@ -748,9 +748,9 @@ func TestSessionsCreateJSONSkipsDuplicateLiveActiveSession(t *testing.T) {
 `)
 	before := readFile(t, registry.RegistryPath(root))
 	callsPath := filepath.Join(t.TempDir(), "zellij-calls.txt")
-	fakeCodex := writeFakeCodex(t)
-	t.Setenv("ZELMA_CODEX_BIN", fakeCodex)
-	t.Setenv("ZELMA_ZELLIJ_BIN", writeFakeHandoffZellij(t, callsPath, "zelma-main\n", panesJSONWithID(3, paneRoot, fakeCodex+" --cd "+paneRoot, true)))
+	missingCodex := filepath.Join(t.TempDir(), "missing-codex")
+	t.Setenv("ZELMA_CODEX_BIN", missingCodex)
+	t.Setenv("ZELMA_ZELLIJ_BIN", writeFakeHandoffZellij(t, callsPath, "zelma-main\n", panesJSONWithID(3, paneRoot, missingCodex+" --cd "+paneRoot, true)))
 	t.Chdir(root)
 
 	var stdout, stderr bytes.Buffer
@@ -762,6 +762,9 @@ func TestSessionsCreateJSONSkipsDuplicateLiveActiveSession(t *testing.T) {
 	}
 	if stderr.Len() != 0 {
 		t.Fatalf("stderr = %q, want empty", stderr.String())
+	}
+	if strings.Contains(stderr.String(), "create_codex_missing_binary") {
+		t.Fatalf("stderr = %q, must not run Codex binary preflight for duplicate guard", stderr.String())
 	}
 	var got struct {
 		Created    int              `json:"created"`
