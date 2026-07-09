@@ -269,7 +269,7 @@ func sessionInventoryPanesJSON(t *testing.T, cwd string) string {
 			"tab_id":        1,
 			"tab_position":  0,
 			"tab_name":      "work",
-			"pane_command":  "/usr/local/bin/codex --cd " + cwd,
+			"pane_command":  "/usr/local/bin/codex resume 11111111-1111-4111-8111-111111111111 --cd " + cwd,
 			"pane_cwd":      cwd,
 		},
 	}

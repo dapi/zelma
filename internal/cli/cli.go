@@ -586,10 +586,21 @@ func livePaneCommandMatchesActiveSession(command *string, codexSession string) b
 		return false
 	}
 	commandSession := codexSessionFromLivePaneCommand(*command)
-	if commandSession != "" && codexSession != "" && commandSession != codexSession {
+	if codexSession != "" {
+		if commandSession != "" {
+			return commandSession == codexSession
+		}
+		return commandContainsCodexSession(*command, codexSession)
+	}
+	return commandSession != "" || detection.CodexCommandEntrypoint(*command) != ""
+}
+
+func commandContainsCodexSession(command, codexSession string) bool {
+	codexSession = strings.ToLower(strings.TrimSpace(codexSession))
+	if codexSession == "" {
 		return false
 	}
-	return true
+	return strings.Contains(strings.ToLower(command), codexSession)
 }
 
 func codexSessionFromLivePaneCommand(command string) string {
