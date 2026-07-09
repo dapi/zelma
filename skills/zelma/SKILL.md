@@ -26,7 +26,7 @@ public `zelma` CLI. Run commands from inside the target Git worktree.
 | --- | --- | --- |
 | Inspect known sessions | `zelma sessions list --json` | Registry inventory for the current repo. |
 | Check live status | `zelma sessions list --live --json` | Read-only live/unreachable check; does not persist live status. |
-| Create a managed Codex pane | `zelma sessions create [path] --json` | Omit `path` to use the repo root. |
+| Create a managed Codex pane | `zelma sessions create [path] --json` | Omit `path` to use the repo root; if a live active session already owns that path, the command returns skipped with the existing session instead of launching a duplicate. |
 | Preview create inputs | `zelma sessions create [path] --dry-run --json` | Use before mutating create when path or Codex binary resolution is uncertain. |
 | Detect/adopt manual Codex panes | `zelma sessions detect --json` | Upserts detected candidates/active records through `zelma`. |
 | Explain detect evidence | `zelma sessions detect --json --explain` | Use when evidence diagnostics are needed. |

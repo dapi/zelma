@@ -450,8 +450,25 @@ func newSessionsCreateCommand(stdout io.Writer) *cobra.Command {
 				return err
 			}
 
-			zellijSession := configuredZellijSession()
 			client := zellij.New(zellij.WithBinary(os.Getenv("ZELMA_ZELLIJ_BIN")))
+			current, err := readRegistryForRoot(cmd.CommandPath(), root.Path)
+			if err != nil {
+				return err
+			}
+			existingSession, exists, err := findLiveActiveSessionForOpenedPath(cmd.Context(), current, openedPath, client)
+			if err != nil {
+				return fmt.Errorf("%s: %w", cmd.CommandPath(), err)
+			}
+			if exists {
+				summary := create.Summary{Skipped: 1}
+				if jsonOutput {
+					return writeCreateResultJSON(stdout, summary, existingSession)
+				}
+				_, err = fmt.Fprintf(stdout, "created=%d registered=%d skipped=%d\n", summary.Created, summary.Registered, summary.Skipped)
+				return err
+			}
+
+			zellijSession := configuredZellijSession()
 			result, err := create.LaunchAndConfirm(cmd.Context(), create.Request{
 				ZellijSession: zellijSession,
 				Contract:      contract,
@@ -490,6 +507,33 @@ func newSessionsCreateCommand(stdout io.Writer) *cobra.Command {
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Print the resolved Codex launch contract without creating a pane.")
 	cmd.Flags().BoolVar(&jsonOutput, "json", false, "Print JSON output.")
 	return cmd
+}
+
+func findLiveActiveSessionForOpenedPath(ctx context.Context, reg registry.Registry, openedPath string, client live.Inventory) (registry.Session, bool, error) {
+	var matches []registry.Session
+	for _, session := range reg.Sessions {
+		if session.State != registry.StateActive {
+			continue
+		}
+		if filepath.Clean(session.OpenedPath) != openedPath {
+			continue
+		}
+		matches = append(matches, session)
+	}
+	if len(matches) == 0 {
+		return registry.Session{}, false, nil
+	}
+
+	view, err := live.Reconcile(ctx, registry.Registry{Version: reg.Version, Sessions: matches}, client)
+	if err != nil {
+		return registry.Session{}, false, err
+	}
+	for _, session := range view.Sessions {
+		if session.LiveStatus == live.StatusLive {
+			return session.Session, true, nil
+		}
+	}
+	return registry.Session{}, false, nil
 }
 
 func newSessionsDetectCommand(stdout io.Writer) *cobra.Command {

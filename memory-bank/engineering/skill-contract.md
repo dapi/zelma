@@ -99,8 +99,13 @@ record only after confirmation. Omit `path` to open the repository root. If
 `path` is present, it must be an existing directory equal to or inside the repo
 root.
 
-The successful JSON object includes the stable create counters plus the
-registered session row returned by the registry upsert. `session` is the
+Before launching a new pane, create checks for an existing live `active` record
+with the same `opened_path`. In that handoff case it does not create a duplicate
+pane and returns `created: 0`, `registered: 0`, `skipped: 1` plus the existing
+session, so the caller can continue polling or focus that session.
+
+Otherwise, the successful JSON object includes the stable create counters plus
+the registered session row returned by the registry upsert. `session` is the
 matching `active` record when one exists for the zellij pane key; otherwise it
 is the matching `candidate` record. Historical `closed` and `stale` records are
 not returned as the create result session.

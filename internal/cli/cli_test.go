@@ -651,9 +651,18 @@ func TestSessionsCreateRegistryWriteFailureReportsRecoveryHint(t *testing.T) {
 	fakeCodex := writeFakeCodex(t)
 	t.Setenv("ZELMA_CODEX_BIN", fakeCodex)
 	t.Setenv("ZELMA_ZELLIJ_BIN", writeFakeCreateZellij(t, "terminal_7", panesJSONWithID(7, paneRoot, fakeCodex+" --cd "+paneRoot, true)))
-	if err := os.MkdirAll(registry.RegistryPath(root), 0o755); err != nil {
+	writeRegistryFile(t, root, `{
+  "version": 1,
+  "sessions": []
+}
+`)
+	registryDir := filepath.Dir(registry.RegistryPath(root))
+	if err := os.Chmod(registryDir, 0o555); err != nil {
 		t.Fatal(err)
 	}
+	t.Cleanup(func() {
+		_ = os.Chmod(registryDir, 0o755)
+	})
 	t.Chdir(root)
 
 	var stdout, stderr bytes.Buffer
@@ -715,6 +724,74 @@ func TestSessionsCreateJSONSummary(t *testing.T) {
 `
 	if stdout.String() != want {
 		t.Fatalf("stdout mismatch\nwant:\n%s\ngot:\n%s", want, stdout.String())
+	}
+}
+
+func TestSessionsCreateJSONSkipsDuplicateLiveActiveSession(t *testing.T) {
+	root := newTestGitRepo(t)
+	paneRoot := resolvedPath(t, root)
+	writeRegistryFile(t, root, `{
+  "version": 1,
+  "sessions": [
+    {
+      "id": 4,
+      "zellij_session": "zelma-main",
+      "zellij_tab": "tab_1",
+      "zellij_tab_name": "work",
+      "zellij_pane": "terminal_3",
+      "codex_session": "11111111-1111-4111-8111-111111111111",
+      "opened_path": "`+paneRoot+`",
+      "state": "active"
+    }
+  ]
+}
+`)
+	before := readFile(t, registry.RegistryPath(root))
+	callsPath := filepath.Join(t.TempDir(), "zellij-calls.txt")
+	fakeCodex := writeFakeCodex(t)
+	t.Setenv("ZELMA_CODEX_BIN", fakeCodex)
+	t.Setenv("ZELMA_ZELLIJ_BIN", writeFakeHandoffZellij(t, callsPath, "zelma-main\n", panesJSONWithID(3, paneRoot, fakeCodex+" --cd "+paneRoot, true)))
+	t.Chdir(root)
+
+	var stdout, stderr bytes.Buffer
+
+	code := Run(context.Background(), []string{"sessions", "create", "--json"}, &stdout, &stderr)
+
+	if code != 0 {
+		t.Fatalf("Run() code = %d, want 0; stderr = %q", code, stderr.String())
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("stderr = %q, want empty", stderr.String())
+	}
+	var got struct {
+		Created    int              `json:"created"`
+		Registered int              `json:"registered"`
+		Skipped    int              `json:"skipped"`
+		Session    registry.Session `json:"session"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &got); err != nil {
+		t.Fatalf("decode create JSON: %v; stdout = %q", err, stdout.String())
+	}
+	if got.Created != 0 || got.Registered != 0 || got.Skipped != 1 {
+		t.Fatalf("summary = %+v, want duplicate guard skipped create", got)
+	}
+	if got.Session.ID != 4 ||
+		got.Session.ZellijPane != "terminal_3" ||
+		got.Session.CodexSession != "11111111-1111-4111-8111-111111111111" ||
+		got.Session.OpenedPath != paneRoot ||
+		got.Session.State != registry.StateActive {
+		t.Fatalf("session = %+v, want existing active session", got.Session)
+	}
+	after := readFile(t, registry.RegistryPath(root))
+	if after != before {
+		t.Fatalf("registry changed by duplicate create guard\nbefore:\n%s\nafter:\n%s", before, after)
+	}
+	calls := readFile(t, callsPath)
+	if strings.Contains(calls, " run ") {
+		t.Fatalf("fake zellij calls = %q, must not launch duplicate pane", calls)
+	}
+	if calls != "list-sessions --short --no-formatting\n--session zelma-main action list-panes --json --all\n" {
+		t.Fatalf("fake zellij calls = %q, want read-only live check", calls)
 	}
 }
 
@@ -2675,6 +2752,36 @@ exit 2
 	return path
 }
 
+func writeFakeHandoffZellij(t *testing.T, callsPath, sessionsOutput, panesJSON string) string {
+	t.Helper()
+
+	path := filepath.Join(t.TempDir(), "fake-zellij")
+	script := `#!/bin/sh
+printf '%s\n' "$*" >> ` + shellQuoteForTest(callsPath) + `
+if [ "$1" = "list-sessions" ]; then
+  cat <<'SESSIONS'
+` + sessionsOutput + `SESSIONS
+  exit 0
+fi
+if [ "$1" = "--session" ] && [ "$2" = "zelma-main" ] && [ "$3" = "action" ] && [ "$4" = "list-panes" ]; then
+  cat <<'JSON'
+` + panesJSON + `
+JSON
+  exit 0
+fi
+if [ "$1" = "--session" ] && [ "$2" = "zelma-main" ] && [ "$3" = "run" ]; then
+  printf 'duplicate zellij run was attempted\n' >&2
+  exit 77
+fi
+printf 'unexpected fake zellij args: %s\n' "$*" >&2
+exit 2
+`
+	if err := os.WriteFile(path, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
 func assertFakeZellijListSessionsCalls(t *testing.T, callsPath string, want int) {
 	t.Helper()
 
@@ -2840,6 +2947,10 @@ func panesJSONWithOptionalPID(id int, cwd, command string, codex bool, pid *int)
     "pane_cwd": %q
   }
 ]`, id, pidField, title, command, cwd)
+}
+
+func shellQuoteForTest(value string) string {
+	return "'" + strings.ReplaceAll(value, "'", "'\"'\"'") + "'"
 }
 
 func withPaneProcessResolver(t *testing.T, resolver codex.PaneProcessEvidenceResolver) {

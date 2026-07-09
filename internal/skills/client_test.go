@@ -94,6 +94,39 @@ func TestCreateSessionInvokesZelmaCLI(t *testing.T) {
 	}
 }
 
+func TestCreateSessionParsesDuplicateGuardSkip(t *testing.T) {
+	root := t.TempDir()
+	stdout := writeFile(t, root, "stdout.json", `{
+  "created": 0,
+  "registered": 0,
+  "skipped": 1,
+  "session": {
+    "id": 3,
+    "zellij_session": "zelma-main",
+    "zellij_pane": "terminal_1",
+    "codex_session": "11111111-1111-4111-8111-111111111111",
+    "opened_path": "/workspace/zelma",
+    "state": "active"
+  }
+}
+`)
+	calls := filepath.Join(root, "calls.txt")
+	client := fakeCLIClient(t, root, stdout, "", "0", calls)
+
+	got, err := client.CreateSession(context.Background(), "")
+
+	if err != nil {
+		t.Fatalf("CreateSession() error = %v", err)
+	}
+	assertCall(t, calls, root, "sessions", "create", "--json")
+	if got.Created != 0 || got.Registered != 0 || got.Skipped != 1 {
+		t.Fatalf("CreateSession() = %+v, want duplicate guard skipped result", got)
+	}
+	if got.Session.ID != 3 || got.Session.State != "active" || got.Session.OpenedPath != "/workspace/zelma" {
+		t.Fatalf("Session = %+v, want existing active session", got.Session)
+	}
+}
+
 func TestPreviewCreateSessionInvokesZelmaCLI(t *testing.T) {
 	root := t.TempDir()
 	stdout := writeFile(t, root, "stdout.json", `{
