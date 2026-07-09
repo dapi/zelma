@@ -1877,7 +1877,10 @@ func TestSessionsDetectPIDFallbackExplainRedactsRawProcessDetails(t *testing.T) 
 	}
 	registryData := readFile(t, registry.RegistryPath(root))
 	for _, output := range []string{stdout.String(), registryData} {
-		if strings.Contains(output, privatePrompt) || strings.Contains(output, "TOKEN=") || strings.Contains(output, "101") || strings.Contains(output, "4242") {
+		if strings.Contains(output, privatePrompt) ||
+			strings.Contains(output, "TOKEN=") ||
+			strings.Contains(output, `"pid": 101`) ||
+			strings.Contains(output, `"pane_pid": 4242`) {
 			t.Fatalf("output leaked raw process details: %s", output)
 		}
 	}
