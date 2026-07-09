@@ -592,7 +592,7 @@ func livePaneCommandMatchesActiveSession(command *string, codexSession, configur
 		if commandSession != "" {
 			return commandSession == codexSession
 		}
-		if externalSession := externalSessionFromLivePaneCommand(*command); externalSession != "" {
+		if externalSession := externalSessionFromLivePaneCommand(*command, hasCodexLaunchEvidence); externalSession != "" {
 			return externalSession == codexSession
 		}
 		return hasCodexLaunchEvidence
@@ -625,8 +625,13 @@ func codexSessionFromLivePaneCommand(command string) string {
 	return evidence.Ref.SessionID
 }
 
-func externalSessionFromLivePaneCommand(command string) string {
-	evidence := codex.FindExternalCommandSessionEvidence(command)
+func externalSessionFromLivePaneCommand(command string, hasCodexLaunchEvidence bool) string {
+	var evidence codex.SessionEvidenceResult
+	if hasCodexLaunchEvidence {
+		evidence = codex.FindExternalCommandSessionEvidence(command)
+	} else {
+		evidence = codex.FindExternalEnvCommandSessionEvidence(command)
+	}
 	if evidence.Verdict != codex.SessionEvidenceResolved || evidence.Ref == nil {
 		return ""
 	}

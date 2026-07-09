@@ -1114,7 +1114,7 @@ func TestSessionsCreateJSONDoesNotTreatArbitraryUUIDArgAsCodexEvidence(t *testin
 `)
 	callsPath := filepath.Join(t.TempDir(), "zellij-calls.txt")
 	fakeCodex := writeFakeCodex(t)
-	arbitraryCommand := "/bin/zsh -lc echo 11111111-1111-4111-8111-111111111111"
+	arbitraryCommand := "/bin/zsh -lc echo 'External session UUID: 11111111-1111-4111-8111-111111111111'"
 	panesJSON := reusedPaneKeyPanesJSON(t, paneRoot, fakeCodex+" --cd "+paneRoot, paneRoot)
 	panesJSON = strings.Replace(panesJSON, `"pane_command": "/bin/zsh"`, `"pane_command": `+strconv.Quote(arbitraryCommand), 1)
 	t.Setenv("ZELMA_CODEX_BIN", fakeCodex)
@@ -1141,7 +1141,7 @@ func TestSessionsCreateJSONDoesNotTreatArbitraryUUIDArgAsCodexEvidence(t *testin
 		t.Fatalf("decode create JSON: %v; stdout = %q", err, stdout.String())
 	}
 	if got.Created != 1 || got.Registered != 1 || got.Skipped != 0 {
-		t.Fatalf("summary = %+v, want new create after rejecting arbitrary UUID arg", got)
+		t.Fatalf("summary = %+v, want new create after rejecting arbitrary external UUID text", got)
 	}
 	if got.Session.ZellijPane != "terminal_7" ||
 		got.Session.OpenedPath != paneRoot ||
@@ -1150,7 +1150,7 @@ func TestSessionsCreateJSONDoesNotTreatArbitraryUUIDArgAsCodexEvidence(t *testin
 	}
 	calls := readFile(t, callsPath)
 	if !strings.Contains(calls, "--session zelma-main run --cwd "+paneRoot+" --name codex -- "+fakeCodex+" --cd "+paneRoot) {
-		t.Fatalf("fake zellij calls = %q, want create run after rejecting arbitrary UUID arg", calls)
+		t.Fatalf("fake zellij calls = %q, want create run after rejecting arbitrary external UUID text", calls)
 	}
 }
 
