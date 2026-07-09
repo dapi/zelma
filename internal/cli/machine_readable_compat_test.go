@@ -6,10 +6,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/dapi/zelma/internal/config"
 	"github.com/dapi/zelma/internal/registry"
 	"github.com/gofrs/flock"
 )
@@ -42,6 +44,90 @@ func TestMachineReadableOutputCompatibilityExamples(t *testing.T) {
 `, filepath.Join(root, ".gitignore"), filepath.Join(root, ".zelma"))
 			},
 			parse: parseSkillSetupResult,
+		},
+		{
+			name: "supervisor start issue json",
+			args: []string{"supervisor", "start-issue", "67", "--repo", "dapi/zelma", "--base", "main", "--json"},
+			arrange: func(t *testing.T) string {
+				root := newTestGitRepo(t)
+				statePath := filepath.Join(t.TempDir(), "supervisor-state")
+				t.Setenv("ZELMA_ZELLIJ_BIN", writeFakeSupervisorZellij(t, statePath))
+				t.Setenv(config.StartIssueSurfaceEnvVar, "")
+				t.Chdir(root)
+				return resolvedPath(t, root)
+			},
+			want: func(root string) string {
+				return fmt.Sprintf(`{
+  "version": 1,
+  "issue": 67,
+  "repository": "dapi/zelma",
+  "base": "main",
+  "status": "merged_simulated",
+  "launch": {
+    "surface": "pane",
+    "surface_source": "default",
+    "zellij_session": "zelma-main",
+    "zellij_pane": "terminal_7",
+    "name": "issue-67",
+    "cwd": %q,
+    "command": [
+      "start-issue",
+      "67",
+      "--repo",
+      "dapi/zelma",
+      "--base",
+      "main"
+    ],
+    "command_line": "start-issue 67 --repo dapi/zelma --base main"
+  },
+  "polling": {
+    "interval_seconds": 60,
+    "snapshots": [
+      {
+        "sequence": 1,
+        "phase": "implementation_complete",
+        "marker": "implementation_complete",
+        "elapsed_seconds": 0
+      },
+      {
+        "sequence": 2,
+        "phase": "review_findings",
+        "marker": "review_findings",
+        "elapsed_seconds": 60
+      },
+      {
+        "sequence": 3,
+        "phase": "fix_complete",
+        "marker": "fix_complete",
+        "elapsed_seconds": 120
+      },
+      {
+        "sequence": 4,
+        "phase": "review_clean",
+        "marker": "review_clean",
+        "elapsed_seconds": 180
+      },
+      {
+        "sequence": 5,
+        "phase": "merge_simulated",
+        "marker": "merge_simulated",
+        "elapsed_seconds": 240
+      }
+    ]
+  },
+  "review": {
+    "cycles": 2,
+    "findings_fixed": 1,
+    "clean": true
+  },
+  "cleanup": {
+    "pane_closed": true,
+    "registry": "simulated_no_registry_records"
+  }
+}
+`, root)
+			},
+			parse: parseSkillSupervisorStartIssue,
 		},
 		{
 			name: "sessions list json",
@@ -492,6 +578,31 @@ func TestMachineReadableRegistryLockDiagnosticCompatibility(t *testing.T) {
 	}
 }
 
+func TestMachineReadableSupervisorInvalidConfigDiagnostic(t *testing.T) {
+	root := newTestGitRepo(t)
+	t.Setenv(config.StartIssueSurfaceEnvVar, "split")
+	t.Chdir(root)
+
+	var stdout, stderr bytes.Buffer
+
+	code := Run(context.Background(), []string{"supervisor", "start-issue", "67", "--repo", "dapi/zelma", "--base", "main", "--json"}, &stdout, &stderr)
+
+	if code != 1 {
+		t.Fatalf("Run() code = %d, want 1", code)
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("stdout = %q, want empty", stdout.String())
+	}
+	diagnostic := decodeSkillRecoveryDiagnostic(t, stderr.Bytes())
+	if diagnostic.Code != "supervisor_invalid_config" ||
+		diagnostic.CommandPath != "zelma supervisor start-issue" ||
+		diagnostic.Retryable ||
+		!diagnostic.ManualActionRequired ||
+		len(diagnostic.NextCommand) != 0 {
+		t.Fatalf("diagnostic = %+v, want stable supervisor_invalid_config diagnostic", diagnostic)
+	}
+}
+
 func TestMachineReadableArgumentValidationDiagnostics(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -728,6 +839,64 @@ func parseSkillCreateLaunchContract(t *testing.T, data []byte) {
 	}
 }
 
+func parseSkillSupervisorStartIssue(t *testing.T, data []byte) {
+	t.Helper()
+
+	var output struct {
+		Version    int    `json:"version"`
+		Issue      int    `json:"issue"`
+		Repository string `json:"repository"`
+		Base       string `json:"base"`
+		Status     string `json:"status"`
+		Launch     struct {
+			Surface       string   `json:"surface"`
+			SurfaceSource string   `json:"surface_source"`
+			ZellijSession string   `json:"zellij_session"`
+			ZellijTab     string   `json:"zellij_tab,omitempty"`
+			ZellijPane    string   `json:"zellij_pane"`
+			Name          string   `json:"name"`
+			CWD           string   `json:"cwd"`
+			Command       []string `json:"command"`
+			CommandLine   string   `json:"command_line"`
+			PromptFile    string   `json:"prompt_file,omitempty"`
+		} `json:"launch"`
+		Polling struct {
+			IntervalSeconds int `json:"interval_seconds"`
+			Snapshots       []struct {
+				Sequence       int    `json:"sequence"`
+				Phase          string `json:"phase"`
+				Marker         string `json:"marker,omitempty"`
+				ElapsedSeconds int    `json:"elapsed_seconds"`
+			} `json:"snapshots"`
+		} `json:"polling"`
+		Review struct {
+			Cycles        int  `json:"cycles"`
+			FindingsFixed int  `json:"findings_fixed"`
+			Clean         bool `json:"clean"`
+		} `json:"review"`
+		Cleanup struct {
+			PaneClosed bool   `json:"pane_closed"`
+			Registry   string `json:"registry"`
+		} `json:"cleanup"`
+	}
+	decodeStrict(t, data, &output)
+	if output.Version != 1 || output.Issue <= 0 || output.Repository == "" || output.Base == "" || output.Status == "" {
+		t.Fatalf("supervisor output = %+v, want stable envelope", output)
+	}
+	if output.Launch.Surface == "" || output.Launch.SurfaceSource == "" || output.Launch.ZellijSession == "" || output.Launch.ZellijPane == "" || output.Launch.CWD == "" || len(output.Launch.Command) == 0 {
+		t.Fatalf("supervisor launch = %+v, want stable launch state", output.Launch)
+	}
+	if output.Polling.IntervalSeconds <= 0 || len(output.Polling.Snapshots) == 0 {
+		t.Fatalf("supervisor polling = %+v, want poll interval and snapshots", output.Polling)
+	}
+	if output.Review.Cycles < 2 || output.Review.FindingsFixed < 1 || !output.Review.Clean {
+		t.Fatalf("supervisor review = %+v, want clean re-review after fix", output.Review)
+	}
+	if !output.Cleanup.PaneClosed || output.Cleanup.Registry == "" {
+		t.Fatalf("supervisor cleanup = %+v, want cleanup state", output.Cleanup)
+	}
+}
+
 func parseSkillCreateSummary(t *testing.T, data []byte) {
 	t.Helper()
 
@@ -814,6 +983,46 @@ func parseSkillCleanupConfirmed(t *testing.T, data []byte) {
 			t.Fatalf("stale record state = %q, want stale", record.State)
 		}
 	}
+}
+
+func writeFakeSupervisorZellij(t *testing.T, statePath string) string {
+	t.Helper()
+
+	path := filepath.Join(t.TempDir(), "fake-zellij")
+	script := `#!/bin/sh
+if [ "$1" = "--session" ] && [ "$2" = "zelma-main" ] && [ "$3" = "run" ]; then
+  printf 'terminal_7\n'
+  exit 0
+fi
+if [ "$1" = "--session" ] && [ "$2" = "zelma-main" ] && [ "$3" = "action" ] && [ "$4" = "dump-screen" ]; then
+  count=0
+  if [ -f ` + shellQuoteForTest(statePath) + ` ]; then
+    count=$(cat ` + shellQuoteForTest(statePath) + `)
+  fi
+  count=$((count + 1))
+  printf '%s\n' "$count" > ` + shellQuoteForTest(statePath) + `
+  case "$count" in
+    1) printf 'ZELMA_SUPERVISOR: implementation_complete\n' ;;
+    2) printf 'ZELMA_SUPERVISOR: implementation_complete\nZELMA_SUPERVISOR: review_findings\n' ;;
+    3) printf 'ZELMA_SUPERVISOR: implementation_complete\nZELMA_SUPERVISOR: review_findings\nZELMA_SUPERVISOR: fix_complete\n' ;;
+    4) printf 'ZELMA_SUPERVISOR: implementation_complete\nZELMA_SUPERVISOR: review_findings\nZELMA_SUPERVISOR: fix_complete\nZELMA_SUPERVISOR: review_clean\n' ;;
+    *) printf 'ZELMA_SUPERVISOR: implementation_complete\nZELMA_SUPERVISOR: review_findings\nZELMA_SUPERVISOR: fix_complete\nZELMA_SUPERVISOR: review_clean\nZELMA_SUPERVISOR: merge_simulated\n' ;;
+  esac
+  exit 0
+fi
+if [ "$1" = "--session" ] && [ "$2" = "zelma-main" ] && [ "$3" = "action" ] && [ "$4" = "write-chars" ]; then
+  exit 0
+fi
+if [ "$1" = "--session" ] && [ "$2" = "zelma-main" ] && [ "$3" = "action" ] && [ "$4" = "close-pane" ]; then
+  exit 0
+fi
+printf 'unexpected fake zellij args: %s\n' "$*" >&2
+exit 2
+`
+	if err := os.WriteFile(path, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	return path
 }
 
 func decodeStrict(t *testing.T, data []byte, dst any) {

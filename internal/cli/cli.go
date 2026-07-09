@@ -21,6 +21,7 @@ import (
 	"github.com/dapi/zelma/internal/registry"
 	"github.com/dapi/zelma/internal/repo"
 	"github.com/dapi/zelma/internal/setup"
+	"github.com/dapi/zelma/internal/supervisor"
 	"github.com/dapi/zelma/internal/zellij"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -72,6 +73,16 @@ func NewRootCommand(stdout, stderr io.Writer) *cobra.Command {
 
 	root.AddCommand(newSetupCommand(stdout))
 
+	supervisorCommand := &cobra.Command{
+		Use:   "supervisor",
+		Short: "Run issue supervision workflows.",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return cmd.Help()
+		},
+	}
+	supervisorCommand.AddCommand(newSupervisorStartIssueCommand(stdout))
+	root.AddCommand(supervisorCommand)
+
 	sessions := &cobra.Command{
 		Use:   "sessions",
 		Short: "Manage zelma sessions.",
@@ -109,6 +120,10 @@ func renderHelp(cmd *cobra.Command, args []string) {
 		fmt.Fprint(cmd.OutOrStdout(), sessionsFocusHelp)
 	case "zelma sessions cleanup":
 		fmt.Fprint(cmd.OutOrStdout(), sessionsCleanupHelp)
+	case "zelma supervisor":
+		fmt.Fprint(cmd.OutOrStdout(), supervisorHelp)
+	case "zelma supervisor start-issue":
+		fmt.Fprint(cmd.OutOrStdout(), supervisorStartIssueHelp)
 	case "zelma help":
 		fmt.Fprint(cmd.OutOrStdout(), helpCommandHelp)
 	default:
@@ -125,6 +140,8 @@ const rootHelp = `COMMAND MAP
   zelma sessions detect   Detect existing Codex panes. Status: implemented.
   zelma sessions focus    Focus a known zellij pane by zelma session ID. Status: implemented.
   zelma sessions cleanup  Propose or confirm stale record cleanup. Status: implemented.
+  zelma supervisor help   Show the supervisor command map.
+  zelma supervisor start-issue  Launch and supervise start-issue. Status: implemented.
 
 OUTPUT CONVENTIONS
   help output: stdout, exit 0, plain text.
@@ -141,12 +158,15 @@ OUTPUT CONVENTIONS
   --confirm to remove proposed stale records.
   sessions create --dry-run: stdout, exit 0, launch contract text or JSON.
   sessions create: stdout, exit 0, created/registered/skipped summary.
+  supervisor start-issue: stdout, exit 0, terminal status summary by default
+  or schema v1 supervisor JSON with launch, polling, review and cleanup state.
   machine-readable session data: use "zelma sessions list --json".
 
 RECOVERY HINTS
   unknown command: run "zelma help".
   session inventory task: run "zelma sessions list --json".
   setup task: run "zelma setup" from inside a git repository.
+  issue supervision task: run "zelma supervisor start-issue <issue> --repo owner/name --base main --json".
 
 HUMAN NOTES
   zelma manages Codex sessions in zellij panes. sessions list is the primary
@@ -323,6 +343,53 @@ Notes:
   candidate, closed and archived records are never removed by this command.
 `
 
+const supervisorHelp = `COMMAND MAP
+  zelma supervisor help         Show this supervisor command map.
+  zelma supervisor start-issue  Launch and supervise start-issue. Status: implemented.
+
+OUTPUT CONVENTIONS
+  help output: stdout, exit 0, plain text.
+  start-issue: stdout, exit 0, terminal status summary by default or schema v1
+  JSON with launch, polling, review and cleanup state with --json.
+
+RECOVERY HINTS
+  issue supervision task: run "zelma supervisor start-issue <issue> --repo owner/name --base main --json".
+  configuration error: inspect ZELMA_START_ISSUE_ZELLIJ_SURFACE and .zelma/config.json.
+  zellij error: inspect the adapter command and task pane availability.
+
+HUMAN NOTES
+  supervisor start-issue launches external start-issue in the current zellij
+  session target, observes structured pane markers, repeats review after fixes,
+  and closes the task pane only after merge simulation.
+
+Usage:
+  zelma supervisor [command]
+`
+
+const supervisorStartIssueHelp = `Usage:
+  zelma supervisor start-issue <issue> --repo <owner/name> --base <branch> [--json]
+
+Status:
+  implemented: launches external start-issue in zellij and simulates the
+  supervisor observe/review/fix/re-review/cleanup lifecycle from pane markers.
+
+Output:
+  default: terminal status summary.
+  --json: schema v1 supervisor result with issue, repository, base, launch,
+  polling, review and cleanup state.
+
+Contract:
+  launch surface resolves from ZELMA_START_ISSUE_ZELLIJ_SURFACE, then
+  .zelma/config.json start_issue.zellij_surface, then default pane.
+  poll interval must be one minute or less; default is 1m.
+  task pane markers use "ZELMA_SUPERVISOR: <phase>" for implementation,
+  review findings, fix completion, clean review and merge simulation.
+
+Notes:
+  This command does not merge GitHub PRs. FT-036 covers the local supervisor
+  lifecycle simulation and keeps JSON stable for agent automation.
+`
+
 const helpCommandHelp = `Usage:
   zelma help [command]
 
@@ -361,6 +428,80 @@ func newSetupCommand(stdout io.Writer) *cobra.Command {
 		},
 	}
 	cmd.Flags().BoolVar(&jsonOutput, "json", false, "Print setup result JSON.")
+	return cmd
+}
+
+func newSupervisorStartIssueCommand(stdout io.Writer) *cobra.Command {
+	var jsonOutput bool
+	var repository string
+	var base string
+	var agent string
+	var promptFile string
+	var pollInterval time.Duration
+	var maxPolls int
+	var maxReviews int
+
+	cmd := &cobra.Command{
+		Use:   "start-issue <issue>",
+		Short: "Launch and supervise start-issue.",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			issue, err := strconv.Atoi(args[0])
+			if err != nil || issue <= 0 {
+				return commandFailure(cmd.CommandPath(), fmt.Errorf("invalid issue %q; pass a positive integer", args[0]), jsonOutput)
+			}
+
+			root, err := repo.ResolveRoot("")
+			if err != nil {
+				return commandFailure(cmd.CommandPath(), errors.New(repo.Diagnostic(cmd.CommandPath(), err)), jsonOutput)
+			}
+			surface, err := config.StartIssueZellijSurface(root.Path)
+			if err != nil {
+				return commandFailure(cmd.CommandPath(), err, jsonOutput)
+			}
+
+			client := zellij.New(zellij.WithBinary(os.Getenv("ZELMA_ZELLIJ_BIN")))
+			result, err := supervisor.StartIssue(cmd.Context(), supervisor.Request{
+				Issue:         issue,
+				Repository:    repository,
+				Base:          base,
+				Agent:         agent,
+				PromptFile:    promptFile,
+				RepoRoot:      root.Path,
+				ZellijSession: configuredZellijSession(),
+				Surface:       surface,
+				PollInterval:  pollInterval,
+				MaxPolls:      maxPolls,
+				MaxReviews:    maxReviews,
+				Runtime:       client,
+			})
+			if err != nil {
+				return commandFailure(cmd.CommandPath(), err, jsonOutput)
+			}
+			if jsonOutput {
+				return writeSupervisorStartIssueJSON(stdout, result)
+			}
+			_, err = fmt.Fprintf(
+				stdout,
+				"status=%s issue=%d review_cycles=%d pane_closed=%t zellij_session=%s zellij_pane=%s\n",
+				result.Status,
+				result.Issue,
+				result.Review.Cycles,
+				result.Cleanup.PaneClosed,
+				result.Launch.ZellijSession,
+				result.Launch.ZellijPane,
+			)
+			return err
+		},
+	}
+	cmd.Flags().BoolVar(&jsonOutput, "json", false, "Print schema v1 supervisor result JSON.")
+	cmd.Flags().StringVar(&repository, "repo", "", "GitHub repository in owner/name format.")
+	cmd.Flags().StringVar(&base, "base", "", "Base branch passed to start-issue.")
+	cmd.Flags().StringVar(&agent, "agent", "", "Optional agent backend passed to start-issue.")
+	cmd.Flags().StringVar(&promptFile, "prompt-file", "", "Optional prompt file passed to start-issue.")
+	cmd.Flags().DurationVar(&pollInterval, "poll-interval", supervisor.DefaultPollInterval, "Pane polling interval; must be one minute or less.")
+	cmd.Flags().IntVar(&maxPolls, "max-polls", supervisor.DefaultMaxPolls, "Maximum pane polls before stopping.")
+	cmd.Flags().IntVar(&maxReviews, "max-review-cycles", supervisor.DefaultMaxReviewCycles, "Maximum review cycles before stopping.")
 	return cmd
 }
 
@@ -1071,6 +1212,15 @@ func writeCleanupProposalJSON(stdout io.Writer, proposal registry.CleanupProposa
 	return err
 }
 
+func writeSupervisorStartIssueJSON(stdout io.Writer, result supervisor.Result) error {
+	data, err := json.MarshalIndent(result, "", "  ")
+	if err != nil {
+		return fmt.Errorf("encode supervisor start-issue JSON: %w", err)
+	}
+	_, err = fmt.Fprintf(stdout, "%s\n", data)
+	return err
+}
+
 func writeFocusSessionJSON(stdout io.Writer, session registry.Session) error {
 	data, err := json.MarshalIndent(session, "", "  ")
 	if err != nil {
@@ -1300,6 +1450,18 @@ func recoveryDiagnosticForError(command string, err error) recoveryDiagnosticJSO
 		return diagnostic
 	}
 
+	var supervisorErr *supervisor.DiagnosticError
+	if errors.As(err, &supervisorErr) {
+		supervisorDiagnostic := supervisorErr.Diagnostic
+		diagnostic.Code = string(supervisorDiagnostic.Code)
+		diagnostic.Message = supervisorDiagnostic.Message
+		diagnostic.RecoveryHint = supervisorDiagnostic.RecoveryHint
+		diagnostic.Retryable = false
+		diagnostic.ManualActionRequired = true
+		diagnostic.NextCommand = nextCommandForCode(diagnostic.Code)
+		return diagnostic
+	}
+
 	var codexErr *codex.DiagnosticError
 	if errors.As(err, &codexErr) {
 		codexDiagnostic := codexErr.Diagnostic
@@ -1311,6 +1473,13 @@ func recoveryDiagnosticForError(command string, err error) recoveryDiagnosticJSO
 	}
 
 	lower := strings.ToLower(err.Error())
+	if strings.Contains(err.Error(), config.StartIssueSurfaceEnvVar) || strings.Contains(err.Error(), "start_issue.zellij_surface") {
+		diagnostic.Code = "supervisor_invalid_config"
+		diagnostic.Message = err.Error()
+		diagnostic.RecoveryHint = "set ZELMA_START_ISSUE_ZELLIJ_SURFACE or .zelma/config.json start_issue.zellij_surface to pane or tab"
+		diagnostic.NextCommand = []string{}
+		return diagnostic
+	}
 	if strings.Contains(lower, "unsupported repo") || strings.Contains(lower, "no git worktree found") {
 		diagnostic.Code = "unsupported_repo"
 		diagnostic.Message = err.Error()
