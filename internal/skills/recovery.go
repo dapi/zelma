@@ -71,6 +71,12 @@ var recoveryRules = append([]recoveryRule{
 		needles:     []string{"create_confirmation_failed"},
 	},
 	{
+		reasonCode: "create_live_check_failed",
+		action:     RecoveryActionStop,
+		message:    "Stop and fix zellij session availability; retry create only after live pane checks work again.",
+		needles:    []string{"create_live_check_failed"},
+	},
+	{
 		reasonCode:  "create_registry_write_failed",
 		action:      RecoveryActionDetect,
 		message:     "Fix the registry write problem, then force detection of any created pane before retrying create.",

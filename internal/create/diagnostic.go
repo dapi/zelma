@@ -17,6 +17,7 @@ const (
 	ReasonCodexMissingBinary  ReasonCode = "create_codex_missing_binary"
 	ReasonPaneLaunchFailed    ReasonCode = "create_pane_launch_failed"
 	ReasonPaneUnconfirmed     ReasonCode = "create_pane_unconfirmed"
+	ReasonLiveCheckFailed     ReasonCode = "create_live_check_failed"
 	ReasonConfirmationFailed  ReasonCode = "create_confirmation_failed"
 	ReasonRegistryWriteFailed ReasonCode = "create_registry_write_failed"
 	causeRegistryLocked                  = "registry_locked"
@@ -162,7 +163,43 @@ func paneLaunchFailure(err error) error {
 			diagnostic.RecoveryHint = "inspect zellij run output and adapter compatibility; zelma did not write registry state"
 		case zellij.ErrorCodeCommandFailed:
 			if zellijErr.Diagnostic.RecoveryHint != "" {
-				diagnostic.RecoveryHint = zellijErr.Diagnostic.RecoveryHint
+				diagnostic.RecoveryHint = zellijErr.Diagnostic.RecoveryHint + "; zelma did not launch a pane or write registry state"
+			}
+		}
+	}
+
+	return &DiagnosticError{Diagnostic: diagnostic, Err: err}
+}
+
+func LiveCheckFailure(err error) error {
+	if err == nil {
+		return nil
+	}
+
+	diagnostic := Diagnostic{
+		Code:         ReasonLiveCheckFailed,
+		CauseCode:    diagnosticCauseCode(err),
+		Message:      "check live zellij panes failed",
+		RecoveryHint: "inspect zellij session availability, then retry create; zelma did not launch a pane or write registry state",
+		Retryable:    true,
+	}
+
+	var zellijErr *zellij.DiagnosticError
+	if errors.As(err, &zellijErr) {
+		diagnostic.Message = zellijErr.Diagnostic.Message
+		switch zellijErr.Diagnostic.Code {
+		case zellij.ErrorCodeMissingBinary:
+			diagnostic.Retryable = false
+			diagnostic.RecoveryHint = "fix environment: " + zellijErr.Diagnostic.RecoveryHint
+		case zellij.ErrorCodeInvalidInput:
+			diagnostic.Retryable = false
+			diagnostic.RecoveryHint = "fix the create request and retry; zelma did not launch a pane or write registry state"
+		case zellij.ErrorCodeInvalidOutput:
+			diagnostic.Retryable = false
+			diagnostic.RecoveryHint = "inspect zellij list output and adapter compatibility; zelma did not launch a pane or write registry state"
+		case zellij.ErrorCodeCommandFailed:
+			if zellijErr.Diagnostic.RecoveryHint != "" {
+				diagnostic.RecoveryHint = zellijErr.Diagnostic.RecoveryHint + "; zelma did not launch a pane or write registry state"
 			}
 		}
 	}

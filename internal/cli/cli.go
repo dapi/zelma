@@ -436,7 +436,7 @@ func newSessionsCreateCommand(stdout io.Writer) *cobra.Command {
 				}
 				existingSession, exists, err := findLiveActiveSessionForOpenedPath(cmd.Context(), current, openedPath, os.Getenv("ZELMA_CODEX_BIN"), client)
 				if err != nil {
-					return fmt.Errorf("%s: %w", cmd.CommandPath(), err)
+					return fmt.Errorf("%s: %w", cmd.CommandPath(), create.LiveCheckFailure(err))
 				}
 				if exists {
 					summary := create.Summary{Skipped: 1}

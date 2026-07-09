@@ -984,6 +984,56 @@ func TestSessionsCreateJSONSkipsDuplicateLiveCodexPaneWithoutArgvUUID(t *testing
 	}
 }
 
+func TestSessionsCreateLiveCheckFailureReportsCreateDiagnostic(t *testing.T) {
+	root := newTestGitRepo(t)
+	paneRoot := resolvedPath(t, root)
+	writeRegistryFile(t, root, `{
+  "version": 1,
+  "sessions": [
+    {
+      "id": 4,
+      "zellij_session": "zelma-main",
+      "zellij_tab": "tab_1",
+      "zellij_tab_name": "work",
+      "zellij_pane": "terminal_3",
+      "codex_session": "11111111-1111-4111-8111-111111111111",
+      "opened_path": "`+paneRoot+`",
+      "state": "active"
+    }
+  ]
+}
+`)
+	before := readFile(t, registry.RegistryPath(root))
+	t.Setenv("ZELMA_CODEX_BIN", writeFakeCodex(t))
+	t.Setenv("ZELMA_ZELLIJ_BIN", writeFakeZellijListSessionsFailure(t))
+	t.Chdir(root)
+
+	var stdout, stderr bytes.Buffer
+
+	code := Run(context.Background(), []string{"sessions", "create", "--json"}, &stdout, &stderr)
+
+	if code != 1 {
+		t.Fatalf("Run() code = %d, want 1", code)
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("stdout = %q, want empty", stdout.String())
+	}
+	for _, want := range []string{
+		"create_live_check_failed",
+		"cause=zellij_command_failed",
+		"retryable=true",
+		"zellij server temporarily unavailable",
+		"did not launch a pane or write registry state",
+	} {
+		if !strings.Contains(stderr.String(), want) {
+			t.Fatalf("stderr = %q, want substring %q", stderr.String(), want)
+		}
+	}
+	if after := readFile(t, registry.RegistryPath(root)); after != before {
+		t.Fatalf("registry changed after failed duplicate live check\nbefore:\n%s\nafter:\n%s", before, after)
+	}
+}
+
 func TestSessionsCreateJSONDoesNotSkipSameCWDNonCodexPane(t *testing.T) {
 	root := newTestGitRepo(t)
 	paneRoot := resolvedPath(t, root)
