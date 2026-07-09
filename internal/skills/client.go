@@ -71,9 +71,10 @@ type CreateLaunchContract struct {
 }
 
 type CreateSummary struct {
-	Created    int `json:"created"`
-	Registered int `json:"registered"`
-	Skipped    int `json:"skipped"`
+	Created    int     `json:"created"`
+	Registered int     `json:"registered"`
+	Skipped    int     `json:"skipped"`
+	Session    Session `json:"session,omitempty"`
 }
 
 type DetectSummary struct {

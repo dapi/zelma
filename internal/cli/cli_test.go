@@ -700,11 +700,143 @@ func TestSessionsCreateJSONSummary(t *testing.T) {
 	want := `{
   "created": 1,
   "registered": 1,
-  "skipped": 0
+  "skipped": 0,
+  "session": {
+    "id": 1,
+    "zellij_session": "zelma-main",
+    "zellij_tab": "tab_1",
+    "zellij_tab_name": "work",
+    "zellij_pane": "terminal_3",
+    "codex_session": "",
+    "opened_path": "` + paneRoot + `",
+    "state": "candidate"
+  }
 }
 `
 	if stdout.String() != want {
 		t.Fatalf("stdout mismatch\nwant:\n%s\ngot:\n%s", want, stdout.String())
+	}
+}
+
+func TestSessionsCreateJSONReturnsNewRecordWhenPaneKeyWasHistorical(t *testing.T) {
+	root := newTestGitRepo(t)
+	paneRoot := resolvedPath(t, root)
+	writeRegistryFile(t, root, `{
+  "version": 1,
+  "sessions": [
+    {
+      "id": 8,
+      "zellij_session": "zelma-main",
+      "zellij_pane": "terminal_3",
+      "codex_session": "11111111-1111-4111-8111-111111111111",
+      "opened_path": "/workspace/old",
+      "state": "stale"
+    },
+    {
+      "id": 9,
+      "zellij_session": "zelma-main",
+      "zellij_pane": "terminal_4",
+      "codex_session": "22222222-2222-4222-8222-222222222222",
+      "opened_path": "/workspace/closed",
+      "state": "closed"
+    }
+  ]
+}
+`)
+	fakeCodex := writeFakeCodex(t)
+	t.Setenv("ZELMA_CODEX_BIN", fakeCodex)
+	t.Setenv("ZELMA_ZELLIJ_BIN", writeFakeCreateZellij(t, "terminal_3", panesJSONWithID(3, paneRoot, fakeCodex+" --cd "+paneRoot, true)))
+	t.Chdir(root)
+
+	var stdout, stderr bytes.Buffer
+
+	code := Run(context.Background(), []string{"sessions", "create", "--json"}, &stdout, &stderr)
+
+	if code != 0 {
+		t.Fatalf("Run() code = %d, want 0; stderr = %q", code, stderr.String())
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("stderr = %q, want empty", stderr.String())
+	}
+	var got struct {
+		Created    int              `json:"created"`
+		Registered int              `json:"registered"`
+		Skipped    int              `json:"skipped"`
+		Session    registry.Session `json:"session"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &got); err != nil {
+		t.Fatalf("decode create JSON: %v; stdout = %q", err, stdout.String())
+	}
+	if got.Created != 1 || got.Registered != 1 || got.Skipped != 0 {
+		t.Fatalf("summary = %+v, want created=1 registered=1 skipped=0", got)
+	}
+	if got.Session.ID != 10 ||
+		got.Session.ZellijPane != "terminal_3" ||
+		got.Session.OpenedPath != paneRoot ||
+		got.Session.State != registry.StateCandidate {
+		t.Fatalf("session = %+v, want newly appended candidate for reused terminal_3", got.Session)
+	}
+}
+
+func TestSessionsCreateJSONPrefersActiveWhenLaterCandidateDuplicatesPaneKey(t *testing.T) {
+	root := newTestGitRepo(t)
+	paneRoot := resolvedPath(t, root)
+	activePath := filepath.Join(paneRoot, "active")
+	writeRegistryFile(t, root, `{
+  "version": 1,
+  "sessions": [
+    {
+      "id": 8,
+      "zellij_session": "zelma-main",
+      "zellij_pane": "terminal_3",
+      "codex_session": "11111111-1111-4111-8111-111111111111",
+      "opened_path": "`+activePath+`",
+      "state": "active"
+    },
+    {
+      "id": 9,
+      "zellij_session": "zelma-main",
+      "zellij_pane": "terminal_3",
+      "codex_session": "",
+      "opened_path": "`+paneRoot+`",
+      "state": "candidate"
+    }
+  ]
+}
+`)
+	fakeCodex := writeFakeCodex(t)
+	t.Setenv("ZELMA_CODEX_BIN", fakeCodex)
+	t.Setenv("ZELMA_ZELLIJ_BIN", writeFakeCreateZellij(t, "terminal_3", panesJSONWithID(3, paneRoot, fakeCodex+" --cd "+paneRoot, true)))
+	t.Chdir(root)
+
+	var stdout, stderr bytes.Buffer
+
+	code := Run(context.Background(), []string{"sessions", "create", "--json"}, &stdout, &stderr)
+
+	if code != 0 {
+		t.Fatalf("Run() code = %d, want 0; stderr = %q", code, stderr.String())
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("stderr = %q, want empty", stderr.String())
+	}
+	var got struct {
+		Created    int              `json:"created"`
+		Registered int              `json:"registered"`
+		Skipped    int              `json:"skipped"`
+		Session    registry.Session `json:"session"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &got); err != nil {
+		t.Fatalf("decode create JSON: %v; stdout = %q", err, stdout.String())
+	}
+	if got.Created != 1 || got.Registered != 1 || got.Skipped != 0 {
+		t.Fatalf("summary = %+v, want created=1 registered=1 skipped=0", got)
+	}
+	if got.Session.ID != 8 ||
+		got.Session.ZellijPane != "terminal_3" ||
+		got.Session.CodexSession != "11111111-1111-4111-8111-111111111111" ||
+		got.Session.OpenedPath != activePath ||
+		got.Session.State != registry.StateActive {
+		t.Fatalf("session = %+v, want existing active record for reused terminal_3", got.Session)
 	}
 }
 
@@ -1745,7 +1877,10 @@ func TestSessionsDetectPIDFallbackExplainRedactsRawProcessDetails(t *testing.T) 
 	}
 	registryData := readFile(t, registry.RegistryPath(root))
 	for _, output := range []string{stdout.String(), registryData} {
-		if strings.Contains(output, privatePrompt) || strings.Contains(output, "TOKEN=") || strings.Contains(output, "101") || strings.Contains(output, "4242") {
+		if strings.Contains(output, privatePrompt) ||
+			strings.Contains(output, "TOKEN=") ||
+			strings.Contains(output, `"pid": 101`) ||
+			strings.Contains(output, `"pane_pid": 4242`) {
 			t.Fatalf("output leaked raw process details: %s", output)
 		}
 	}

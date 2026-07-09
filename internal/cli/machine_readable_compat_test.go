@@ -176,13 +176,24 @@ func TestMachineReadableOutputCompatibilityExamples(t *testing.T) {
 				t.Chdir(root)
 				return root
 			},
-			want: func(string) string {
-				return `{
+			want: func(root string) string {
+				openedPath := resolvedPath(t, root)
+				return fmt.Sprintf(`{
   "created": 1,
   "registered": 1,
-  "skipped": 0
+  "skipped": 0,
+  "session": {
+    "id": 1,
+    "zellij_session": "zelma-main",
+    "zellij_tab": "tab_1",
+    "zellij_tab_name": "work",
+    "zellij_pane": "terminal_3",
+    "codex_session": "",
+    "opened_path": %q,
+    "state": "candidate"
+  }
 }
-`
+`, openedPath)
 			},
 			parse: parseSkillCreateSummary,
 		},
@@ -512,13 +523,18 @@ func parseSkillCreateSummary(t *testing.T, data []byte) {
 	t.Helper()
 
 	var output struct {
-		Created    int `json:"created"`
-		Registered int `json:"registered"`
-		Skipped    int `json:"skipped"`
+		Created    int          `json:"created"`
+		Registered int          `json:"registered"`
+		Skipped    int          `json:"skipped"`
+		Session    skillSession `json:"session"`
 	}
 	decodeStrict(t, data, &output)
 	if output.Created != 1 || output.Registered != 1 || output.Skipped != 0 {
 		t.Fatalf("create summary = %+v, want created=1 registered=1 skipped=0", output)
+	}
+	assertSkillSession(t, output.Session)
+	if output.Session.State != "candidate" || output.Session.ZellijPane == "" {
+		t.Fatalf("create session = %+v, want registered candidate session", output.Session)
 	}
 }
 
