@@ -778,6 +778,68 @@ func TestSessionsCreateJSONReturnsNewRecordWhenPaneKeyWasHistorical(t *testing.T
 	}
 }
 
+func TestSessionsCreateJSONPrefersActiveWhenLaterCandidateDuplicatesPaneKey(t *testing.T) {
+	root := newTestGitRepo(t)
+	paneRoot := resolvedPath(t, root)
+	activePath := filepath.Join(paneRoot, "active")
+	writeRegistryFile(t, root, `{
+  "version": 1,
+  "sessions": [
+    {
+      "id": 8,
+      "zellij_session": "zelma-main",
+      "zellij_pane": "terminal_3",
+      "codex_session": "11111111-1111-4111-8111-111111111111",
+      "opened_path": "`+activePath+`",
+      "state": "active"
+    },
+    {
+      "id": 9,
+      "zellij_session": "zelma-main",
+      "zellij_pane": "terminal_3",
+      "codex_session": "",
+      "opened_path": "`+paneRoot+`",
+      "state": "candidate"
+    }
+  ]
+}
+`)
+	fakeCodex := writeFakeCodex(t)
+	t.Setenv("ZELMA_CODEX_BIN", fakeCodex)
+	t.Setenv("ZELMA_ZELLIJ_BIN", writeFakeCreateZellij(t, "terminal_3", panesJSONWithID(3, paneRoot, fakeCodex+" --cd "+paneRoot, true)))
+	t.Chdir(root)
+
+	var stdout, stderr bytes.Buffer
+
+	code := Run(context.Background(), []string{"sessions", "create", "--json"}, &stdout, &stderr)
+
+	if code != 0 {
+		t.Fatalf("Run() code = %d, want 0; stderr = %q", code, stderr.String())
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("stderr = %q, want empty", stderr.String())
+	}
+	var got struct {
+		Created    int              `json:"created"`
+		Registered int              `json:"registered"`
+		Skipped    int              `json:"skipped"`
+		Session    registry.Session `json:"session"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &got); err != nil {
+		t.Fatalf("decode create JSON: %v; stdout = %q", err, stdout.String())
+	}
+	if got.Created != 1 || got.Registered != 1 || got.Skipped != 0 {
+		t.Fatalf("summary = %+v, want created=1 registered=1 skipped=0", got)
+	}
+	if got.Session.ID != 8 ||
+		got.Session.ZellijPane != "terminal_3" ||
+		got.Session.CodexSession != "11111111-1111-4111-8111-111111111111" ||
+		got.Session.OpenedPath != activePath ||
+		got.Session.State != registry.StateActive {
+		t.Fatalf("session = %+v, want existing active record for reused terminal_3", got.Session)
+	}
+}
+
 func TestSessionsListEmptyRegistrySucceeds(t *testing.T) {
 	root := newTestGitRepo(t)
 	writeRegistryFile(t, root, `{

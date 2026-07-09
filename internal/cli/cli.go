@@ -1084,13 +1084,18 @@ func findSessionByID(reg registry.Registry, id int) (registry.Session, bool) {
 }
 
 func findSessionByPane(reg registry.Registry, zellijSession, zellijPane string) registry.Session {
-	for i := len(reg.Sessions) - 1; i >= 0; i-- {
-		session := reg.Sessions[i]
+	for _, session := range reg.Sessions {
 		if session.ZellijSession == zellijSession && session.ZellijPane == zellijPane {
-			if session.State != registry.StateActive && session.State != registry.StateCandidate {
-				continue
+			if session.State == registry.StateActive {
+				return session
 			}
-			return session
+		}
+	}
+	for _, session := range reg.Sessions {
+		if session.ZellijSession == zellijSession && session.ZellijPane == zellijPane {
+			if session.State == registry.StateCandidate {
+				return session
+			}
 		}
 	}
 	return registry.Session{}
