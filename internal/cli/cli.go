@@ -1008,12 +1008,11 @@ func jsonCommandForArgs(root *cobra.Command, args []string) (*cobra.Command, boo
 	if command.Flags().Lookup("json") == nil {
 		return nil, false
 	}
-	for _, arg := range args {
-		if arg == "--json" || strings.HasPrefix(arg, "--json=") {
-			return command, true
-		}
+	jsonOutput, err := command.Flags().GetBool("json")
+	if err != nil || !jsonOutput {
+		return nil, false
 	}
-	return nil, false
+	return command, true
 }
 
 func jsonArgumentFailure(command string, err error) error {
@@ -1077,7 +1076,9 @@ func recoveryDiagnosticForError(command string, err error) recoveryDiagnosticJSO
 		registryDiagnostic := registryErr.Diagnostic
 		diagnostic.Code = string(registryDiagnostic.Code)
 		diagnostic.Message = registryDiagnostic.Message
-		diagnostic.RegistryPath = registryDiagnostic.Path
+		if isRegistryFilePath(registryDiagnostic.Path) {
+			diagnostic.RegistryPath = registryDiagnostic.Path
+		}
 		diagnostic.RecoveryHint = registryDiagnostic.RecoveryHint
 		diagnostic.NextCommand = nextCommandForCode(diagnostic.Code)
 		return diagnostic
@@ -1139,6 +1140,10 @@ func manualActionRequiredForCreateDiagnostic(diagnostic create.Diagnostic) bool 
 	default:
 		return !diagnostic.Retryable
 	}
+}
+
+func isRegistryFilePath(path string) bool {
+	return filepath.Base(path) == registry.RegistryFileName
 }
 
 func nextCommandForCode(code string) []string {

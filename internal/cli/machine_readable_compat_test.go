@@ -403,6 +403,10 @@ func TestMachineReadableDiagnosticCompatibility(t *testing.T) {
 	if stdout.Len() != 0 {
 		t.Fatalf("stdout = %q, want empty", stdout.String())
 	}
+	diagnostic := decodeSkillRecoveryDiagnostic(t, stderr.Bytes())
+	if diagnostic.Code != "registry_unsupported_version" || diagnostic.RegistryPath != "" {
+		t.Fatalf("diagnostic = %+v, want unsupported version without registry_path", diagnostic)
+	}
 	for _, want := range []string{
 		"zelma sessions list:",
 		"registry_unsupported_version",
@@ -412,6 +416,28 @@ func TestMachineReadableDiagnosticCompatibility(t *testing.T) {
 		if !strings.Contains(stderr.String(), want) {
 			t.Fatalf("stderr = %q, want substring %q", stderr.String(), want)
 		}
+	}
+}
+
+func TestMachineReadableInvalidRegistryJSONReportsRegistryFilePath(t *testing.T) {
+	root := newTestGitRepo(t)
+	registryPath := registry.RegistryPath(resolvedPath(t, root))
+	writeRegistryFile(t, root, `{"version":`)
+	t.Chdir(root)
+
+	var stdout, stderr bytes.Buffer
+
+	code := Run(context.Background(), []string{"sessions", "list", "--no-detect", "--json"}, &stdout, &stderr)
+
+	if code != 1 {
+		t.Fatalf("Run() code = %d, want 1", code)
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("stdout = %q, want empty", stdout.String())
+	}
+	diagnostic := decodeSkillRecoveryDiagnostic(t, stderr.Bytes())
+	if diagnostic.Code != "registry_invalid_json" || diagnostic.RegistryPath != registryPath {
+		t.Fatalf("diagnostic = %+v, want invalid JSON with registry_path %q", diagnostic, registryPath)
 	}
 }
 
@@ -517,6 +543,28 @@ func TestMachineReadableArgumentValidationDiagnostics(t *testing.T) {
 	}
 }
 
+func TestExplicitJSONFalseKeepsHumanArgumentValidationDiagnostic(t *testing.T) {
+	root := newTestGitRepo(t)
+	t.Chdir(root)
+
+	var stdout, stderr bytes.Buffer
+
+	code := Run(context.Background(), []string{"sessions", "focus", "--json=false"}, &stdout, &stderr)
+
+	if code != 1 {
+		t.Fatalf("Run() code = %d, want 1", code)
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("stdout = %q, want empty", stdout.String())
+	}
+	if strings.Contains(stderr.String(), `"code"`) || strings.HasPrefix(strings.TrimSpace(stderr.String()), "{") {
+		t.Fatalf("stderr = %q, want human diagnostic when --json=false", stderr.String())
+	}
+	if !strings.Contains(stderr.String(), "accepts 1 arg(s), received 0") {
+		t.Fatalf("stderr = %q, want Cobra argument validation diagnostic", stderr.String())
+	}
+}
+
 type skillRecoveryDiagnostic struct {
 	Code                 string   `json:"code"`
 	CommandPath          string   `json:"command_path"`
@@ -526,6 +574,7 @@ type skillRecoveryDiagnostic struct {
 	ManualActionRequired bool     `json:"manual_action_required"`
 	RecoveryHint         string   `json:"recovery_hint"`
 	NextCommand          []string `json:"next_command"`
+	RegistryPath         string   `json:"registry_path,omitempty"`
 }
 
 func decodeSkillRecoveryDiagnostic(t *testing.T, data []byte) skillRecoveryDiagnostic {
