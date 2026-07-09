@@ -798,6 +798,69 @@ func TestSessionsCreateJSONSkipsDuplicateLiveActiveSessionWithMissingCodex(t *te
 	}
 }
 
+func TestSessionsCreateJSONDoesNotSkipReusedPaneKeyWithDifferentLivePane(t *testing.T) {
+	root := newTestGitRepo(t)
+	paneRoot := resolvedPath(t, root)
+	reusedPaneRoot := filepath.Join(paneRoot, "other-worktree")
+	if err := os.MkdirAll(reusedPaneRoot, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeRegistryFile(t, root, `{
+  "version": 1,
+  "sessions": [
+    {
+      "id": 4,
+      "zellij_session": "zelma-main",
+      "zellij_tab": "tab_1",
+      "zellij_tab_name": "work",
+      "zellij_pane": "terminal_3",
+      "codex_session": "11111111-1111-4111-8111-111111111111",
+      "opened_path": "`+paneRoot+`",
+      "state": "active"
+    }
+  ]
+}
+`)
+	callsPath := filepath.Join(t.TempDir(), "zellij-calls.txt")
+	fakeCodex := writeFakeCodex(t)
+	panesJSON := reusedPaneKeyPanesJSON(t, reusedPaneRoot, fakeCodex+" --cd "+paneRoot, paneRoot)
+	t.Setenv("ZELMA_CODEX_BIN", fakeCodex)
+	t.Setenv("ZELMA_ZELLIJ_BIN", writeFakeHandoffCreateZellij(t, callsPath, panesJSON, "terminal_7"))
+	t.Chdir(root)
+
+	var stdout, stderr bytes.Buffer
+
+	code := Run(context.Background(), []string{"sessions", "create", "--json"}, &stdout, &stderr)
+
+	if code != 0 {
+		t.Fatalf("Run() code = %d, want 0; stderr = %q", code, stderr.String())
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("stderr = %q, want empty", stderr.String())
+	}
+	var got struct {
+		Created    int              `json:"created"`
+		Registered int              `json:"registered"`
+		Skipped    int              `json:"skipped"`
+		Session    registry.Session `json:"session"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &got); err != nil {
+		t.Fatalf("decode create JSON: %v; stdout = %q", err, stdout.String())
+	}
+	if got.Created != 1 || got.Registered != 1 || got.Skipped != 0 {
+		t.Fatalf("summary = %+v, want new create instead of duplicate skip", got)
+	}
+	if got.Session.ZellijPane != "terminal_7" ||
+		got.Session.OpenedPath != paneRoot ||
+		got.Session.State != registry.StateCandidate {
+		t.Fatalf("session = %+v, want newly registered terminal_7 candidate", got.Session)
+	}
+	calls := readFile(t, callsPath)
+	if !strings.Contains(calls, "--session zelma-main run --cwd "+paneRoot+" --name codex -- "+fakeCodex+" --cd "+paneRoot) {
+		t.Fatalf("fake zellij calls = %q, want create run after rejecting reused pane key", calls)
+	}
+}
+
 func TestSessionsCreateJSONReturnsNewRecordWhenPaneKeyWasHistorical(t *testing.T) {
 	root := newTestGitRepo(t)
 	paneRoot := resolvedPath(t, root)
@@ -2785,6 +2848,35 @@ exit 2
 	return path
 }
 
+func writeFakeHandoffCreateZellij(t *testing.T, callsPath, panesJSON, paneID string) string {
+	t.Helper()
+
+	path := filepath.Join(t.TempDir(), "fake-zellij")
+	script := `#!/bin/sh
+printf '%s\n' "$*" >> ` + shellQuoteForTest(callsPath) + `
+if [ "$1" = "list-sessions" ]; then
+  printf 'zelma-main\n'
+  exit 0
+fi
+if [ "$1" = "--session" ] && [ "$2" = "zelma-main" ] && [ "$3" = "action" ] && [ "$4" = "list-panes" ]; then
+  cat <<'JSON'
+` + panesJSON + `
+JSON
+  exit 0
+fi
+if [ "$1" = "--session" ] && [ "$2" = "zelma-main" ] && [ "$3" = "run" ]; then
+  printf '%s\n' '` + paneID + `'
+  exit 0
+fi
+printf 'unexpected fake zellij args: %s\n' "$*" >&2
+exit 2
+`
+	if err := os.WriteFile(path, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
 func assertFakeZellijListSessionsCalls(t *testing.T, callsPath string, want int) {
 	t.Helper()
 
@@ -2950,6 +3042,46 @@ func panesJSONWithOptionalPID(id int, cwd, command string, codex bool, pid *int)
     "pane_cwd": %q
   }
 ]`, id, pidField, title, command, cwd)
+}
+
+func reusedPaneKeyPanesJSON(t *testing.T, reusedPaneRoot, createdCommand, createdCWD string) string {
+	t.Helper()
+
+	panes := []map[string]any{
+		{
+			"id":            3,
+			"is_plugin":     false,
+			"title":         "shell",
+			"is_focused":    true,
+			"is_floating":   false,
+			"is_suppressed": false,
+			"exited":        false,
+			"tab_id":        1,
+			"tab_position":  0,
+			"tab_name":      "work",
+			"pane_command":  "/bin/zsh",
+			"pane_cwd":      reusedPaneRoot,
+		},
+		{
+			"id":            7,
+			"is_plugin":     false,
+			"title":         "codex",
+			"is_focused":    false,
+			"is_floating":   false,
+			"is_suppressed": false,
+			"exited":        false,
+			"tab_id":        1,
+			"tab_position":  0,
+			"tab_name":      "work",
+			"pane_command":  createdCommand,
+			"pane_cwd":      createdCWD,
+		},
+	}
+	data, err := json.MarshalIndent(panes, "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(data)
 }
 
 func shellQuoteForTest(value string) string {

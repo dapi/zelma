@@ -434,7 +434,7 @@ func newSessionsCreateCommand(stdout io.Writer) *cobra.Command {
 				if err != nil {
 					return err
 				}
-				existingSession, exists, err := findLiveActiveSessionForOpenedPath(cmd.Context(), current, openedPath, client)
+				existingSession, exists, err := findLiveActiveSessionForOpenedPath(cmd.Context(), current, openedPath, os.Getenv("ZELMA_CODEX_BIN"), client)
 				if err != nil {
 					return fmt.Errorf("%s: %w", cmd.CommandPath(), err)
 				}
@@ -511,7 +511,7 @@ func newSessionsCreateCommand(stdout io.Writer) *cobra.Command {
 	return cmd
 }
 
-func findLiveActiveSessionForOpenedPath(ctx context.Context, reg registry.Registry, openedPath string, client live.Inventory) (registry.Session, bool, error) {
+func findLiveActiveSessionForOpenedPath(ctx context.Context, reg registry.Registry, openedPath, launchBinary string, client live.Inventory) (registry.Session, bool, error) {
 	var matches []registry.Session
 	for _, session := range reg.Sessions {
 		if session.State != registry.StateActive {
@@ -526,16 +526,98 @@ func findLiveActiveSessionForOpenedPath(ctx context.Context, reg registry.Regist
 		return registry.Session{}, false, nil
 	}
 
-	view, err := live.Reconcile(ctx, registry.Registry{Version: reg.Version, Sessions: matches}, client)
+	liveSessions, err := client.ListSessions(ctx)
 	if err != nil {
 		return registry.Session{}, false, err
 	}
-	for _, session := range view.Sessions {
-		if session.LiveStatus == live.StatusLive {
-			return session.Session, true, nil
+	sessionNames := make(map[string]struct{}, len(liveSessions))
+	for _, session := range liveSessions {
+		sessionNames[session.Name] = struct{}{}
+	}
+
+	panesBySession := make(map[string][]zellij.Pane)
+	for _, session := range matches {
+		if _, ok := sessionNames[session.ZellijSession]; !ok {
+			continue
+		}
+		panes, ok := panesBySession[session.ZellijSession]
+		if !ok {
+			var err error
+			panes, err = client.ListPanes(ctx, session.ZellijSession)
+			if err != nil {
+				return registry.Session{}, false, err
+			}
+			panesBySession[session.ZellijSession] = panes
+		}
+		for _, pane := range panes {
+			if pane.ID.String() != session.ZellijPane {
+				continue
+			}
+			if livePaneMatchesActiveSession(session, pane, openedPath, launchBinary) {
+				return session, true, nil
+			}
 		}
 	}
 	return registry.Session{}, false, nil
+}
+
+func livePaneMatchesActiveSession(session registry.Session, pane zellij.Pane, openedPath, launchBinary string) bool {
+	if pane.ID.Kind != zellij.PaneKindTerminal || pane.Exited {
+		return false
+	}
+	if normalizedLivePaneCWD(pane.PaneCWD) != openedPath {
+		return false
+	}
+	if !livePaneCommandMatchesActiveSession(pane.PaneCommand, session.CodexSession, launchBinary) {
+		return false
+	}
+	return true
+}
+
+func normalizedLivePaneCWD(cwd *string) string {
+	if cwd == nil || strings.TrimSpace(*cwd) == "" || !filepath.IsAbs(*cwd) {
+		return ""
+	}
+	return filepath.Clean(*cwd)
+}
+
+func livePaneCommandMatchesActiveSession(command *string, codexSession, launchBinary string) bool {
+	if command == nil || strings.TrimSpace(*command) == "" {
+		return false
+	}
+	commandSession := codexSessionFromLivePaneCommand(*command)
+	if commandSession != "" && codexSession != "" && commandSession != codexSession {
+		return false
+	}
+	return paneCommandMatchesConfiguredCodex(*command, launchBinary) || detection.CodexCommandEntrypoint(*command) != ""
+}
+
+func codexSessionFromLivePaneCommand(command string) string {
+	evidence := codex.FindCommandSessionEvidence(command)
+	if evidence.Verdict != codex.SessionEvidenceResolved || evidence.Ref == nil {
+		return ""
+	}
+	return evidence.Ref.SessionID
+}
+
+func paneCommandMatchesConfiguredCodex(command, launchBinary string) bool {
+	if strings.TrimSpace(launchBinary) == "" {
+		return false
+	}
+	executable := detection.CodexCommandEntrypoint(command)
+	if executable == "" {
+		executable = detection.CommandExecutable(command)
+	}
+	if executable == "" {
+		return false
+	}
+	if executable == launchBinary {
+		return true
+	}
+	if filepath.IsAbs(executable) && filepath.IsAbs(launchBinary) {
+		return filepath.Clean(executable) == filepath.Clean(launchBinary)
+	}
+	return filepath.Base(executable) == filepath.Base(launchBinary)
 }
 
 func newSessionsDetectCommand(stdout io.Writer) *cobra.Command {
