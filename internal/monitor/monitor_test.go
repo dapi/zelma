@@ -96,6 +96,71 @@ func TestRefreshPreservesSelectionWhenSessionStillVisible(t *testing.T) {
 	}
 }
 
+func TestRefreshDoesNotOverlapWhileSnapshotInFlight(t *testing.T) {
+	provider := &fakeProvider{snapshots: []statusbackend.Snapshot{mixedSnapshot()}}
+	app := New(context.Background(), provider, nil)
+
+	refreshCmd := app.Init()
+	if refreshCmd == nil {
+		t.Fatalf("Init() returned nil command, want initial refresh")
+	}
+	if !app.refreshing {
+		t.Fatalf("app.refreshing = false, want true while initial refresh is in flight")
+	}
+
+	_, overlappingCmd := app.Update(tickMsg{})
+	if overlappingCmd != nil {
+		t.Fatalf("tick while refresh is in flight returned command, want nil")
+	}
+
+	msg := refreshCmd().(snapshotMsg)
+	_, nextTickCmd := app.Update(msg)
+	if app.refreshing {
+		t.Fatalf("app.refreshing = true after snapshot, want false")
+	}
+	if nextTickCmd == nil {
+		t.Fatalf("snapshot completion returned nil command, want next tick scheduled")
+	}
+}
+
+func TestManualRefreshInvalidatesPreviouslyScheduledTick(t *testing.T) {
+	provider := &fakeProvider{snapshots: []statusbackend.Snapshot{
+		mixedSnapshot(),
+		mixedSnapshot(),
+		mixedSnapshot(),
+	}}
+	app := New(context.Background(), provider, nil)
+
+	initialRefreshCmd := app.Init()
+	initialMsg := initialRefreshCmd().(snapshotMsg)
+	_, initialTickCmd := app.Update(initialMsg)
+	if initialTickCmd == nil {
+		t.Fatalf("initial snapshot completion returned nil command, want scheduled tick")
+	}
+	oldTick := tickMsg{generation: app.tickGeneration}
+
+	manualRefreshCmd := app.beginRefresh()
+	if manualRefreshCmd == nil {
+		t.Fatalf("manual refresh returned nil command, want refresh command")
+	}
+	manualMsg := manualRefreshCmd().(snapshotMsg)
+	_, manualTickCmd := app.Update(manualMsg)
+	if manualTickCmd == nil {
+		t.Fatalf("manual snapshot completion returned nil command, want replacement tick")
+	}
+
+	_, staleTickCmd := app.Update(oldTick)
+	if staleTickCmd != nil {
+		t.Fatalf("stale tick returned command, want nil")
+	}
+
+	currentTick := tickMsg{generation: app.tickGeneration}
+	_, currentTickCmd := app.Update(currentTick)
+	if currentTickCmd == nil {
+		t.Fatalf("current tick returned nil command, want refresh command")
+	}
+}
+
 func TestFocusSelectedLiveSessionDelegatesByID(t *testing.T) {
 	focuser := &fakeFocuser{}
 	app := New(context.Background(), nil, focuser)

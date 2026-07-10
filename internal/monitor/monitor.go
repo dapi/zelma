@@ -34,6 +34,8 @@ type App struct {
 	showOther      bool
 	statusMessage  string
 	recoveryNotice string
+	refreshing     bool
+	tickGeneration uint64
 }
 
 type Row struct {
@@ -70,7 +72,7 @@ func New(ctx context.Context, provider Provider, focuser Focuser, opts ...Option
 
 func Run(ctx context.Context, provider Provider, focuser Focuser, output io.Writer, opts ...Option) error {
 	app := New(ctx, provider, focuser, opts...)
-	programOptions := []tea.ProgramOption{}
+	programOptions := []tea.ProgramOption{tea.WithContext(app.ctx)}
 	if output != nil {
 		programOptions = append(programOptions, tea.WithOutput(output))
 	}
@@ -79,7 +81,7 @@ func Run(ctx context.Context, provider Provider, focuser Focuser, output io.Writ
 }
 
 func (app *App) Init() tea.Cmd {
-	return tea.Batch(app.refreshCmd(), app.tickCmd())
+	return app.beginRefresh()
 }
 
 func (app *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -95,7 +97,7 @@ func (app *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			app.Move(1)
 			return app, nil
 		case "r":
-			return app, app.refreshCmd()
+			return app, app.beginRefresh()
 		case "tab", "t":
 			app.ToggleOther()
 			return app, nil
@@ -103,10 +105,14 @@ func (app *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return app, app.focusCmd()
 		}
 	case tickMsg:
-		return app, tea.Batch(app.refreshCmd(), app.tickCmd())
+		if msg.generation != app.tickGeneration {
+			return app, nil
+		}
+		return app, app.beginRefresh()
 	case snapshotMsg:
+		app.refreshing = false
 		app.applySnapshot(msg.snapshot, msg.err)
-		return app, nil
+		return app, app.tickCmd()
 	case focusMsg:
 		app.applyFocusResult(msg.id, msg.err)
 		return app, nil
@@ -273,12 +279,22 @@ func (app *App) refreshCmd() tea.Cmd {
 	}
 }
 
+func (app *App) beginRefresh() tea.Cmd {
+	if app.refreshing {
+		return nil
+	}
+	app.tickGeneration++
+	app.refreshing = true
+	return app.refreshCmd()
+}
+
 func (app *App) tickCmd() tea.Cmd {
 	if app.refreshInterval <= 0 {
 		return nil
 	}
+	generation := app.tickGeneration
 	return tea.Tick(app.refreshInterval, func(t time.Time) tea.Msg {
-		return tickMsg(t)
+		return tickMsg{generation: generation}
 	})
 }
 
@@ -349,4 +365,6 @@ type focusMsg struct {
 	err error
 }
 
-type tickMsg time.Time
+type tickMsg struct {
+	generation uint64
+}
