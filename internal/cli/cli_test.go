@@ -104,6 +104,11 @@ func TestHelpRoutes(t *testing.T) {
 			wantOutput: []string{"Usage:", "zelma status --json"},
 		},
 		{
+			name:       "monitor",
+			args:       []string{"monitor", "--help"},
+			wantOutput: []string{"Usage:", "zelma monitor", "read-only terminal monitor"},
+		},
+		{
 			name:       "sessions list",
 			args:       []string{"sessions", "list", "--help"},
 			wantOutput: []string{"Usage:", "zelma sessions list"},
@@ -176,6 +181,11 @@ func TestCommandHelpSnapshots(t *testing.T) {
 			name: "status help",
 			args: []string{"status", "--help"},
 			want: statusHelp,
+		},
+		{
+			name: "monitor help",
+			args: []string{"monitor", "--help"},
+			want: monitorHelp,
 		},
 		{
 			name: "sessions create help",
@@ -359,6 +369,7 @@ const rootHelpSnapshot = `COMMAND MAP
   zelma help              Show this command map.
   zelma setup             Add .zelma to this repository .gitignore. Status: implemented.
   zelma status            Print dashboard status snapshot. Status: implemented.
+  zelma monitor           Open a live zelma sessions terminal monitor. Status: implemented.
   zelma sessions help     Show the sessions command map.
   zelma sessions list     List known zelma sessions. Status: implemented.
   zelma sessions create   Create and register a confirmed Codex pane. Status: implemented.
@@ -384,6 +395,7 @@ OUTPUT CONVENTIONS
   sessions create --dry-run: stdout, exit 0, launch contract text or JSON.
   sessions create: stdout, exit 0, created/registered/skipped summary.
   status: stdout, exit 0, schema v1 dashboard snapshot JSON.
+  monitor: stdout, exit 0, interactive read-only live sessions TUI.
   supervisor start-issue: stdout, exit 0, terminal status summary by default
   or schema v1 supervisor JSON with launch, polling, review and cleanup state.
   machine-readable session data: use "zelma sessions list --json".
@@ -392,6 +404,7 @@ RECOVERY HINTS
   unknown command: run "zelma help".
   session inventory task: run "zelma sessions list --json".
   dashboard task: run "zelma status --json".
+  live monitor task: run "zelma monitor".
   setup task: run "zelma setup" from inside a git repository.
   issue supervision task: run "zelma supervisor start-issue <issue> --repo owner/name --base main --json".
 
@@ -400,7 +413,8 @@ HUMAN NOTES
   inventory command and auto-detects fresh-enough manual panes before rendering
   the repository-local registry. setup creates .zelma and configures
   repository-local ignore rules. status is the dashboard/backend snapshot
-  command and does not mutate the sessions registry.
+  command and monitor is the live human-facing view over the same status
+  contract. Neither command mutates the sessions registry.
 
 Usage:
   zelma [command]

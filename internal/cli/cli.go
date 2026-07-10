@@ -18,6 +18,7 @@ import (
 	"github.com/dapi/zelma/internal/create"
 	"github.com/dapi/zelma/internal/detection"
 	"github.com/dapi/zelma/internal/live"
+	"github.com/dapi/zelma/internal/monitor"
 	"github.com/dapi/zelma/internal/registry"
 	"github.com/dapi/zelma/internal/repo"
 	"github.com/dapi/zelma/internal/setup"
@@ -74,6 +75,7 @@ func NewRootCommand(stdout, stderr io.Writer) *cobra.Command {
 
 	root.AddCommand(newSetupCommand(stdout))
 	root.AddCommand(newStatusCommand(stdout))
+	root.AddCommand(newMonitorCommand(stdout))
 
 	supervisorCommand := &cobra.Command{
 		Use:   "supervisor",
@@ -112,6 +114,8 @@ func renderHelp(cmd *cobra.Command, args []string) {
 		fmt.Fprint(cmd.OutOrStdout(), setupHelp)
 	case "zelma status":
 		fmt.Fprint(cmd.OutOrStdout(), statusHelp)
+	case "zelma monitor":
+		fmt.Fprint(cmd.OutOrStdout(), monitorHelp)
 	case "zelma sessions":
 		fmt.Fprint(cmd.OutOrStdout(), sessionsHelp)
 	case "zelma sessions list":
@@ -139,6 +143,7 @@ const rootHelp = `COMMAND MAP
   zelma help              Show this command map.
   zelma setup             Add .zelma to this repository .gitignore. Status: implemented.
   zelma status            Print dashboard status snapshot. Status: implemented.
+  zelma monitor           Open a live zelma sessions terminal monitor. Status: implemented.
   zelma sessions help     Show the sessions command map.
   zelma sessions list     List known zelma sessions. Status: implemented.
   zelma sessions create   Create and register a confirmed Codex pane. Status: implemented.
@@ -164,6 +169,7 @@ OUTPUT CONVENTIONS
   sessions create --dry-run: stdout, exit 0, launch contract text or JSON.
   sessions create: stdout, exit 0, created/registered/skipped summary.
   status: stdout, exit 0, schema v1 dashboard snapshot JSON.
+  monitor: stdout, exit 0, interactive read-only live sessions TUI.
   supervisor start-issue: stdout, exit 0, terminal status summary by default
   or schema v1 supervisor JSON with launch, polling, review and cleanup state.
   machine-readable session data: use "zelma sessions list --json".
@@ -172,6 +178,7 @@ RECOVERY HINTS
   unknown command: run "zelma help".
   session inventory task: run "zelma sessions list --json".
   dashboard task: run "zelma status --json".
+  live monitor task: run "zelma monitor".
   setup task: run "zelma setup" from inside a git repository.
   issue supervision task: run "zelma supervisor start-issue <issue> --repo owner/name --base main --json".
 
@@ -180,7 +187,8 @@ HUMAN NOTES
   inventory command and auto-detects fresh-enough manual panes before rendering
   the repository-local registry. setup creates .zelma and configures
   repository-local ignore rules. status is the dashboard/backend snapshot
-  command and does not mutate the sessions registry.
+  command and monitor is the live human-facing view over the same status
+  contract. Neither command mutates the sessions registry.
 
 Usage:
   zelma [command]
@@ -224,6 +232,23 @@ Notes:
   The backend reads the sessions registry and attempts live zellij reconciliation.
   If zellij is unavailable, the command still returns a degraded snapshot with
   recovery hints for dashboard and agent automation.
+`
+
+const monitorHelp = `Usage:
+  zelma monitor
+
+Status:
+  implemented: opens a read-only terminal monitor for live zelma sessions.
+
+Output:
+  default: interactive TUI with live/active sessions first, secondary
+  stale/non-active records, degraded status and recovery hints.
+
+Notes:
+  The monitor uses the same status/list semantics as "zelma status --json" and
+  "zelma sessions list --live --json". It does not parse registry internals in
+  the UI layer, does not cleanup stale records, and delegates focus to the
+  existing "zelma sessions focus <id>" behavior.
 `
 
 const sessionsHelp = `COMMAND MAP
@@ -481,6 +506,51 @@ func newStatusCommand(stdout io.Writer) *cobra.Command {
 	}
 	cmd.Flags().BoolVar(&jsonOutput, "json", false, "Print schema v1 dashboard status snapshot JSON.")
 	return cmd
+}
+
+func newMonitorCommand(stdout io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "monitor",
+		Short: "Open a live zelma sessions monitor.",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			root, err := repo.ResolveRoot("")
+			if err != nil {
+				return commandFailure(cmd.CommandPath(), errors.New(repo.Diagnostic(cmd.CommandPath(), err)), false)
+			}
+			provider := monitorStatusProvider{command: cmd.CommandPath(), repoRoot: root.Path}
+			focuser := monitorFocusAdapter{command: cmd.CommandPath()}
+			if err := monitor.Run(cmd.Context(), provider, focuser, stdout); err != nil {
+				return commandFailure(cmd.CommandPath(), err, false)
+			}
+			return nil
+		},
+	}
+	return cmd
+}
+
+type monitorStatusProvider struct {
+	command  string
+	repoRoot string
+}
+
+func (provider monitorStatusProvider) Snapshot(ctx context.Context) (statusbackend.Snapshot, error) {
+	reg, err := readRegistryForRoot(provider.command, provider.repoRoot)
+	if err != nil {
+		return statusbackend.Snapshot{}, err
+	}
+	client := zellij.New(zellij.WithBinary(os.Getenv("ZELMA_ZELLIJ_BIN")))
+	return statusbackend.Build(ctx, reg, client), nil
+}
+
+type monitorFocusAdapter struct {
+	command string
+}
+
+func (adapter monitorFocusAdapter) Focus(ctx context.Context, id int) error {
+	client := zellij.New(zellij.WithBinary(os.Getenv("ZELMA_ZELLIJ_BIN")))
+	_, err := focusSessionByID(ctx, adapter.command, id, client)
+	return err
 }
 
 func newSupervisorStartIssueCommand(stdout io.Writer) *cobra.Command {
@@ -949,29 +1019,9 @@ func newSessionsFocusCommand(stdout io.Writer) *cobra.Command {
 				return commandFailure(cmd.CommandPath(), err, jsonOutput)
 			}
 
-			reg, err := readCurrentRegistry(cmd.CommandPath())
-			if err != nil {
-				return commandFailure(cmd.CommandPath(), err, jsonOutput)
-			}
-			session, ok := findSessionByID(reg, id)
-			if !ok {
-				return commandFailure(cmd.CommandPath(), fmt.Errorf("session id %d not found; run zelma sessions list", id), jsonOutput)
-			}
-
-			tabID, hasTab, err := parseZellijTabRef(session.ZellijTab)
-			if err != nil {
-				return commandFailure(cmd.CommandPath(), err, jsonOutput)
-			}
-			request := zellij.FocusPaneRequest{
-				Session: session.ZellijSession,
-				PaneID:  session.ZellijPane,
-			}
-			if hasTab {
-				request.TabID = &tabID
-			}
-
 			client := zellij.New(zellij.WithBinary(os.Getenv("ZELMA_ZELLIJ_BIN")))
-			if err := client.FocusPane(cmd.Context(), request); err != nil {
+			session, err := focusSessionByID(cmd.Context(), cmd.CommandPath(), id, client)
+			if err != nil {
 				return commandFailure(cmd.CommandPath(), err, jsonOutput)
 			}
 
@@ -992,6 +1042,36 @@ func newSessionsFocusCommand(stdout io.Writer) *cobra.Command {
 	}
 	cmd.Flags().BoolVar(&jsonOutput, "json", false, "Print focused session JSON.")
 	return cmd
+}
+
+func focusSessionByID(ctx context.Context, command string, id int, client zellij.PaneFocuser) (registry.Session, error) {
+	reg, err := readCurrentRegistry(command)
+	if err != nil {
+		return registry.Session{}, err
+	}
+	session, ok := findSessionByID(reg, id)
+	if !ok {
+		return registry.Session{}, fmt.Errorf("session id %d not found; run zelma sessions list", id)
+	}
+	if err := focusSession(ctx, session, client); err != nil {
+		return registry.Session{}, err
+	}
+	return session, nil
+}
+
+func focusSession(ctx context.Context, session registry.Session, client zellij.PaneFocuser) error {
+	tabID, hasTab, err := parseZellijTabRef(session.ZellijTab)
+	if err != nil {
+		return err
+	}
+	request := zellij.FocusPaneRequest{
+		Session: session.ZellijSession,
+		PaneID:  session.ZellijPane,
+	}
+	if hasTab {
+		request.TabID = &tabID
+	}
+	return client.FocusPane(ctx, request)
 }
 
 func newSessionsCleanupCommand(stdout io.Writer) *cobra.Command {
