@@ -31,6 +31,10 @@ type PaneWriter interface {
 	WriteChars(ctx context.Context, request WriteCharsRequest) error
 }
 
+type PaneTextSender interface {
+	SendTextToPane(ctx context.Context, request SendTextRequest) error
+}
+
 type PaneCloser interface {
 	ClosePane(ctx context.Context, request ClosePaneRequest) error
 }
@@ -66,6 +70,13 @@ type WriteCharsRequest struct {
 	Session string
 	PaneID  string
 	Chars   string
+}
+
+type SendTextRequest struct {
+	Session string
+	PaneID  string
+	Text    string
+	Submit  bool
 }
 
 type ClosePaneRequest struct {
@@ -396,6 +407,68 @@ func (client Client) WriteChars(ctx context.Context, request WriteCharsRequest) 
 	return nil
 }
 
+func (client Client) SendTextToPane(ctx context.Context, request SendTextRequest) error {
+	if request.Session == "" {
+		return &DiagnosticError{
+			Diagnostic: Diagnostic{
+				Code:         ErrorCodeInvalidInput,
+				Command:      "zellij --session <name> action write-chars --pane-id <pane_id> <redacted chars>",
+				ExitCode:     -1,
+				Message:      "zellij session name is required",
+				RecoveryHint: "pass an explicit zellij session name before sending text to a pane",
+			},
+		}
+	}
+	if request.PaneID == "" {
+		return &DiagnosticError{
+			Diagnostic: Diagnostic{
+				Code:         ErrorCodeInvalidInput,
+				Command:      "zellij --session <name> action write-chars --pane-id <pane_id> <redacted chars>",
+				ExitCode:     -1,
+				Message:      "zellij pane id is required",
+				RecoveryHint: "pass an explicit zellij pane id before sending text to a pane",
+			},
+		}
+	}
+	if request.Text == "" {
+		return &DiagnosticError{
+			Diagnostic: Diagnostic{
+				Code:         ErrorCodeInvalidInput,
+				Command:      "zellij --session <name> action write-chars --pane-id <pane_id> <redacted chars>",
+				ExitCode:     -1,
+				Message:      "zellij text is required",
+				RecoveryHint: "pass non-empty text before sending to a pane",
+			},
+		}
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	client = client.withDefaults()
+
+	runCtx, cancel := withTimeout(ctx, client.timeout)
+	defer cancel()
+
+	chars := request.Text
+	if request.Submit {
+		chars += "\n"
+	}
+	args := writeCharsArgs(WriteCharsRequest{
+		Session: request.Session,
+		PaneID:  request.PaneID,
+		Chars:   chars,
+	})
+	result := client.run(runCtx, client.binary, args)
+	command := sendTextCommandString(client.binary, request)
+	if result.err != nil {
+		return normalizeSendTextCommandError(command, result)
+	}
+	if isSessionNotFoundResult(result) {
+		return normalizeSendTextSessionNotFoundResult(command, result)
+	}
+	return nil
+}
+
 func (client Client) ClosePane(ctx context.Context, request ClosePaneRequest) error {
 	if request.Session == "" {
 		return &DiagnosticError{
@@ -498,7 +571,11 @@ func dumpScreenArgs(request DumpScreenRequest) []string {
 }
 
 func writeCharsArgs(request WriteCharsRequest) []string {
-	return []string{"--session", request.Session, "action", "write-chars", "--pane-id", request.PaneID, request.Chars}
+	return []string{"--session", request.Session, "action", "write-chars", "--pane-id", request.PaneID, "--", request.Chars}
+}
+
+func sendTextCommandString(binary string, request SendTextRequest) string {
+	return commandString(binary, []string{"--session", request.Session, "action", "write-chars", "--pane-id", request.PaneID, "--", "<redacted chars>"})
 }
 
 func closePaneArgs(request ClosePaneRequest) []string {
@@ -554,6 +631,15 @@ func normalizeFocusCommandError(command string, result commandResult) error {
 	)
 }
 
+func normalizeSendTextCommandError(command string, result commandResult) error {
+	return normalizeCommandErrorWithRecovery(
+		command,
+		result,
+		"install zellij or configure the adapter binary path, then verify with zelma sessions list --live --json",
+		"run zelma sessions list --live --json to inspect the target, then retry only after the active Codex pane is confirmed",
+	)
+}
+
 func normalizeRunPaneSessionNotFoundResult(command string, result commandResult) error {
 	return &DiagnosticError{
 		Diagnostic: Diagnostic{
@@ -563,6 +649,19 @@ func normalizeRunPaneSessionNotFoundResult(command string, result commandResult)
 			Stderr:       trimStderr(result.stderr),
 			Message:      "zellij command reported session failure",
 			RecoveryHint: "verify the target zellij session exists with zellij list-sessions --short --no-formatting; zelma did not write registry state",
+		},
+	}
+}
+
+func normalizeSendTextSessionNotFoundResult(command string, result commandResult) error {
+	return &DiagnosticError{
+		Diagnostic: Diagnostic{
+			Code:         ErrorCodeCommandFailed,
+			Command:      command,
+			ExitCode:     0,
+			Stderr:       trimStderr(result.stderr),
+			Message:      "zellij command reported session failure",
+			RecoveryHint: "run zelma sessions list --live --json to inspect the target before retrying send",
 		},
 	}
 }

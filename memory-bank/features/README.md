@@ -131,3 +131,6 @@ audience: humans_and_agents
   public CLI contract.
 - [FT-049: TUI Monitor For Live Sessions](FT-049/README.md) — read-only
   terminal monitor for live zelma sessions.
+- [FT-101: Safe Message Sending To Codex Sessions](FT-101/README.md) —
+  guarded `zelma sessions send <id>` flow for delivering follow-up messages to
+  live-revalidated Codex sessions through the public CLI and skill contract.

@@ -243,6 +243,11 @@ normalized domain values in `.zelma/sessions.json` after mapping and validation.
   `0`; terminal and plugin pane ids can overlap.
 - Prefer `zellij run --cwd <path> --name <name> -- codex` for the first create
   prototype. Re-evaluate `action new-pane` if it gives better control in tests.
+- For verified send delivery, keep text submission behind a typed adapter method
+  such as `SendTextToPane`. FT-101 uses one explicit-pane
+  `zellij --session <name> action write-chars --pane-id <pane> <message + "\n">`
+  call when `submit=true`. Adapter diagnostics for this path must redact the
+  message body.
 - Never parse ANSI-colored human output when a parse-friendly flag or JSON
   output exists.
 

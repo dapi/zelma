@@ -89,12 +89,12 @@ func TestIssueSupervisorStartIssueReviewFixCleanupE2E(t *testing.T) {
 	assertFakeZellijCallsContain(t, callsPath,
 		"--session zelma-main run --cwd "+repoRoot+" --name issue-67 -- start-issue 67 --repo dapi/zelma --base main",
 		"--session zelma-main action dump-screen --pane-id terminal_7 --full",
-		"--session zelma-main action write-chars --pane-id terminal_7 /review",
+		"--session zelma-main action write-chars --pane-id terminal_7 -- /review",
 		"Fix all critical/high/important review findings in scope for issue 67.",
 		"--session zelma-main action close-pane --pane-id terminal_7",
 	)
 	calls := readTextFile(t, callsPath)
-	if strings.Count(calls, "write-chars --pane-id terminal_7 /review") != 2 {
+	if strings.Count(calls, "write-chars --pane-id terminal_7 -- /review") != 2 {
 		t.Fatalf("fake zellij calls = %q, want two review commands", calls)
 	}
 	if strings.Count(calls, "dump-screen --pane-id terminal_7 --full") != 5 {
@@ -197,10 +197,10 @@ func TestIssueSupervisorParallelStartIssueE2E(t *testing.T) {
 	if strings.Count(calls, "action dump-screen --pane-id terminal_72 --full") != 5 {
 		t.Fatalf("calls = %q, want five polls for issue 72", calls)
 	}
-	if strings.Count(calls, "action write-chars --pane-id terminal_71 /review") != 2 {
+	if strings.Count(calls, "action write-chars --pane-id terminal_71 -- /review") != 2 {
 		t.Fatalf("calls = %q, want two review commands for issue 71", calls)
 	}
-	if strings.Count(calls, "action write-chars --pane-id terminal_72 /review") != 2 {
+	if strings.Count(calls, "action write-chars --pane-id terminal_72 -- /review") != 2 {
 		t.Fatalf("calls = %q, want two review commands for issue 72", calls)
 	}
 }

@@ -13,6 +13,7 @@ derived_from:
   - ../features/FT-029/brief.md
   - ../features/FT-047/brief.md
   - ../features/FT-035/brief.md
+  - ../features/FT-101/brief.md
 status: active
 audience: humans_and_agents
 ---
@@ -40,6 +41,7 @@ The skill should choose commands from the user's intent:
 | Preview create inputs | `zelma sessions create [path] --dry-run --json` | Resolve Codex command and opened path without side effects. |
 | Run an explicit diagnostic detect pass | `zelma sessions detect --json` | Detect live zellij panes and upsert candidate or active records outside the normal list workflow. |
 | Focus a known session pane | `zelma sessions focus <id> --json` | Switch zellij UI to a registry-backed tab/pane without registry mutation. |
+| Send a message to a known session pane | `zelma sessions send <id> [message] --json` or `zelma sessions send <id> --stdin --json` | Deliver text only after `zelma` revalidates active Codex readiness; never use direct `zellij` fallback. |
 | Observe a session pane screen | `zelma sessions buffer <id> --json` | Read bounded current zellij screen/scrollback for an explicit repo-local session id without registry mutation. |
 | Observe Codex transcript events | `zelma sessions transcript <id> --json` | Read bounded Codex transcript events for an explicit repo-local session id with a resolved `codex_session` without registry mutation. |
 | Review stale cleanup | `zelma sessions cleanup --json` | Propose stale records without mutation. |
@@ -213,6 +215,74 @@ The successful JSON object is the focused session record:
   "state": "active"
 }
 ```
+
+### `zelma sessions send <id> [message] --json`
+
+Sends a message to an existing active Codex session after `zelma` revalidates
+that the registry record still points to the intended live terminal pane. The
+target selector is only the positive repo-local `id` from `zelma sessions list`.
+The message source is exactly one of:
+
+- one positional `message` argument;
+- `--stdin`, which reads the full stdin stream and allows multiline content.
+
+Do not pass both sources. Do not call `zellij` directly and do not type into the
+terminal manually as fallback.
+
+The successful JSON object includes target/session identity and message
+metadata, but never the message body:
+
+```json
+{
+  "id": 2,
+  "zellij_session": "zelma-main",
+  "zellij_tab": "tab_6",
+  "zellij_pane": "terminal_75",
+  "codex_session": "11111111-1111-4111-8111-111111111111",
+  "opened_path": "/workspace/zelma",
+  "state": "active",
+  "message": {
+    "source": "argument",
+    "byte_count": 18,
+    "line_count": 1,
+    "submitted": true
+  }
+}
+```
+
+Before any write, `zelma` checks that the registry record exists, is `active`,
+the zellij session and recorded pane are reachable, the pane is terminal, and
+live Codex evidence is compatible with the recorded `codex_session` and
+`opened_path`. A live Codex launch command does not need to repeat the
+`codex_session` UUID when the active registry record was already resolved from
+process/session metadata and the live pane still matches the recorded
+`opened_path`; an explicitly different live UUID remains an identity mismatch.
+
+Stable send failure codes include:
+
+- `conflicting_message_sources`
+- `missing_message`
+- `empty_message`
+- `session_not_found`
+- `pane_not_found`
+- `pane_not_terminal`
+- `session_state_not_active`
+- `runtime_unreachable`
+- `codex_runtime_missing`
+- `codex_identity_mismatch`
+- `runtime_ambiguous`
+- `target_not_ready`
+
+On any not-ready send diagnostic, stop and present the diagnostic. Use only the
+public `next_command` returned by `zelma`, typically
+`zelma sessions list --live --json` or `zelma sessions detect --json`. The skill
+must not repair, focus or send through direct zellij commands.
+
+### `zelma sessions send <id> --stdin --json`
+
+Same target and readiness contract as positional send, but the message body is
+read from stdin. Use this form for multiline prompts or text that should not be
+placed in the command arguments. Empty stdin is rejected with `empty_message`.
 
 ### `zelma sessions buffer <id> --json`
 

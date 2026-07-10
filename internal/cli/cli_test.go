@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/dapi/zelma/internal/codex"
 	"github.com/dapi/zelma/internal/registry"
+	"github.com/dapi/zelma/internal/zellij"
 )
 
 func TestAgentFirstHelpSnapshots(t *testing.T) {
@@ -127,6 +129,11 @@ func TestHelpRoutes(t *testing.T) {
 			name:       "sessions focus",
 			args:       []string{"sessions", "focus", "--help"},
 			wantOutput: []string{"Usage:", "zelma sessions focus"},
+		},
+		{
+			name:       "sessions send",
+			args:       []string{"sessions", "send", "--help"},
+			wantOutput: []string{"Usage:", "zelma sessions send", "--stdin"},
 		},
 		{
 			name:       "sessions buffer",
@@ -395,6 +402,7 @@ const rootHelpSnapshot = `COMMAND MAP
   zelma sessions create   Create and register a confirmed Codex pane. Status: implemented.
   zelma sessions detect   Detect existing Codex panes. Status: implemented.
   zelma sessions focus    Focus a known zellij pane by zelma session ID. Status: implemented.
+  zelma sessions send     Send a message to a verified Codex session. Status: implemented.
   zelma sessions buffer   Read bounded pane screen/scrollback by zelma session ID. Status: implemented.
   zelma sessions transcript  Read bounded Codex transcript events by zelma session ID. Status: implemented.
   zelma sessions cleanup  Propose or confirm stale record cleanup. Status: implemented.
@@ -412,6 +420,8 @@ OUTPUT CONVENTIONS
   sessions detect: stdout, exit 0, summary with active/candidate/stale counts,
   stale reason lines when found, or JSON with --json.
   sessions focus: stdout, exit 0, focused summary or JSON with --json.
+  sessions send: stdout, exit 0, sent summary or JSON with target metadata;
+  never echoes message body.
   sessions buffer: stdout, exit 0, bounded zellij pane screen JSON with --json.
   sessions transcript: stdout, exit 0, bounded Codex transcript event JSON with --json.
   sessions cleanup: stdout, exit 0, stale cleanup proposal by default; add
@@ -450,6 +460,7 @@ const sessionsHelpSnapshot = `COMMAND MAP
   zelma sessions create   Create and register a confirmed Codex pane. Status: implemented.
   zelma sessions detect   Detect existing Codex panes. Status: implemented.
   zelma sessions focus    Focus a known zellij pane by zelma session ID. Status: implemented.
+  zelma sessions send     Send a message to a verified Codex session. Status: implemented.
   zelma sessions buffer   Read bounded pane screen/scrollback by zelma session ID. Status: implemented.
   zelma sessions transcript  Read bounded Codex transcript events by zelma session ID. Status: implemented.
   zelma sessions cleanup  Propose or confirm stale record cleanup. Status: implemented.
@@ -465,6 +476,8 @@ OUTPUT CONVENTIONS
   detect: stdout, exit 0, added/unchanged/skipped summary with
   active/candidate/stale counts, stale reasons when found, or JSON with --json.
   focus: stdout, exit 0, focused summary or focused session JSON with --json.
+  send: stdout, exit 0, sent summary or JSON with target metadata; message body
+  is never echoed.
   buffer: stdout, exit 0, bounded zellij pane screen/scrollback JSON with
   --json; default --tail 120 lines.
   transcript: stdout, exit 0, bounded Codex transcript event JSON with --json;
@@ -479,6 +492,7 @@ RECOVERY HINTS
   managed create task: inspect "zelma sessions create --help".
   diagnostic/manual detect task: inspect "zelma sessions detect --help".
   focus task: inspect "zelma sessions focus --help".
+  send task: inspect "zelma sessions send --help".
   observation task: run "zelma sessions buffer <id> --json" or
   "zelma sessions transcript <id> --json".
 
@@ -486,8 +500,9 @@ HUMAN NOTES
   sessions list is the primary inventory command and auto-detects fresh-enough
   manual panes before rendering .zelma/sessions.json. --no-detect keeps a
   registry-only read path. focus switches zellij UI to a stored pane and does
-  not mutate registry. cleanup removes stale records only after explicit
-  --confirm.
+  not mutate registry. send revalidates the recorded active Codex pane before
+  delivery and does not mutate registry. cleanup removes stale records only
+  after explicit --confirm.
 
 Usage:
   zelma sessions [command]
@@ -2968,6 +2983,354 @@ func TestSessionsFocusReportsMissingID(t *testing.T) {
 	}
 }
 
+func TestSessionsSendArgumentJSONRevalidatesAndWritesRecordedPane(t *testing.T) {
+	root := newTestGitRepo(t)
+	openedPath := resolvedPath(t, root)
+	const codexSession = "11111111-1111-4111-8111-111111111111"
+	writeRegistryFile(t, root, fmt.Sprintf(`{
+  "version": 1,
+  "sessions": [
+    {
+      "id": 2,
+      "zellij_session": "zelma-main",
+      "zellij_tab": "tab_6",
+      "zellij_tab_name": "work",
+      "zellij_pane": "terminal_75",
+      "codex_session": %q,
+      "opened_path": %q,
+      "state": "active"
+    }
+  ]
+}
+`, codexSession, openedPath))
+	calls := filepath.Join(t.TempDir(), "send-calls.txt")
+	command := "/usr/local/bin/codex resume " + codexSession + " --cd " + openedPath
+	t.Setenv("ZELMA_ZELLIJ_BIN", writeFakeSendZellij(t, calls, panesJSONWithID(75, openedPath, command, true), true))
+	t.Chdir(root)
+
+	var stdout, stderr bytes.Buffer
+
+	code := Run(context.Background(), []string{"sessions", "send", "2", "continue carefully", "--json"}, &stdout, &stderr)
+
+	if code != 0 {
+		t.Fatalf("Run() code = %d, want 0; stderr = %q", code, stderr.String())
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("stderr = %q, want empty", stderr.String())
+	}
+	var result sendResultJSON
+	decodeStrict(t, stdout.Bytes(), &result)
+	if result.ID != 2 || result.ZellijPane != "terminal_75" || result.Message.Source != "argument" ||
+		result.Message.ByteCount != len("continue carefully") || result.Message.LineCount != 1 || !result.Message.Submitted {
+		t.Fatalf("send result = %+v, want target metadata without message body", result)
+	}
+	if strings.Contains(stdout.String(), "continue carefully") {
+		t.Fatalf("stdout = %q, must not echo message body", stdout.String())
+	}
+	gotCalls := readFile(t, calls)
+	if !strings.Contains(gotCalls, "send_session=zelma-main\nsend_pane=terminal_75\nsend_payload=continue carefully\n") {
+		t.Fatalf("fake zellij calls = %q, want write to recorded pane with submit newline", gotCalls)
+	}
+}
+
+func TestSessionsSendStdinJSONAcceptsMultilineWithoutEcho(t *testing.T) {
+	root := newTestGitRepo(t)
+	openedPath := resolvedPath(t, root)
+	const codexSession = "11111111-1111-4111-8111-111111111111"
+	writeRegistryFile(t, root, fmt.Sprintf(`{
+  "version": 1,
+  "sessions": [
+    {
+      "id": 2,
+      "zellij_session": "zelma-main",
+      "zellij_pane": "terminal_75",
+      "codex_session": %q,
+      "opened_path": %q,
+      "state": "active"
+    }
+  ]
+}
+`, codexSession, openedPath))
+	calls := filepath.Join(t.TempDir(), "send-calls.txt")
+	command := "/usr/local/bin/codex resume " + codexSession + " --cd " + openedPath
+	t.Setenv("ZELMA_ZELLIJ_BIN", writeFakeSendZellij(t, calls, panesJSONWithID(75, openedPath, command, true), true))
+	t.Chdir(root)
+
+	oldInput := sendInputReader
+	sendInputReader = strings.NewReader("line one\nline two")
+	defer func() { sendInputReader = oldInput }()
+
+	var stdout, stderr bytes.Buffer
+
+	code := Run(context.Background(), []string{"sessions", "send", "2", "--stdin", "--json"}, &stdout, &stderr)
+
+	if code != 0 {
+		t.Fatalf("Run() code = %d, want 0; stderr = %q", code, stderr.String())
+	}
+	var result sendResultJSON
+	decodeStrict(t, stdout.Bytes(), &result)
+	if result.Message.Source != "stdin" || result.Message.ByteCount != len("line one\nline two") || result.Message.LineCount != 2 || !result.Message.Submitted {
+		t.Fatalf("send result = %+v, want stdin metadata", result)
+	}
+	if strings.Contains(stdout.String(), "line one") || strings.Contains(stdout.String(), "line two") {
+		t.Fatalf("stdout = %q, must not echo stdin body", stdout.String())
+	}
+}
+
+func TestSessionsSendRejectsConflictingSourcesBeforeRuntimeWork(t *testing.T) {
+	root := newTestGitRepo(t)
+	t.Chdir(root)
+
+	oldInput := sendInputReader
+	sendInputReader = strings.NewReader("stdin body")
+	defer func() { sendInputReader = oldInput }()
+
+	var stdout, stderr bytes.Buffer
+
+	code := Run(context.Background(), []string{"sessions", "send", "2", "SECRET_PROMPT_BODY", "--stdin", "--json"}, &stdout, &stderr)
+
+	if code != 1 {
+		t.Fatalf("Run() code = %d, want 1", code)
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("stdout = %q, want empty", stdout.String())
+	}
+	diagnostic := decodeSkillRecoveryDiagnostic(t, stderr.Bytes())
+	if diagnostic.Code != "conflicting_message_sources" || diagnostic.CommandPath != "zelma sessions send" {
+		t.Fatalf("diagnostic = %+v, want conflicting_message_sources for send", diagnostic)
+	}
+	if strings.Contains(stderr.String(), "SECRET_PROMPT_BODY") {
+		t.Fatalf("stderr = %q, must not echo message body", stderr.String())
+	}
+}
+
+func TestSessionsSendRedactsDashPrefixedMessageRejectedByCobra(t *testing.T) {
+	tests := []struct {
+		name string
+		args []string
+	}{
+		{
+			name: "unknown shorthand flag",
+			args: []string{"sessions", "send", "2", "-SECRET_PROMPT_BODY", "--json"},
+		},
+		{
+			name: "known bool flag with private value",
+			args: []string{"sessions", "send", "2", "--json=SECRET_PROMPT_BODY"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			root := newTestGitRepo(t)
+			t.Chdir(root)
+
+			var stdout, stderr bytes.Buffer
+
+			code := Run(context.Background(), tt.args, &stdout, &stderr)
+
+			if code != 1 {
+				t.Fatalf("Run() code = %d, want 1", code)
+			}
+			if stdout.Len() != 0 {
+				t.Fatalf("stdout = %q, want empty", stdout.String())
+			}
+			diagnostic := decodeSkillRecoveryDiagnostic(t, stderr.Bytes())
+			if diagnostic.Code != "cli_invalid_arguments" || diagnostic.CommandPath != "zelma sessions send" {
+				t.Fatalf("diagnostic = %+v, want cli_invalid_arguments for send", diagnostic)
+			}
+			if strings.Contains(stderr.String(), "SECRET_PROMPT_BODY") {
+				t.Fatalf("stderr = %q, must not echo message body", stderr.String())
+			}
+			if !strings.Contains(diagnostic.Message, "--") || !strings.Contains(diagnostic.HumanMessage, "--") {
+				t.Fatalf("diagnostic = %+v, want separator guidance", diagnostic)
+			}
+		})
+	}
+}
+
+func TestSessionsSendRejectsNonCodexTargetBeforeWrite(t *testing.T) {
+	root := newTestGitRepo(t)
+	openedPath := resolvedPath(t, root)
+	const codexSession = "11111111-1111-4111-8111-111111111111"
+	writeRegistryFile(t, root, fmt.Sprintf(`{
+  "version": 1,
+  "sessions": [
+    {
+      "id": 2,
+      "zellij_session": "zelma-main",
+      "zellij_pane": "terminal_75",
+      "codex_session": %q,
+      "opened_path": %q,
+      "state": "active"
+    }
+  ]
+}
+`, codexSession, openedPath))
+	calls := filepath.Join(t.TempDir(), "send-calls.txt")
+	t.Setenv("ZELMA_ZELLIJ_BIN", writeFakeSendZellij(t, calls, panesJSONWithID(75, openedPath, "/bin/zsh", true), true))
+	t.Chdir(root)
+
+	var stdout, stderr bytes.Buffer
+
+	code := Run(context.Background(), []string{"sessions", "send", "2", "SECRET_PROMPT_BODY", "--json"}, &stdout, &stderr)
+
+	if code != 1 {
+		t.Fatalf("Run() code = %d, want 1", code)
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("stdout = %q, want empty", stdout.String())
+	}
+	diagnostic := decodeSkillRecoveryDiagnostic(t, stderr.Bytes())
+	if diagnostic.Code != "codex_runtime_missing" || diagnostic.CommandPath != "zelma sessions send" {
+		t.Fatalf("diagnostic = %+v, want codex_runtime_missing for shell target", diagnostic)
+	}
+	if strings.Contains(stderr.String(), "SECRET_PROMPT_BODY") {
+		t.Fatalf("stderr = %q, must not echo message body", stderr.String())
+	}
+	if gotCalls := readFile(t, calls); strings.Contains(gotCalls, "write-chars") {
+		t.Fatalf("fake zellij calls = %q, must not write before readiness", gotCalls)
+	}
+}
+
+func TestValidateSendTargetReadyReasonCodes(t *testing.T) {
+	const codexSession = "11111111-1111-4111-8111-111111111111"
+	openedPath := "/workspace/zelma"
+	baseSession := registry.Session{
+		ID:            2,
+		ZellijSession: "zelma-main",
+		ZellijPane:    "terminal_75",
+		CodexSession:  codexSession,
+		OpenedPath:    openedPath,
+		State:         registry.StateActive,
+	}
+	readyPane := zellij.Pane{
+		ID:          zellij.PaneID{Kind: zellij.PaneKindTerminal, Number: 75},
+		PaneCommand: stringPtrForCLITest("/usr/local/bin/codex resume " + codexSession + " --cd " + openedPath),
+		PaneCWD:     stringPtrForCLITest(openedPath),
+	}
+
+	tests := []struct {
+		name        string
+		session     registry.Session
+		runtime     fakeSendRuntime
+		wantReason  sendReasonCode
+		wantSuccess bool
+	}{
+		{
+			name:       "missing zellij session",
+			session:    baseSession,
+			runtime:    fakeSendRuntime{sessions: []zellij.Session{}},
+			wantReason: sendReasonSessionNotFound,
+		},
+		{
+			name:       "missing pane",
+			session:    baseSession,
+			runtime:    fakeSendRuntime{sessions: []zellij.Session{{Name: "zelma-main"}}},
+			wantReason: sendReasonPaneNotFound,
+		},
+		{
+			name: "non terminal pane",
+			session: registry.Session{
+				ID:            2,
+				ZellijSession: "zelma-main",
+				ZellijPane:    "plugin_75",
+				CodexSession:  codexSession,
+				OpenedPath:    openedPath,
+				State:         registry.StateActive,
+			},
+			runtime: fakeSendRuntime{
+				sessions: []zellij.Session{{Name: "zelma-main"}},
+				panes: []zellij.Pane{{
+					ID:          zellij.PaneID{Kind: zellij.PaneKindPlugin, Number: 75},
+					PaneCommand: stringPtrForCLITest("/usr/local/bin/codex resume " + codexSession + " --cd " + openedPath),
+					PaneCWD:     stringPtrForCLITest(openedPath),
+				}},
+			},
+			wantReason: sendReasonPaneNotTerminal,
+		},
+		{
+			name:    "opened path mismatch",
+			session: baseSession,
+			runtime: fakeSendRuntime{
+				sessions: []zellij.Session{{Name: "zelma-main"}},
+				panes: []zellij.Pane{{
+					ID:          zellij.PaneID{Kind: zellij.PaneKindTerminal, Number: 75},
+					PaneCommand: stringPtrForCLITest("/usr/local/bin/codex resume " + codexSession + " --cd /workspace/other"),
+					PaneCWD:     stringPtrForCLITest("/workspace/other"),
+				}},
+			},
+			wantReason: sendReasonCodexIdentityMismatch,
+		},
+		{
+			name:    "codex session mismatch",
+			session: baseSession,
+			runtime: fakeSendRuntime{
+				sessions: []zellij.Session{{Name: "zelma-main"}},
+				panes: []zellij.Pane{{
+					ID:          zellij.PaneID{Kind: zellij.PaneKindTerminal, Number: 75},
+					PaneCommand: stringPtrForCLITest("/usr/local/bin/codex resume 22222222-2222-4222-8222-222222222222 --cd " + openedPath),
+					PaneCWD:     stringPtrForCLITest(openedPath),
+				}},
+			},
+			wantReason: sendReasonCodexIdentityMismatch,
+		},
+		{
+			name:    "active managed codex launch without command uuid",
+			session: baseSession,
+			runtime: fakeSendRuntime{
+				sessions: []zellij.Session{{Name: "zelma-main"}},
+				panes: []zellij.Pane{{
+					ID:          zellij.PaneID{Kind: zellij.PaneKindTerminal, Number: 75},
+					PaneCommand: stringPtrForCLITest("/usr/local/bin/codex --cd " + openedPath),
+					PaneCWD:     stringPtrForCLITest(openedPath),
+				}},
+			},
+			wantSuccess: true,
+		},
+		{
+			name:    "external uuid without codex command is missing runtime",
+			session: baseSession,
+			runtime: fakeSendRuntime{
+				sessions: []zellij.Session{{Name: "zelma-main"}},
+				panes: []zellij.Pane{{
+					ID:          zellij.PaneID{Kind: zellij.PaneKindTerminal, Number: 75},
+					PaneCommand: stringPtrForCLITest("env CODEX_EXTERNAL_SESSION_UUID=" + codexSession + " /bin/zsh"),
+					PaneCWD:     stringPtrForCLITest(openedPath),
+				}},
+			},
+			wantReason: sendReasonCodexRuntimeMissing,
+		},
+		{
+			name:    "ready",
+			session: baseSession,
+			runtime: fakeSendRuntime{
+				sessions: []zellij.Session{{Name: "zelma-main"}},
+				panes:    []zellij.Pane{readyPane},
+			},
+			wantSuccess: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateSendTargetReady(context.Background(), tt.session, "", tt.runtime)
+			if tt.wantSuccess {
+				if err != nil {
+					t.Fatalf("validateSendTargetReady() error = %v, want nil", err)
+				}
+				return
+			}
+			var sendErr *sendDiagnosticError
+			if !errors.As(err, &sendErr) {
+				t.Fatalf("validateSendTargetReady() error = %T, want sendDiagnosticError", err)
+			}
+			if sendErr.Code != tt.wantReason {
+				t.Fatalf("reason = %s, want %s; error=%v", sendErr.Code, tt.wantReason, err)
+			}
+		})
+	}
+}
+
 func TestSessionsCleanupProposalDoesNotMutateRegistry(t *testing.T) {
 	root := newTestGitRepo(t)
 	openedPath := resolvedPath(t, root)
@@ -3466,6 +3829,66 @@ func assertFakeZellijListSessionsCalls(t *testing.T, callsPath string, want int)
 	if got != want {
 		t.Fatalf("fake zellij list-sessions calls = %d, want %d; calls:\n%s", got, want, data)
 	}
+}
+
+type fakeSendRuntime struct {
+	sessions        []zellij.Session
+	panes           []zellij.Pane
+	listSessionsErr error
+	listPanesErr    error
+}
+
+func (runtime fakeSendRuntime) ListSessions(context.Context) ([]zellij.Session, error) {
+	return append([]zellij.Session(nil), runtime.sessions...), runtime.listSessionsErr
+}
+
+func (runtime fakeSendRuntime) ListPanes(context.Context, string) ([]zellij.Pane, error) {
+	return append([]zellij.Pane(nil), runtime.panes...), runtime.listPanesErr
+}
+
+func stringPtrForCLITest(value string) *string {
+	return &value
+}
+
+func writeFakeSendZellij(t *testing.T, callsPath, panesJSON string, sendSucceeds bool) string {
+	t.Helper()
+
+	path := filepath.Join(t.TempDir(), "fake-zellij")
+	sendExit := "0"
+	sendFailure := ""
+	if !sendSucceeds {
+		sendExit = "2"
+		sendFailure = "printf 'send failed\\n' >&2\n"
+	}
+	script := `#!/bin/sh
+printf '%s\n' "$*" >> ` + shellQuoteForTest(callsPath) + `
+if [ "$1" = "list-sessions" ]; then
+  printf 'zelma-main\n'
+  exit 0
+fi
+if [ "$1" = "--session" ] && [ "$2" = "zelma-main" ] && [ "$3" = "action" ] && [ "$4" = "list-panes" ]; then
+  cat <<'JSON'
+` + panesJSON + `
+JSON
+  exit 0
+fi
+if [ "$1" = "--session" ] && [ "$2" = "zelma-main" ] && [ "$3" = "action" ] && [ "$4" = "write-chars" ] && [ "$5" = "--pane-id" ] && [ "$7" = "--" ]; then
+  {
+    printf 'send_session=%s\n' "$2"
+    printf 'send_pane=%s\n' "$6"
+    printf 'send_payload='
+    printf '%s' "$8"
+    printf '\n'
+  } >> ` + shellQuoteForTest(callsPath) + `
+  ` + sendFailure + `  exit ` + sendExit + `
+fi
+printf 'unexpected fake zellij args: %s\n' "$*" >&2
+exit 2
+`
+	if err := os.WriteFile(path, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	return path
 }
 
 func writeFakeFocusZellij(t *testing.T, callsPath string) string {

@@ -214,6 +214,84 @@ func TestFocusSessionInvokesZelmaCLI(t *testing.T) {
 	}
 }
 
+func TestSendMessageInvokesZelmaCLI(t *testing.T) {
+	root := t.TempDir()
+	stdout := writeFile(t, root, "stdout.json", `{
+  "id": 2,
+  "zellij_session": "zelma-main",
+  "zellij_tab": "tab_6",
+  "zellij_pane": "terminal_75",
+  "codex_session": "11111111-1111-4111-8111-111111111111",
+  "opened_path": "/workspace/zelma",
+  "state": "active",
+  "message": {
+    "source": "argument",
+    "byte_count": 18,
+    "line_count": 1,
+    "submitted": true
+  }
+}
+`)
+	calls := filepath.Join(root, "calls.txt")
+	client := fakeCLIClient(t, root, stdout, "", "0", calls)
+
+	got, err := client.SendMessage(context.Background(), 2, "continue carefully")
+
+	if err != nil {
+		t.Fatalf("SendMessage() error = %v", err)
+	}
+	assertCall(t, calls, root, "sessions", "send", "2", "--json", "--", "continue carefully")
+	if got.ID != 2 || got.ZellijPane != "terminal_75" || got.Message.Source != "argument" || !got.Message.Submitted {
+		t.Fatalf("SendMessage() = %+v, want sent active session metadata", got)
+	}
+}
+
+func TestSendMessageFromStdinInvokesZelmaCLIWithStdin(t *testing.T) {
+	root := t.TempDir()
+	runner := &recordingRunner{
+		result: CommandResult{
+			Stdout: []byte(`{
+  "id": 2,
+  "zellij_session": "zelma-main",
+  "zellij_pane": "terminal_75",
+  "codex_session": "11111111-1111-4111-8111-111111111111",
+  "opened_path": "/workspace/zelma",
+  "state": "active",
+  "message": {
+    "source": "stdin",
+    "byte_count": 17,
+    "line_count": 2,
+    "submitted": true
+  }
+}
+`),
+		},
+	}
+	client := Client{Binary: "zelma-test", WorkDir: root, Runner: runner}
+
+	got, err := client.SendMessageFromStdin(context.Background(), 2, []byte("line one\nline two"))
+
+	if err != nil {
+		t.Fatalf("SendMessageFromStdin() error = %v", err)
+	}
+	if runner.calls != 1 {
+		t.Fatalf("runner calls = %d, want 1", runner.calls)
+	}
+	wantArgs := []string{"sessions", "send", "2", "--stdin", "--json"}
+	if strings.Join(runner.request.Args, "\x00") != strings.Join(wantArgs, "\x00") {
+		t.Fatalf("args = %#v, want %#v", runner.request.Args, wantArgs)
+	}
+	if runner.request.Binary != "zelma-test" || runner.request.WorkDir != root {
+		t.Fatalf("request = %+v, want configured binary/workdir", runner.request)
+	}
+	if !runner.request.HasStdin || string(runner.request.Stdin) != "line one\nline two" {
+		t.Fatalf("stdin = has:%t %q, want exact message bytes", runner.request.HasStdin, string(runner.request.Stdin))
+	}
+	if got.Message.Source != "stdin" || got.Message.LineCount != 2 || !got.Message.Submitted {
+		t.Fatalf("SendMessageFromStdin() = %+v, want stdin metadata", got)
+	}
+}
+
 func TestObserveSessionBufferInvokesZelmaCLI(t *testing.T) {
 	root := t.TempDir()
 	stdout := writeFile(t, root, "stdout.json", `{
@@ -415,6 +493,48 @@ func TestZellijUnavailableErrorStopsForEnvironmentFix(t *testing.T) {
 	}
 }
 
+func TestSendNotReadySuggestsLiveListOnly(t *testing.T) {
+	root := t.TempDir()
+	stderr := writeFile(t, root, "stderr.txt", "zelma sessions send: send message: codex_runtime_missing: pane command evidence does not indicate Codex; recovery: run zelma sessions list --live --json\n")
+	calls := filepath.Join(root, "calls.txt")
+	client := fakeCLIClient(t, root, "", stderr, "1", calls)
+
+	_, err := client.SendMessage(context.Background(), 2, "SECRET_PROMPT_BODY")
+
+	var commandErr *CommandError
+	if !errors.As(err, &commandErr) {
+		t.Fatalf("SendMessage() error = %T, want CommandError", err)
+	}
+	if commandErr.Recovery.Action != RecoveryActionInspect || commandErr.Recovery.ReasonCode != "send_target_not_ready" {
+		t.Fatalf("Recovery = %+v, want inspect for send_target_not_ready", commandErr.Recovery)
+	}
+	assertRecoveryCommand(t, commandErr.Recovery, DefaultZelmaBinary, "sessions", "list", "--live", "--json")
+	if strings.Contains(commandErr.Error(), "SECRET_PROMPT_BODY") || strings.Contains(strings.Join(commandErr.Command, " "), "SECRET_PROMPT_BODY") {
+		t.Fatalf("CommandError leaked message body: command=%#v error=%q", commandErr.Command, commandErr.Error())
+	}
+}
+
+func TestSendMessageWithDashPrefixedPromptUsesSeparatorAndRedactsDiagnostics(t *testing.T) {
+	root := t.TempDir()
+	stderr := writeFile(t, root, "stderr.txt", "zelma sessions send: send message: codex_runtime_missing: pane command evidence does not indicate Codex\n")
+	calls := filepath.Join(root, "calls.txt")
+	client := fakeCLIClient(t, root, "", stderr, "1", calls)
+
+	_, err := client.SendMessage(context.Background(), 2, "-SECRET_PROMPT_BODY")
+
+	var commandErr *CommandError
+	if !errors.As(err, &commandErr) {
+		t.Fatalf("SendMessage() error = %T, want CommandError", err)
+	}
+	assertCall(t, calls, root, "sessions", "send", "2", "--json", "--", "-SECRET_PROMPT_BODY")
+	if strings.Contains(commandErr.Error(), "-SECRET_PROMPT_BODY") || strings.Contains(strings.Join(commandErr.Command, " "), "-SECRET_PROMPT_BODY") {
+		t.Fatalf("CommandError leaked dash-prefixed message body: command=%#v error=%q", commandErr.Command, commandErr.Error())
+	}
+	if !strings.Contains(strings.Join(commandErr.Command, " "), "<redacted message>") {
+		t.Fatalf("CommandError command = %#v, want redacted message placeholder", commandErr.Command)
+	}
+}
+
 func TestEmptyRegistryWithLikelyLivePanesSuggestsDetect(t *testing.T) {
 	recovery := RecoveryForListResult(SessionsList{Version: SessionsSchemaVersion}, ListRecoveryOptions{
 		LivePanesLikely: true,
@@ -458,6 +578,7 @@ func TestRecoveryCommandsStayInsideSafeZelmaSurface(t *testing.T) {
 		recoveryFor("zelma sessions list: unsupported repo: no Git worktree found"),
 		recoveryFor("zelma sessions create: create session: create_pane_unconfirmed: created pane could not be confirmed"),
 		recoveryFor("zelma sessions create: create session: create_registry_write_failed: write sessions registry failed"),
+		recoveryFor("zelma sessions send: send message: codex_runtime_missing: pane command evidence does not indicate Codex"),
 		RecoveryForListResult(SessionsList{Version: SessionsSchemaVersion}, ListRecoveryOptions{LivePanesLikely: true}),
 		RecoveryForDetectResult(DetectSummary{Stale: 1}),
 	}
@@ -500,6 +621,19 @@ func TestDecodeRejectsTrailingData(t *testing.T) {
 	if !strings.Contains(decodeErr.Stdout, `"created": 1`) {
 		t.Fatalf("DecodeError stdout = %q, want preserved stdout", decodeErr.Stdout)
 	}
+}
+
+type recordingRunner struct {
+	request CommandRequest
+	result  CommandResult
+	err     error
+	calls   int
+}
+
+func (runner *recordingRunner) Run(ctx context.Context, request CommandRequest) (CommandResult, error) {
+	runner.calls++
+	runner.request = request
+	return runner.result, runner.err
 }
 
 func fakeCLIClient(t *testing.T, workDir, stdoutPath, stderrPath, exitCode, callPath string) Client {

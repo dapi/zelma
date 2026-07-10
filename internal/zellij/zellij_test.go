@@ -525,17 +525,65 @@ func TestPaneObservationActionsRunExpectedCommands(t *testing.T) {
 	if err := client.WriteChars(context.Background(), WriteCharsRequest{Session: "zelma-main", PaneID: "terminal_7", Chars: "/review\n"}); err != nil {
 		t.Fatalf("WriteChars() error = %v, want nil", err)
 	}
+	if err := client.SendTextToPane(context.Background(), SendTextRequest{Session: "zelma-main", PaneID: "terminal_7", Text: "continue carefully", Submit: true}); err != nil {
+		t.Fatalf("SendTextToPane() error = %v, want nil", err)
+	}
 	if err := client.ClosePane(context.Background(), ClosePaneRequest{Session: "zelma-main", PaneID: "terminal_7"}); err != nil {
 		t.Fatalf("ClosePane() error = %v, want nil", err)
 	}
 
 	wantArgs := [][]string{
 		{"--session", "zelma-main", "action", "dump-screen", "--pane-id", "terminal_7", "--full"},
-		{"--session", "zelma-main", "action", "write-chars", "--pane-id", "terminal_7", "/review\n"},
+		{"--session", "zelma-main", "action", "write-chars", "--pane-id", "terminal_7", "--", "/review\n"},
+		{"--session", "zelma-main", "action", "write-chars", "--pane-id", "terminal_7", "--", "continue carefully\n"},
 		{"--session", "zelma-main", "action", "close-pane", "--pane-id", "terminal_7"},
 	}
 	if !reflect.DeepEqual(gotArgs, wantArgs) {
 		t.Fatalf("args = %#v, want %#v", gotArgs, wantArgs)
+	}
+}
+
+func TestSendTextToPaneSeparatesDashPrefixedPayload(t *testing.T) {
+	var gotArgs []string
+	client := New(WithBinary("fake-zellij"), WithTimeout(time.Minute))
+	client.run = func(ctx context.Context, binary string, args []string) commandResult {
+		gotArgs = append([]string(nil), args...)
+		return commandResult{}
+	}
+
+	if err := client.SendTextToPane(context.Background(), SendTextRequest{Session: "zelma-main", PaneID: "terminal_7", Text: "-SECRET_PROMPT_BODY", Submit: true}); err != nil {
+		t.Fatalf("SendTextToPane() error = %v, want nil", err)
+	}
+
+	wantArgs := []string{"--session", "zelma-main", "action", "write-chars", "--pane-id", "terminal_7", "--", "-SECRET_PROMPT_BODY\n"}
+	if !reflect.DeepEqual(gotArgs, wantArgs) {
+		t.Fatalf("args = %#v, want %#v", gotArgs, wantArgs)
+	}
+}
+
+func TestSendTextToPaneRedactsPayloadInDiagnostics(t *testing.T) {
+	const payload = "SECRET_PROMPT_BODY"
+	client := New(WithBinary("fake-zellij"), WithTimeout(time.Minute))
+	client.run = func(context.Context, string, []string) commandResult {
+		return commandResult{
+			stderr: []byte("target unavailable"),
+			err:    errors.New("synthetic zellij failure"),
+		}
+	}
+
+	err := client.SendTextToPane(context.Background(), SendTextRequest{
+		Session: "zelma-main",
+		PaneID:  "terminal_7",
+		Text:    payload,
+		Submit:  true,
+	})
+
+	diagnostic := requireDiagnostic(t, err, ErrorCodeCommandFailed)
+	if strings.Contains(diagnostic.Command, payload) || strings.Contains(err.Error(), payload) {
+		t.Fatalf("diagnostic leaked payload: command=%q error=%q", diagnostic.Command, err.Error())
+	}
+	if !strings.Contains(diagnostic.Command, "<redacted chars>") {
+		t.Fatalf("command = %q, want redacted chars placeholder", diagnostic.Command)
 	}
 }
 
