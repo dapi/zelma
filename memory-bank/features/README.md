@@ -127,5 +127,5 @@ audience: humans_and_agents
 - [FT-047: Focus Zelma Session By ID](FT-047/README.md) — команда
   `sessions focus <id>` для перехода к сохраненному zellij tab/pane.
 - [FT-048: Distributable Codex Skill](FT-048/README.md) — repo-local Codex
-  skill package `skills/zelma/` для управления `zelma` sessions через публичный
-  CLI contract.
+  skill package rooted at `SKILL.md` for managing `zelma` sessions through the
+  public CLI contract.

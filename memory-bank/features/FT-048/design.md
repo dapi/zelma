@@ -35,23 +35,23 @@ skill and route user intents to existing `zelma` commands safely.
 
 | C4 ID | Decision | Trigger / reason | Artifact |
 | --- | --- | --- | --- |
-| `C4-01` | `C1` | The feature adds a Codex-facing integration surface: a Codex agent discovers `skills/zelma/SKILL.md` and invokes the `zelma` CLI inside a repository. | C1 context table below |
+| `C4-01` | `C1` | The feature adds a Codex-facing integration surface: a Codex agent discovers `SKILL.md` and invokes the `zelma` CLI inside a repository. | C1 context table below |
 
 ### C4 Artifact
 
 | Element ID | Element | Type | Direction | Boundary / responsibility |
 | --- | --- | --- | --- | --- |
 | `C4-E01` | Codex agent | External actor / agent runtime | Reads skill instructions; invokes commands | Must follow `SKILL.md` and user intent |
-| `C4-E02` | `skills/zelma/SKILL.md` | Skill package artifact | Instructs agent which `zelma` command to run | Owns concise agent-facing routing only |
+| `C4-E02` | `SKILL.md` | Skill package artifact | Instructs agent which `zelma` command to run | Owns concise agent-facing routing only |
 | `C4-E03` | `zelma` CLI | System under feature | Receives public commands and returns JSON/diagnostics | Owns registry, zellij adapter and command behavior |
 | `C4-E04` | zellij / `.zelma/sessions.json` | External/runtime internals relative to skill | Accessed only through `zelma` CLI | Not directly called or parsed by the skill |
 
 ## Selected Solution
 
-- `SOL-01` Create `skills/zelma/SKILL.md` as the single distributable skill
+- `SOL-01` Create `SKILL.md` as the single distributable skill
   instruction artifact. It closes `REQ-01` through `REQ-06` by making intent
   routing and safety boundaries discoverable without duplicating large docs.
-- `SOL-02` Add `skills/zelma/agents/openai.yaml` with UI metadata only. Local
+- `SOL-02` Add `agents/openai.yaml` with UI metadata only. Local
   Codex skill examples show this path for display metadata, and issue 87 allows
   it when appropriate.
 - `SOL-03` Keep install/development notes outside `SKILL.md` when extra repo
@@ -75,10 +75,10 @@ skill and route user intents to existing `zelma` commands safely.
 
 ## Accepted Local Decisions
 
-- `SD-01` `skills/zelma/SKILL.md` is the behavioral instruction owner for the
+- `SD-01` `SKILL.md` is the behavioral instruction owner for the
   distributable skill; `../../engineering/skill-contract.md` remains the
   command/recovery contract owner.
-- `SD-02` `skills/zelma/agents/openai.yaml` is appropriate because local Codex
+- `SD-02` `agents/openai.yaml` is appropriate because local Codex
   skill examples use it for display metadata and it does not add runtime
   behavior.
 - `SD-03` The skill may mention `cleanup --confirm --json` only as a command
@@ -121,7 +121,7 @@ skill and route user intents to existing `zelma` commands safely.
 
 | Stage ID | Stage | Entry condition | Backout |
 | --- | --- | --- | --- |
-| `RB-01` | Add skill package files | `brief.md` and `design.md` active | Remove `skills/zelma/` before merge if validation fails |
+| `RB-01` | Add skill package files | `brief.md` and `design.md` active | Remove `./` before merge if validation fails |
 | `RB-02` | Add minimal install/development docs if needed | Skill files exist and validation path is known | Revert doc additions if they duplicate canonical contract |
 | `RB-03` | Verify and merge | All `CHK-*` pass | Keep feature branch unmerged until skill package is corrected |
 

@@ -174,10 +174,20 @@ any terminal.
 ## Codex Skill Package
 
 The repo-local distributable Codex skill lives at
-[`skills/zelma/SKILL.md`](skills/zelma/SKILL.md), with optional OpenAI UI
-metadata in [`skills/zelma/agents/openai.yaml`](skills/zelma/agents/openai.yaml).
+[`SKILL.md`](SKILL.md), with optional OpenAI UI metadata in
+[`agents/openai.yaml`](agents/openai.yaml).
 The skill is an agent-facing wrapper over the public `zelma` CLI only; it does
 not call `zellij` directly and does not parse `.zelma/sessions.json`.
+
+### Install the skill
+
+Install directly from GitHub:
+
+```bash
+npx skills add dapi/zelma -g -a codex -y
+```
+
+This installs the `zelma` skill for Codex from the published repository.
 
 ### Аудит ссылок и индексации `memory-bank`
 

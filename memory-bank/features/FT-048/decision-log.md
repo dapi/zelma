@@ -36,7 +36,7 @@ must_not_define:
 ### Available Facts
 
 - GitHub issue 87 names `FT-048: Distributable Codex Skill` and requires a
-  repo-local skill package, proposed path `skills/zelma/SKILL.md`.
+  repo-local skill package, proposed path `SKILL.md`.
 - `../../engineering/skill-contract.md` is active and already owns the
   command/recovery contract for `zelma` skills.
 - `../../epics/EP-006/brief.md` and `../../product/roadmap.md` frame skills as
@@ -103,12 +103,12 @@ None.
 | Status | accepted |
 | Date | 2026-07-08 |
 | Review cycle | 1 |
-| Closed question | Is `skills/zelma/agents/openai.yaml` appropriate for FT-048? |
+| Closed question | Is `agents/openai.yaml` appropriate for FT-048? |
 | FPF frame | Evidence graph + options comparison |
 
 ### Available Facts
 
-- Issue 87 explicitly says to add `skills/zelma/agents/openai.yaml` if
+- Issue 87 explicitly says to add `agents/openai.yaml` if
   appropriate for Codex skill UI metadata.
 - Local installed Codex/agent skill examples include `agents/openai.yaml` with
   `interface.display_name` and `interface.short_description`.
@@ -125,7 +125,7 @@ None.
 
 ### Decision
 
-Include `skills/zelma/agents/openai.yaml` as metadata-only UI information.
+Include `agents/openai.yaml` as metadata-only UI information.
 
 ### Rationale
 

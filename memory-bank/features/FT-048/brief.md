@@ -37,7 +37,7 @@ must_not_define:
 
 Issue 87 требует конкретный repo-local skill package artifact для `zelma`.
 Сейчас проект уже описывает CLI/skill contract и Go wrappers, но в репозитории
-нет `skills/zelma/SKILL.md`, который Codex может установить или обнаружить как
+нет `SKILL.md`, который Codex может установить или обнаружить как
 готовый skill.
 
 Без такого artifact agent workflows остаются привязаны к документации и
@@ -48,13 +48,13 @@ Issue 87 требует конкретный repo-local skill package artifact �
 
 | Metric ID | Metric | Baseline | Target | Measurement method |
 | --- | --- | --- | --- | --- |
-| `MET-01` | Distributable skill package availability | `skills/zelma/` отсутствует | `skills/zelma/SKILL.md` существует с валидным `name` и `description` frontmatter | Static file review and skill validation if available |
+| `MET-01` | Distributable skill package availability | `./` отсутствует | `SKILL.md` существует с валидным `name` и `description` frontmatter | Static file review and skill validation if available |
 | `MET-02` | Intent-to-command coverage | Contract exists only in docs / wrappers | Skill covers list, live status, create, detect, focus and cleanup intents | Review against `../../engineering/skill-contract.md` |
 | `MET-03` | Safety boundary preservation | Boundary documented upstream | Skill instructions prohibit direct `zellij` calls, direct `.zelma/sessions.json` parsing and ungated cleanup confirm | Static review and `rg` checks |
 
 ### Scope
 
-- `REQ-01` Create a repo-local Codex skill package at `skills/zelma/SKILL.md`
+- `REQ-01` Create a repo-local Codex skill package at `SKILL.md`
   with valid frontmatter containing `name` and `description`.
 - `REQ-02` Make `description` trigger on requests to list `zelma` sessions,
   create a Codex pane with `zelma`, detect manual Codex panes, focus a
@@ -67,7 +67,7 @@ Issue 87 требует конкретный repo-local skill package artifact �
   preserving CLI diagnostics and using only safe `zelma` next commands.
 - `REQ-06` Gate destructive stale cleanup: `zelma sessions cleanup --confirm
   --json` is allowed only after explicit user intent to remove stale records.
-- `REQ-07` Add Codex UI metadata at `skills/zelma/agents/openai.yaml` if it is
+- `REQ-07` Add Codex UI metadata at `agents/openai.yaml` if it is
   appropriate for discoverability and can stay consistent with local skill
   metadata examples.
 - `REQ-08` Add installation/development notes in the appropriate repo doc if
@@ -88,7 +88,7 @@ Issue 87 требует конкретный repo-local skill package artifact �
 ### Constraints / Assumptions
 
 - `ASM-01` GitHub issue 87 is the tracker source for this delivery unit and
-  names the proposed package path `skills/zelma/SKILL.md`.
+  names the proposed package path `SKILL.md`.
 - `ASM-02` Existing local Codex skills use `SKILL.md` frontmatter with `name`
   and `description`.
 - `ASM-03` Existing local Codex skill metadata examples use
@@ -112,7 +112,7 @@ entries `DL-001` through `DL-003`.
 
 ### Exit Criteria
 
-- `EC-01` `skills/zelma/SKILL.md` exists, is concise and has valid `name` /
+- `EC-01` `SKILL.md` exists, is concise and has valid `name` /
   `description` frontmatter.
 - `EC-02` The skill description and body cover list, live status, create,
   detect, focus and stale cleanup intents.
@@ -138,7 +138,7 @@ entries `DL-001` through `DL-003`.
 
 ### Acceptance Scenarios
 
-- `SC-01` A Codex agent discovers `skills/zelma/SKILL.md`; the frontmatter
+- `SC-01` A Codex agent discovers `SKILL.md`; the frontmatter
   `description` matches requests such as "list zelma sessions", "create a
   Codex pane with zelma", "detect manual Codex panes", "focus zelma session 2"
   and "cleanup stale zelma sessions".
@@ -149,7 +149,7 @@ entries `DL-001` through `DL-003`.
 - `SC-04` When a command fails or returns an incomplete state, the skill keeps
   CLI diagnostics visible and follows recovery actions from
   `../../engineering/skill-contract.md`.
-- `SC-05` If UI metadata is present, `skills/zelma/agents/openai.yaml` remains
+- `SC-05` If UI metadata is present, `agents/openai.yaml` remains
   metadata-only and does not redefine skill behavior.
 - `SC-06` Repo docs explain install/development notes only where needed and do
   not duplicate the full skill contract.
@@ -165,7 +165,7 @@ entries `DL-001` through `DL-003`.
 
 | Check ID | Covers | How to check | Expected result | Evidence path |
 | --- | --- | --- | --- | --- |
-| `CHK-01` | `EC-01`, `EC-02`, `SC-01`, `SC-05` | Static review of `skills/zelma/SKILL.md` and optional `skills/zelma/agents/openai.yaml` | Required files exist with expected frontmatter / metadata fields | `artifacts/ft-048/verify/chk-01/` |
+| `CHK-01` | `EC-01`, `EC-02`, `SC-01`, `SC-05` | Static review of `SKILL.md` and optional `agents/openai.yaml` | Required files exist with expected frontmatter / metadata fields | `artifacts/ft-048/verify/chk-01/` |
 | `CHK-02` | `EC-03`, `SC-02`, `SC-04` | Compare skill intent table and recovery guidance with `../../engineering/skill-contract.md` | Intent routing and recovery commands match the contract | `artifacts/ft-048/verify/chk-02/` |
 | `CHK-03` | `EC-04`, `NEG-01`, `NEG-02` | Static search for forbidden direct access guidance and cleanup confirm gating | No direct `zellij` or direct registry parser path; cleanup confirm is explicitly gated | `artifacts/ft-048/verify/chk-03/` |
 | `CHK-04` | `EC-05` | Run available skill validation command if present; otherwise record manual validation | Validation passes or manual validation gap is documented | `artifacts/ft-048/verify/chk-04/` |
@@ -183,7 +183,7 @@ entries `DL-001` through `DL-003`.
 
 ### Evidence
 
-- `EVID-01` File/frontmatter review result for `skills/zelma/SKILL.md` and
+- `EVID-01` File/frontmatter review result for `SKILL.md` and
   optional OpenAI UI metadata.
 - `EVID-02` Intent-to-command and recovery mapping review result.
 - `EVID-03` Boundary/static-search review result for forbidden guidance and
