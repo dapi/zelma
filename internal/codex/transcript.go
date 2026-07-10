@@ -9,10 +9,13 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
+	"time"
 )
 
 const DefaultTranscriptTailEvents = 50
+const externalTranscriptScanLimit = 64
 
 const (
 	ErrorCodeTranscriptMissing ErrorCode = "codex_transcript_missing"
@@ -48,9 +51,14 @@ type transcriptRecord struct {
 	Payload   json.RawMessage `json:"payload"`
 }
 
+type transcriptFileCandidate struct {
+	path    string
+	modTime time.Time
+}
+
 func ReadTranscript(sessionID string, options TranscriptReadOptions) (TranscriptResult, error) {
-	sessionID = strings.ToLower(strings.TrimSpace(sessionID))
-	if !uuidPattern.MatchString(sessionID) {
+	sessionID = normalizeSessionID(sessionID)
+	if sessionID == "" {
 		return TranscriptResult{}, transcriptDiagnostic(ErrorCodeInvalidInput, "Codex session id must be a UUID", "inspect the zelma session record and rerun detection before reading transcript", nil)
 	}
 	limit := normalizeTranscriptTail(options.TailEvents)
@@ -75,13 +83,18 @@ func ReadTranscript(sessionID string, options TranscriptReadOptions) (Transcript
 }
 
 func FindTranscriptFile(sessionID string, options MetadataDiscoveryOptions) (string, error) {
+	sessionID = normalizeSessionID(sessionID)
+	if sessionID == "" {
+		return "", transcriptDiagnostic(ErrorCodeInvalidInput, "Codex session id must be a UUID", "inspect the zelma session record and rerun detection before reading transcript", nil)
+	}
 	codexHome, _ := resolveCodexHome(options)
 	if codexHome == "" {
 		return "", transcriptDiagnostic(ErrorCodeTranscriptMissing, "Codex home is unavailable", "set CODEX_HOME or run from an environment with a Codex home before reading transcript", nil)
 	}
 
 	sessionsDir := filepath.Join(codexHome, "sessions")
-	var matches []string
+	var matches []transcriptFileCandidate
+	var externalCandidates []transcriptFileCandidate
 	err := filepath.WalkDir(sessionsDir, func(path string, entry fs.DirEntry, err error) error {
 		if err != nil {
 			return nil
@@ -90,12 +103,15 @@ func FindTranscriptFile(sessionID string, options MetadataDiscoveryOptions) (str
 			return nil
 		}
 
-		result, err := ParseSessionEvidenceFile(path)
-		if err != nil || result.Verdict != SessionEvidenceResolved || result.Ref == nil {
+		info, statErr := entry.Info()
+		if statErr != nil {
 			return nil
 		}
-		if strings.EqualFold(result.Ref.SessionID, sessionID) {
-			matches = append(matches, filepath.Clean(path))
+		candidate := transcriptFileCandidate{path: filepath.Clean(path), modTime: info.ModTime()}
+		externalCandidates = append(externalCandidates, candidate)
+
+		if transcriptFileMatchesSessionMetadata(path, sessionID) || transcriptFilenameMatchesSession(path, sessionID) {
+			matches = append(matches, candidate)
 		}
 		return nil
 	})
@@ -106,12 +122,77 @@ func FindTranscriptFile(sessionID string, options MetadataDiscoveryOptions) (str
 		return "", transcriptDiagnostic(ErrorCodeTranscriptRead, fmt.Sprintf("scan Codex sessions directory: %v", err), "inspect Codex home permissions and retry", err)
 	}
 	if len(matches) == 0 {
-		return "", transcriptDiagnostic(ErrorCodeTranscriptMissing, "no Codex transcript file matches codex_session", "run zelma sessions detect --json to refresh session identity, or verify CODEX_HOME", nil)
+		externalMatch := findExternalTranscriptMatch(externalCandidates, sessionID)
+		if externalMatch == "" {
+			return "", transcriptDiagnostic(ErrorCodeTranscriptMissing, "no Codex transcript file matches codex_session", "run zelma sessions detect --json to refresh session identity, or verify CODEX_HOME", nil)
+		}
+		return externalMatch, nil
 	}
-	if len(matches) > 1 {
-		return "", transcriptDiagnostic(ErrorCodeTranscriptInvalid, "multiple Codex transcript files match codex_session", "inspect Codex session files and remove duplicate synthetic fixtures before retrying", nil)
+	return newestTranscriptPath(matches), nil
+}
+
+func transcriptFileMatchesSessionMetadata(path, sessionID string) bool {
+	result, err := ParseSessionEvidenceFile(path)
+	if err == nil && result.Verdict == SessionEvidenceResolved && result.Ref != nil && strings.EqualFold(result.Ref.SessionID, sessionID) {
+		return true
 	}
-	return matches[0], nil
+	return false
+}
+
+func transcriptFilenameMatchesSession(path, sessionID string) bool {
+	if sessionID == "" {
+		return false
+	}
+	return strings.Contains(strings.ToLower(filepath.Base(path)), sessionID)
+}
+
+func findExternalTranscriptMatch(candidates []transcriptFileCandidate, sessionID string) string {
+	sortTranscriptCandidatesByRecency(candidates)
+	if len(candidates) > externalTranscriptScanLimit {
+		candidates = candidates[:externalTranscriptScanLimit]
+	}
+
+	var matches []transcriptFileCandidate
+	for _, candidate := range candidates {
+		matchesSession, err := transcriptFileContainsExternalSession(candidate.path, sessionID)
+		if err != nil || !matchesSession {
+			continue
+		}
+		matches = append(matches, candidate)
+	}
+	if len(matches) == 0 {
+		return ""
+	}
+	return newestTranscriptPath(matches)
+}
+
+func transcriptFileContainsExternalSession(path, sessionID string) (bool, error) {
+	if sessionID == "" {
+		return false, nil
+	}
+	file, err := os.Open(path)
+	if err != nil {
+		return false, err
+	}
+	defer file.Close()
+
+	reader := bufio.NewReader(file)
+	for {
+		line, err := readJSONLLine(reader)
+		if err == io.EOF {
+			return false, nil
+		}
+		if err != nil {
+			return false, err
+		}
+		externalID := externalSessionUUID(line)
+		if externalID == "" {
+			externalID = externalSessionEnvUUID(line)
+		}
+		if externalID == sessionID {
+			return true, nil
+		}
+	}
 }
 
 func readTranscriptEvents(path string, limit int) ([]TranscriptEvent, bool, error) {
@@ -126,13 +207,19 @@ func readTranscriptEvents(path string, limit int) ([]TranscriptEvent, bool, erro
 
 func parseTranscriptEvents(r io.Reader, sessionFile string, limit int) ([]TranscriptEvent, bool, error) {
 	limit = normalizeTranscriptTail(limit)
-	scanner := bufio.NewScanner(r)
-	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+	reader := bufio.NewReader(r)
 
-	var events []TranscriptEvent
+	events := make([]TranscriptEvent, 0, limit)
 	index := 0
-	for scanner.Scan() {
-		line := bytes.TrimSpace(scanner.Bytes())
+	for {
+		rawLine, err := readJSONLLine(reader)
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return nil, false, transcriptDiagnostic(ErrorCodeTranscriptRead, fmt.Sprintf("read Codex transcript %s: %v", sessionFile, err), "inspect Codex transcript file permissions and retry", err)
+		}
+		line := bytes.TrimSpace([]byte(rawLine))
 		if len(line) == 0 {
 			continue
 		}
@@ -154,17 +241,53 @@ func parseTranscriptEvents(r io.Reader, sessionFile string, limit int) ([]Transc
 		if len(record.Payload) > 0 && string(record.Payload) != "null" {
 			event.Payload = append(json.RawMessage(nil), record.Payload...)
 		}
-		events = append(events, event)
-	}
-	if err := scanner.Err(); err != nil {
-		return nil, false, transcriptDiagnostic(ErrorCodeTranscriptRead, fmt.Sprintf("read Codex transcript %s: %v", sessionFile, err), "inspect Codex transcript file permissions and retry", err)
+		if len(events) < limit {
+			events = append(events, event)
+		} else {
+			events[(index-1)%limit] = event
+		}
 	}
 
-	truncated := len(events) > limit
+	truncated := index > limit
 	if truncated {
-		events = append([]TranscriptEvent(nil), events[len(events)-limit:]...)
+		tail := make([]TranscriptEvent, 0, limit)
+		start := index % limit
+		tail = append(tail, events[start:]...)
+		tail = append(tail, events[:start]...)
+		events = tail
 	}
 	return events, truncated, nil
+}
+
+func readJSONLLine(reader *bufio.Reader) (string, error) {
+	line, err := reader.ReadString('\n')
+	if err == nil {
+		return strings.TrimSpace(line), nil
+	}
+	if err == io.EOF {
+		if line == "" {
+			return "", io.EOF
+		}
+		return strings.TrimSpace(line), nil
+	}
+	return "", err
+}
+
+func newestTranscriptPath(candidates []transcriptFileCandidate) string {
+	if len(candidates) == 0 {
+		return ""
+	}
+	sortTranscriptCandidatesByRecency(candidates)
+	return candidates[0].path
+}
+
+func sortTranscriptCandidatesByRecency(candidates []transcriptFileCandidate) {
+	sort.SliceStable(candidates, func(i, j int) bool {
+		if candidates[i].modTime.Equal(candidates[j].modTime) {
+			return candidates[i].path > candidates[j].path
+		}
+		return candidates[i].modTime.After(candidates[j].modTime)
+	})
 }
 
 func normalizeTranscriptTail(limit int) int {
