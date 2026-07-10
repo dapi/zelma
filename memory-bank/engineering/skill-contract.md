@@ -40,6 +40,8 @@ The skill should choose commands from the user's intent:
 | Preview create inputs | `zelma sessions create [path] --dry-run --json` | Resolve Codex command and opened path without side effects. |
 | Run an explicit diagnostic detect pass | `zelma sessions detect --json` | Detect live zellij panes and upsert candidate or active records outside the normal list workflow. |
 | Focus a known session pane | `zelma sessions focus <id> --json` | Switch zellij UI to a registry-backed tab/pane without registry mutation. |
+| Observe a session pane screen | `zelma sessions buffer <id> --json` | Read bounded current zellij screen/scrollback for an explicit repo-local session id without registry mutation. |
+| Observe Codex transcript events | `zelma sessions transcript <id> --json` | Read bounded Codex transcript events for an explicit repo-local session id with a resolved `codex_session` without registry mutation. |
 | Review stale cleanup | `zelma sessions cleanup --json` | Propose stale records without mutation. |
 | Remove stale records after explicit user intent | `zelma sessions cleanup --confirm --json` | Mutating cleanup for records already marked `stale`. |
 
@@ -50,6 +52,10 @@ zellij even when auto-detect is skipped by cache freshness. Keep standalone
 `detect` for diagnostics/manual reconciliation, not normal inventory. Use
 `cleanup --confirm` only after explicit user intent to remove stale registry
 records.
+
+Use observation commands only when the user or orchestrator explicitly asks to
+inspect a session's current work. `list`, `status`, `detect`, `focus` and
+`cleanup` must not read pane buffers or Codex transcript contents implicitly.
 
 ## Command Contracts
 
@@ -208,6 +214,56 @@ The successful JSON object is the focused session record:
 }
 ```
 
+### `zelma sessions buffer <id> --json`
+
+Reads the registry, finds the active record by positive repo-local `id`, and
+reads the current pane screen through the zellij adapter. This command is
+read-only and does not persist pane content. Output is bounded by
+`--tail <lines>`; default `120`.
+
+```json
+{
+  "version": 1,
+  "session_id": 2,
+  "source": "zellij_buffer",
+  "captured_at": "2026-07-10T00:00:00Z",
+  "truncated": false,
+  "limit": 120,
+  "items": [
+    {
+      "line": 1,
+      "text": "synthetic pane line"
+    }
+  ]
+}
+```
+
+### `zelma sessions transcript <id> --json`
+
+Reads the registry, finds the active record by positive repo-local `id`, and
+uses its `codex_session` to read matching Codex JSONL events through the codex
+adapter. This command is read-only and does not persist prompts, assistant
+answers, tool payloads or transcript content in `.zelma/sessions.json`. Output
+is bounded by `--tail <events>`; default `50`.
+
+```json
+{
+  "version": 1,
+  "session_id": 2,
+  "source": "codex_transcript",
+  "captured_at": "2026-07-10T00:00:00Z",
+  "truncated": false,
+  "limit": 50,
+  "codex_session": "11111111-1111-4111-8111-111111111111",
+  "items": [
+    {
+      "index": 1,
+      "type": "session_meta"
+    }
+  ]
+}
+```
+
 ### `zelma sessions cleanup --json`
 
 Reads the registry and proposes cleanup for records whose state is already
@@ -260,3 +316,6 @@ must not call `zellij` directly, read `.zelma/sessions.json`, or suggest
 - Skills do not remove records except through `zelma sessions cleanup --confirm`.
 - Skills do not assume cleanup of created panes after partial `create` failures.
 - Skills keep human-readable stderr diagnostics attached to recovery responses.
+- Skills do not read pane buffers or Codex transcript files directly; explicit
+  observation must go through `zelma sessions buffer <id> --json` or
+  `zelma sessions transcript <id> --json`.

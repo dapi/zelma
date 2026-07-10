@@ -18,6 +18,7 @@ import (
 	"github.com/dapi/zelma/internal/create"
 	"github.com/dapi/zelma/internal/detection"
 	"github.com/dapi/zelma/internal/live"
+	"github.com/dapi/zelma/internal/observe"
 	"github.com/dapi/zelma/internal/registry"
 	"github.com/dapi/zelma/internal/repo"
 	"github.com/dapi/zelma/internal/setup"
@@ -97,6 +98,8 @@ func NewRootCommand(stdout, stderr io.Writer) *cobra.Command {
 		newSessionsCreateCommand(stdout),
 		newSessionsDetectCommand(stdout),
 		newSessionsFocusCommand(stdout),
+		newSessionsBufferCommand(stdout),
+		newSessionsTranscriptCommand(stdout),
 		newSessionsCleanupCommand(stdout),
 	)
 	root.AddCommand(sessions)
@@ -122,6 +125,10 @@ func renderHelp(cmd *cobra.Command, args []string) {
 		fmt.Fprint(cmd.OutOrStdout(), sessionsDetectHelp)
 	case "zelma sessions focus":
 		fmt.Fprint(cmd.OutOrStdout(), sessionsFocusHelp)
+	case "zelma sessions buffer":
+		fmt.Fprint(cmd.OutOrStdout(), sessionsBufferHelp)
+	case "zelma sessions transcript":
+		fmt.Fprint(cmd.OutOrStdout(), sessionsTranscriptHelp)
 	case "zelma sessions cleanup":
 		fmt.Fprint(cmd.OutOrStdout(), sessionsCleanupHelp)
 	case "zelma supervisor":
@@ -144,6 +151,8 @@ const rootHelp = `COMMAND MAP
   zelma sessions create   Create and register a confirmed Codex pane. Status: implemented.
   zelma sessions detect   Detect existing Codex panes. Status: implemented.
   zelma sessions focus    Focus a known zellij pane by zelma session ID. Status: implemented.
+  zelma sessions buffer   Read bounded pane screen/scrollback by zelma session ID. Status: implemented.
+  zelma sessions transcript  Read bounded Codex transcript events by zelma session ID. Status: implemented.
   zelma sessions cleanup  Propose or confirm stale record cleanup. Status: implemented.
   zelma supervisor help   Show the supervisor command map.
   zelma supervisor start-issue  Launch and supervise start-issue. Status: implemented.
@@ -159,6 +168,8 @@ OUTPUT CONVENTIONS
   sessions detect: stdout, exit 0, summary with active/candidate/stale counts,
   stale reason lines when found, or JSON with --json.
   sessions focus: stdout, exit 0, focused summary or JSON with --json.
+  sessions buffer: stdout, exit 0, bounded zellij pane screen JSON with --json.
+  sessions transcript: stdout, exit 0, bounded Codex transcript event JSON with --json.
   sessions cleanup: stdout, exit 0, stale cleanup proposal by default; add
   --confirm to remove proposed stale records.
   sessions create --dry-run: stdout, exit 0, launch contract text or JSON.
@@ -232,6 +243,8 @@ const sessionsHelp = `COMMAND MAP
   zelma sessions create   Create and register a confirmed Codex pane. Status: implemented.
   zelma sessions detect   Detect existing Codex panes. Status: implemented.
   zelma sessions focus    Focus a known zellij pane by zelma session ID. Status: implemented.
+  zelma sessions buffer   Read bounded pane screen/scrollback by zelma session ID. Status: implemented.
+  zelma sessions transcript  Read bounded Codex transcript events by zelma session ID. Status: implemented.
   zelma sessions cleanup  Propose or confirm stale record cleanup. Status: implemented.
 
 OUTPUT CONVENTIONS
@@ -245,6 +258,10 @@ OUTPUT CONVENTIONS
   detect: stdout, exit 0, added/unchanged/skipped summary with
   active/candidate/stale counts, stale reasons when found, or JSON with --json.
   focus: stdout, exit 0, focused summary or focused session JSON with --json.
+  buffer: stdout, exit 0, bounded zellij pane screen/scrollback JSON with
+  --json; default --tail 120 lines.
+  transcript: stdout, exit 0, bounded Codex transcript event JSON with --json;
+  default --tail 50 events.
   cleanup: stdout, exit 0, proposed/removed/kept summary with stale records;
   without --confirm, does not mutate registry.
   sessions registry output: preserves id, zellij_session, zellij_pane,
@@ -255,6 +272,8 @@ RECOVERY HINTS
   managed create task: inspect "zelma sessions create --help".
   diagnostic/manual detect task: inspect "zelma sessions detect --help".
   focus task: inspect "zelma sessions focus --help".
+  observation task: run "zelma sessions buffer <id> --json" or
+  "zelma sessions transcript <id> --json".
 
 HUMAN NOTES
   sessions list is the primary inventory command and auto-detects fresh-enough
@@ -347,6 +366,43 @@ Notes:
   Reads .zelma/sessions.json and sends zellij focus actions. Does not create,
   detect, cleanup or mutate registry records. Use "zelma sessions list" to find
   the target ID.
+`
+
+const sessionsBufferHelp = `Usage:
+  zelma sessions buffer <id> --json [--tail <lines>]
+
+Status:
+  implemented: reads bounded zellij pane screen/scrollback by repo-local zelma
+  session ID.
+
+Output:
+  --json: schema v1 observation object with source zellij_buffer, captured_at,
+  truncated, limit and line items.
+  --tail: maximum lines to return; default 120.
+
+Notes:
+  Reads .zelma/sessions.json to resolve identity, then reads the current zellij
+  pane screen through the adapter. Does not mutate registry records and does
+  not persist pane content.
+`
+
+const sessionsTranscriptHelp = `Usage:
+  zelma sessions transcript <id> --json [--tail <events>]
+
+Status:
+  implemented: reads bounded Codex transcript events by repo-local zelma
+  session ID.
+
+Output:
+  --json: schema v1 observation object with source codex_transcript,
+  captured_at, codex_session, truncated, limit and typed JSONL events.
+  --tail: maximum events to return; default 50.
+
+Notes:
+  Reads .zelma/sessions.json to resolve codex_session, then reads the matching
+  Codex transcript through the codex adapter. Does not mutate registry records
+  and does not persist prompts, assistant answers, tool payloads or transcript
+  content in .zelma/sessions.json.
 `
 
 const sessionsCleanupHelp = `Usage:
@@ -994,6 +1050,83 @@ func newSessionsFocusCommand(stdout io.Writer) *cobra.Command {
 	return cmd
 }
 
+func newSessionsBufferCommand(stdout io.Writer) *cobra.Command {
+	var jsonOutput bool
+	var tailLines int
+
+	cmd := &cobra.Command{
+		Use:   "buffer <id>",
+		Short: "Read bounded zellij pane screen by zelma session ID.",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if !jsonOutput {
+				return commandFailure(cmd.CommandPath(), errors.New("buffer output is currently available only with --json"), jsonOutput)
+			}
+			id, err := parseSessionIDArg(args[0])
+			if err != nil {
+				return commandFailure(cmd.CommandPath(), err, jsonOutput)
+			}
+			if tailLines < 0 {
+				return commandFailure(cmd.CommandPath(), errors.New("--tail must be zero or a positive integer"), jsonOutput)
+			}
+
+			reg, err := readCurrentRegistry(cmd.CommandPath())
+			if err != nil {
+				return commandFailure(cmd.CommandPath(), err, jsonOutput)
+			}
+			client := zellij.New(zellij.WithBinary(os.Getenv("ZELMA_ZELLIJ_BIN")))
+			result, err := observe.Buffer(cmd.Context(), reg, id, tailLines, nowFunc(), client)
+			if err != nil {
+				return commandFailure(cmd.CommandPath(), err, jsonOutput)
+			}
+			return writeObservationJSON(stdout, result)
+		},
+	}
+	cmd.Flags().BoolVar(&jsonOutput, "json", false, "Print schema v1 buffer observation JSON.")
+	cmd.Flags().IntVar(&tailLines, "tail", observe.DefaultBufferTailLines, "Maximum pane screen lines to return.")
+	return cmd
+}
+
+func newSessionsTranscriptCommand(stdout io.Writer) *cobra.Command {
+	var jsonOutput bool
+	var tailEvents int
+
+	cmd := &cobra.Command{
+		Use:   "transcript <id>",
+		Short: "Read bounded Codex transcript events by zelma session ID.",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if !jsonOutput {
+				return commandFailure(cmd.CommandPath(), errors.New("transcript output is currently available only with --json"), jsonOutput)
+			}
+			id, err := parseSessionIDArg(args[0])
+			if err != nil {
+				return commandFailure(cmd.CommandPath(), err, jsonOutput)
+			}
+			if tailEvents < 0 {
+				return commandFailure(cmd.CommandPath(), errors.New("--tail must be zero or a positive integer"), jsonOutput)
+			}
+
+			reg, err := readCurrentRegistry(cmd.CommandPath())
+			if err != nil {
+				return commandFailure(cmd.CommandPath(), err, jsonOutput)
+			}
+			result, err := observe.Transcript(reg, id, tailEvents, nowFunc(), codex.MetadataDiscoveryOptions{
+				Env: map[string]string{
+					"CODEX_HOME": os.Getenv("CODEX_HOME"),
+				},
+			})
+			if err != nil {
+				return commandFailure(cmd.CommandPath(), err, jsonOutput)
+			}
+			return writeObservationJSON(stdout, result)
+		},
+	}
+	cmd.Flags().BoolVar(&jsonOutput, "json", false, "Print schema v1 transcript observation JSON.")
+	cmd.Flags().IntVar(&tailEvents, "tail", observe.DefaultTranscriptTail, "Maximum Codex transcript events to return.")
+	return cmd
+}
+
 func newSessionsCleanupCommand(stdout io.Writer) *cobra.Command {
 	var confirm bool
 	var jsonOutput bool
@@ -1291,6 +1424,15 @@ func writeFocusSessionJSON(stdout io.Writer, session registry.Session) error {
 	return err
 }
 
+func writeObservationJSON(stdout io.Writer, value any) error {
+	data, err := json.MarshalIndent(value, "", "  ")
+	if err != nil {
+		return fmt.Errorf("encode observation JSON: %w", err)
+	}
+	_, err = fmt.Fprintf(stdout, "%s\n", data)
+	return err
+}
+
 type detectSummaryJSON struct {
 	registry.DetectUpsertSummary
 	StaleCandidates       []registry.StaleCandidate      `json:"stale_candidates,omitempty"`
@@ -1496,6 +1638,25 @@ func recoveryDiagnosticForError(command string, err error) recoveryDiagnosticJSO
 		return diagnostic
 	}
 
+	var observeErr *observe.DiagnosticError
+	if errors.As(err, &observeErr) {
+		observeDiagnostic := observeErr.Diagnostic
+		diagnostic.Code = string(observeDiagnostic.Code)
+		diagnostic.Message = observeDiagnostic.Message
+		diagnostic.RecoveryHint = observeDiagnostic.RecoveryHint
+		diagnostic.NextCommand = observeDiagnostic.NextCommand
+		diagnostic.Retryable = false
+		diagnostic.ManualActionRequired = true
+		var zellijErr *zellij.DiagnosticError
+		if errors.As(err, &zellijErr) {
+			zellijDiagnostic := zellijErr.Diagnostic
+			diagnostic.AdapterCommand = zellijDiagnostic.Command
+			diagnostic.AdapterExitCode = intPtr(zellijDiagnostic.ExitCode)
+			diagnostic.AdapterStderr = zellijDiagnostic.Stderr
+		}
+		return diagnostic
+	}
+
 	var zellijErr *zellij.DiagnosticError
 	if errors.As(err, &zellijErr) {
 		zellijDiagnostic := zellijErr.Diagnostic
@@ -1529,7 +1690,11 @@ func recoveryDiagnosticForError(command string, err error) recoveryDiagnosticJSO
 		diagnostic.Code = string(codexDiagnostic.Code)
 		diagnostic.Message = codexDiagnostic.Message
 		diagnostic.RecoveryHint = codexDiagnostic.RecoveryHint
-		diagnostic.NextCommand = nextCommandForCode(diagnostic.Code)
+		if codexDiagnostic.Code == codex.ErrorCodeTranscriptMissing {
+			diagnostic.NextCommand = []string{"zelma", "sessions", "detect", "--json"}
+		} else {
+			diagnostic.NextCommand = nextCommandForCode(diagnostic.Code)
+		}
 		return diagnostic
 	}
 

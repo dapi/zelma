@@ -1,6 +1,6 @@
 ---
 name: zelma
-description: Manage repo-local Codex/zellij sessions through the public zelma CLI. Use when asked to list zelma sessions, check live status, create a Codex pane with zelma, detect manual Codex panes, focus zelma session 2 or another numeric id, preview cleanup stale zelma sessions, or confirm stale cleanup after explicit user intent.
+description: Manage repo-local Codex/zellij sessions through the public zelma CLI. Use when asked to list zelma sessions, check live status, create a Codex pane with zelma, detect manual Codex panes, focus zelma session 2 or another numeric id, observe a session buffer/transcript, preview cleanup stale zelma sessions, or confirm stale cleanup after explicit user intent.
 ---
 
 # zelma
@@ -19,6 +19,10 @@ public `zelma` CLI. Run commands from inside the target Git worktree.
 - Do not infer current task/activity beyond fields exposed by public `zelma`
   JSON. Current public session fields include identifiers, `opened_path`,
   `state` and optional `live_status`.
+- Observation commands are explicit only. Use `zelma sessions buffer <id> --json`
+  or `zelma sessions transcript <id> --json` only when the user asks to inspect
+  a session's current work; do not read pane buffers or Codex transcripts during
+  list/status/detect/focus workflows.
 
 ## Intent Routing
 
@@ -31,6 +35,8 @@ public `zelma` CLI. Run commands from inside the target Git worktree.
 | Detect/adopt manual Codex panes | `zelma sessions detect --json` | Upserts detected candidates/active records through `zelma`. |
 | Explain detect evidence | `zelma sessions detect --json --explain` | Use when evidence diagnostics are needed. |
 | Focus a known session by numeric id | `zelma sessions focus <id> --json` | Use ids from `sessions list`; `<id>` is repo-local and numeric. |
+| Observe pane screen/scrollback | `zelma sessions buffer <id> --json` | Read-only bounded zellij pane observation; use `--tail <lines>` to reduce output. |
+| Observe Codex transcript events | `zelma sessions transcript <id> --json` | Read-only bounded Codex transcript observation for sessions with `codex_session`; use `--tail <events>` to reduce output. |
 | Preview stale cleanup | `zelma sessions cleanup --json` | Read-only proposal. |
 | Confirm stale cleanup | `zelma sessions cleanup --confirm --json` | Only after explicit user intent to remove stale records. |
 
