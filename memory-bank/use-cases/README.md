@@ -44,6 +44,7 @@ Use case нужен для сценария, который живет на ур
 | [`UC-008`](UC-008-multi-agent-parallel-delivery.md) | Параллельная доставка несколькими агентами | `draft` | shipping supervisor | `none` | `FT-040` | 2026-07-08 |
 | [`UC-009`](UC-009-environment-smoke-diagnostics.md) | Smoke-диагностика окружения | `draft` | setup agent | `none` | `FT-041` | 2026-07-08 |
 | [`UC-010`](UC-010-agent-dashboard-status-backend.md) | Dashboard/status backend для agent-сессий | `draft` | dashboard agent | `none` | `FT-042` | 2026-07-08 |
+| [`UC-011`](UC-011-send-message-to-codex-session.md) | Отправка сообщения в существующую Codex session | `draft` | human / supervising agent | `none` | `FT-101` | 2026-07-10 |
 
 ## Naming
 

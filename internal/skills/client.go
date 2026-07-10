@@ -30,10 +30,12 @@ type CommandRunner interface {
 }
 
 type CommandRequest struct {
-	Binary  string
-	Args    []string
-	WorkDir string
-	Env     []string
+	Binary   string
+	Args     []string
+	WorkDir  string
+	Env      []string
+	Stdin    []byte
+	HasStdin bool
 }
 
 type CommandResult struct {
@@ -95,6 +97,18 @@ type StaleCandidate struct {
 	OpenedPath    string `json:"opened_path,omitempty"`
 	PreviousState string `json:"previous_state"`
 	Reason        string `json:"reason"`
+}
+
+type SendMessageResult struct {
+	Session
+	Message SendMessageMetadata `json:"message"`
+}
+
+type SendMessageMetadata struct {
+	Source    string `json:"source"`
+	ByteCount int    `json:"byte_count"`
+	LineCount int    `json:"line_count"`
+	Submitted bool   `json:"submitted"`
 }
 
 type Recovery struct {
@@ -210,22 +224,41 @@ func (client Client) FocusSession(ctx context.Context, id int) (Session, error) 
 	return runJSON[Session](ctx, client, []string{"sessions", "focus", strconv.Itoa(id), "--json"})
 }
 
+func (client Client) SendMessage(ctx context.Context, id int, message string) (SendMessageResult, error) {
+	return runJSON[SendMessageResult](ctx, client, []string{"sessions", "send", strconv.Itoa(id), message, "--json"})
+}
+
+func (client Client) SendMessageFromStdin(ctx context.Context, id int, message []byte) (SendMessageResult, error) {
+	return runJSONWithStdin[SendMessageResult](ctx, client, []string{"sessions", "send", strconv.Itoa(id), "--stdin", "--json"}, message)
+}
+
 func runJSON[T any](ctx context.Context, client Client, args []string) (T, error) {
+	return runJSONWithRequest[T](ctx, client, args, nil, false)
+}
+
+func runJSONWithStdin[T any](ctx context.Context, client Client, args []string, stdin []byte) (T, error) {
+	return runJSONWithRequest[T](ctx, client, args, stdin, true)
+}
+
+func runJSONWithRequest[T any](ctx context.Context, client Client, args []string, stdin []byte, hasStdin bool) (T, error) {
 	var output T
 	binary := client.binary()
 	command := append([]string{binary}, args...)
+	diagnosticCommand := safeCommandForError(command)
 	result, err := client.runner().Run(ctx, CommandRequest{
-		Binary:  binary,
-		Args:    append([]string(nil), args...),
-		WorkDir: client.WorkDir,
-		Env:     append([]string(nil), client.Env...),
+		Binary:   binary,
+		Args:     append([]string(nil), args...),
+		WorkDir:  client.WorkDir,
+		Env:      append([]string(nil), client.Env...),
+		Stdin:    append([]byte(nil), stdin...),
+		HasStdin: hasStdin,
 	})
 	if err != nil || result.ExitCode != 0 {
-		return output, newCommandError(command, result, err)
+		return output, newCommandError(diagnosticCommand, result, err)
 	}
 	if err := decodeStrict(result.Stdout, &output); err != nil {
 		return output, &DecodeError{
-			Command: command,
+			Command: diagnosticCommand,
 			Stdout:  string(result.Stdout),
 			Err:     err,
 		}
@@ -233,13 +266,31 @@ func runJSON[T any](ctx context.Context, client Client, args []string) (T, error
 	if validator, ok := any(output).(contractValidator); ok {
 		if err := validator.validateContract(); err != nil {
 			return output, &ContractError{
-				Command: command,
+				Command: diagnosticCommand,
 				Stdout:  string(result.Stdout),
 				Err:     err,
 			}
 		}
 	}
 	return output, nil
+}
+
+func safeCommandForError(command []string) []string {
+	safe := append([]string(nil), command...)
+	if len(safe) < 6 {
+		return safe
+	}
+	if safe[1] != "sessions" || safe[2] != "send" {
+		return safe
+	}
+	if safe[4] == "--stdin" {
+		return safe
+	}
+	if strings.HasPrefix(safe[4], "-") {
+		return safe
+	}
+	safe[4] = "<redacted message>"
+	return safe
 }
 
 type contractValidator interface {
@@ -249,6 +300,19 @@ type contractValidator interface {
 func (output SessionsList) validateContract() error {
 	if output.Version != SessionsSchemaVersion {
 		return fmt.Errorf("unsupported sessions list schema version %d", output.Version)
+	}
+	return nil
+}
+
+func (output SendMessageResult) validateContract() error {
+	if output.ID <= 0 || output.ZellijSession == "" || output.ZellijPane == "" || output.State == "" {
+		return fmt.Errorf("send result is missing target identity")
+	}
+	if output.Message.Source != "argument" && output.Message.Source != "stdin" {
+		return fmt.Errorf("unsupported send message source %q", output.Message.Source)
+	}
+	if output.Message.ByteCount <= 0 || output.Message.LineCount <= 0 || !output.Message.Submitted {
+		return fmt.Errorf("send result is missing submitted message metadata")
 	}
 	return nil
 }
@@ -307,6 +371,9 @@ func (execRunner) Run(ctx context.Context, request CommandRequest) (CommandResul
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
+	if request.HasStdin {
+		cmd.Stdin = bytes.NewReader(request.Stdin)
+	}
 
 	err := cmd.Run()
 	result := CommandResult{

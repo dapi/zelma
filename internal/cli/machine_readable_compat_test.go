@@ -400,6 +400,53 @@ func TestMachineReadableOutputCompatibilityExamples(t *testing.T) {
 			parse: parseSkillCleanupProposal,
 		},
 		{
+			name: "sessions send json",
+			args: []string{"sessions", "send", "2", "continue carefully", "--json"},
+			arrange: func(t *testing.T) string {
+				root := newTestGitRepo(t)
+				openedPath := resolvedPath(t, root)
+				const codexSession = "11111111-1111-4111-8111-111111111111"
+				writeRegistryFile(t, root, fmt.Sprintf(`{
+  "version": 1,
+  "sessions": [
+    {
+      "id": 2,
+      "zellij_session": "zelma-main",
+      "zellij_tab": "tab_6",
+      "zellij_pane": "terminal_75",
+      "codex_session": %q,
+      "opened_path": %q,
+      "state": "active"
+    }
+  ]
+}
+`, codexSession, openedPath))
+				command := "/usr/local/bin/codex resume " + codexSession + " --cd " + openedPath
+				t.Setenv("ZELMA_ZELLIJ_BIN", writeFakeSendZellij(t, filepath.Join(t.TempDir(), "send-calls.txt"), panesJSONWithID(75, openedPath, command, true), true))
+				t.Chdir(root)
+				return openedPath
+			},
+			want: func(openedPath string) string {
+				return fmt.Sprintf(`{
+  "id": 2,
+  "zellij_session": "zelma-main",
+  "zellij_tab": "tab_6",
+  "zellij_pane": "terminal_75",
+  "codex_session": "11111111-1111-4111-8111-111111111111",
+  "opened_path": %q,
+  "state": "active",
+  "message": {
+    "source": "argument",
+    "byte_count": 18,
+    "line_count": 1,
+    "submitted": true
+  }
+}
+`, openedPath)
+			},
+			parse: parseSkillSendResult,
+		},
+		{
 			name: "sessions cleanup confirm json",
 			args: []string{"sessions", "cleanup", "--confirm", "--json"},
 			arrange: func(t *testing.T) string {
@@ -936,6 +983,28 @@ func parseSkillDetectSummary(t *testing.T, data []byte) {
 		if candidate.ID <= 0 || candidate.ZellijSession == "" || candidate.ZellijPane == "" || candidate.PreviousState == "" || candidate.Reason == "" {
 			t.Fatalf("stale candidate = %+v, want stable identity, previous_state and reason", candidate)
 		}
+	}
+}
+
+func parseSkillSendResult(t *testing.T, data []byte) {
+	t.Helper()
+
+	var output struct {
+		skillSession
+		Message struct {
+			Source    string `json:"source"`
+			ByteCount int    `json:"byte_count"`
+			LineCount int    `json:"line_count"`
+			Submitted bool   `json:"submitted"`
+		} `json:"message"`
+	}
+	decodeStrict(t, data, &output)
+	assertSkillSession(t, output.skillSession)
+	if output.Message.Source != "argument" || output.Message.ByteCount <= 0 || output.Message.LineCount <= 0 || !output.Message.Submitted {
+		t.Fatalf("send result = %+v, want stable message metadata", output)
+	}
+	if bytes.Contains(data, []byte("continue carefully")) {
+		t.Fatalf("send output must not echo message body: %s", data)
 	}
 }
 

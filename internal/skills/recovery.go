@@ -144,6 +144,47 @@ var recoveryRules = append([]recoveryRule{
 		needles:    []string{"zellij_invalid_input"},
 	},
 	{
+		reasonCode: "conflicting_message_sources",
+		action:     RecoveryActionInspect,
+		message:    "Retry send with exactly one message source: a positional message or --stdin.",
+		needles:    []string{"conflicting_message_sources"},
+	},
+	{
+		reasonCode: "missing_message",
+		action:     RecoveryActionInspect,
+		message:    "Retry send with a non-empty positional message or --stdin.",
+		needles:    []string{"missing_message"},
+	},
+	{
+		reasonCode: "empty_message",
+		action:     RecoveryActionInspect,
+		message:    "Retry send with a non-empty positional message or non-empty stdin.",
+		needles:    []string{"empty_message"},
+	},
+	{
+		reasonCode: "message_read_failed",
+		action:     RecoveryActionRetry,
+		message:    "Retry send after stdin is readable; do not use direct terminal or zellij fallback.",
+		needles:    []string{"message_read_failed"},
+	},
+	{
+		reasonCode:  "send_target_not_ready",
+		action:      RecoveryActionInspect,
+		message:     "Inspect live zelma session status before retrying send; do not use direct terminal or zellij fallback.",
+		nextCommand: liveListCommand(),
+		needles: []string{
+			"session_not_found",
+			"pane_not_found",
+			"pane_not_terminal",
+			"session_state_not_active",
+			"runtime_unreachable",
+			"codex_runtime_missing",
+			"codex_identity_mismatch",
+			"runtime_ambiguous",
+			"target_not_ready",
+		},
+	},
+	{
 		reasonCode: "registry_read_failed",
 		action:     RecoveryActionInspect,
 		message:    "Inspect the registry path and filesystem permissions, then retry the same zelma command after the read problem is fixed.",
@@ -239,6 +280,10 @@ func setupCommand() []string {
 
 func detectCommand() []string {
 	return []string{DefaultZelmaBinary, "sessions", "detect", "--json"}
+}
+
+func liveListCommand() []string {
+	return []string{DefaultZelmaBinary, "sessions", "list", "--live", "--json"}
 }
 
 func cleanupPreviewCommand() []string {

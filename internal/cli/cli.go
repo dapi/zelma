@@ -33,6 +33,7 @@ var paneProcessEvidenceResolverFactory = func() codex.PaneProcessEvidenceResolve
 }
 
 var nowFunc = time.Now
+var sendInputReader io.Reader = os.Stdin
 
 func Run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	root := NewRootCommand(stdout, stderr)
@@ -97,6 +98,7 @@ func NewRootCommand(stdout, stderr io.Writer) *cobra.Command {
 		newSessionsCreateCommand(stdout),
 		newSessionsDetectCommand(stdout),
 		newSessionsFocusCommand(stdout),
+		newSessionsSendCommand(stdout),
 		newSessionsCleanupCommand(stdout),
 	)
 	root.AddCommand(sessions)
@@ -122,6 +124,8 @@ func renderHelp(cmd *cobra.Command, args []string) {
 		fmt.Fprint(cmd.OutOrStdout(), sessionsDetectHelp)
 	case "zelma sessions focus":
 		fmt.Fprint(cmd.OutOrStdout(), sessionsFocusHelp)
+	case "zelma sessions send":
+		fmt.Fprint(cmd.OutOrStdout(), sessionsSendHelp)
 	case "zelma sessions cleanup":
 		fmt.Fprint(cmd.OutOrStdout(), sessionsCleanupHelp)
 	case "zelma supervisor":
@@ -144,6 +148,7 @@ const rootHelp = `COMMAND MAP
   zelma sessions create   Create and register a confirmed Codex pane. Status: implemented.
   zelma sessions detect   Detect existing Codex panes. Status: implemented.
   zelma sessions focus    Focus a known zellij pane by zelma session ID. Status: implemented.
+  zelma sessions send     Send a message to a verified Codex session. Status: implemented.
   zelma sessions cleanup  Propose or confirm stale record cleanup. Status: implemented.
   zelma supervisor help   Show the supervisor command map.
   zelma supervisor start-issue  Launch and supervise start-issue. Status: implemented.
@@ -159,6 +164,8 @@ OUTPUT CONVENTIONS
   sessions detect: stdout, exit 0, summary with active/candidate/stale counts,
   stale reason lines when found, or JSON with --json.
   sessions focus: stdout, exit 0, focused summary or JSON with --json.
+  sessions send: stdout, exit 0, sent summary or JSON with target metadata;
+  never echoes message body.
   sessions cleanup: stdout, exit 0, stale cleanup proposal by default; add
   --confirm to remove proposed stale records.
   sessions create --dry-run: stdout, exit 0, launch contract text or JSON.
@@ -232,6 +239,7 @@ const sessionsHelp = `COMMAND MAP
   zelma sessions create   Create and register a confirmed Codex pane. Status: implemented.
   zelma sessions detect   Detect existing Codex panes. Status: implemented.
   zelma sessions focus    Focus a known zellij pane by zelma session ID. Status: implemented.
+  zelma sessions send     Send a message to a verified Codex session. Status: implemented.
   zelma sessions cleanup  Propose or confirm stale record cleanup. Status: implemented.
 
 OUTPUT CONVENTIONS
@@ -245,6 +253,8 @@ OUTPUT CONVENTIONS
   detect: stdout, exit 0, added/unchanged/skipped summary with
   active/candidate/stale counts, stale reasons when found, or JSON with --json.
   focus: stdout, exit 0, focused summary or focused session JSON with --json.
+  send: stdout, exit 0, sent summary or JSON with target metadata; message body
+  is never echoed.
   cleanup: stdout, exit 0, proposed/removed/kept summary with stale records;
   without --confirm, does not mutate registry.
   sessions registry output: preserves id, zellij_session, zellij_pane,
@@ -255,13 +265,15 @@ RECOVERY HINTS
   managed create task: inspect "zelma sessions create --help".
   diagnostic/manual detect task: inspect "zelma sessions detect --help".
   focus task: inspect "zelma sessions focus --help".
+  send task: inspect "zelma sessions send --help".
 
 HUMAN NOTES
   sessions list is the primary inventory command and auto-detects fresh-enough
   manual panes before rendering .zelma/sessions.json. --no-detect keeps a
   registry-only read path. focus switches zellij UI to a stored pane and does
-  not mutate registry. cleanup removes stale records only after explicit
-  --confirm.
+  not mutate registry. send revalidates the recorded active Codex pane before
+  delivery and does not mutate registry. cleanup removes stale records only
+  after explicit --confirm.
 
 Usage:
   zelma sessions [command]
@@ -347,6 +359,31 @@ Notes:
   Reads .zelma/sessions.json and sends zellij focus actions. Does not create,
   detect, cleanup or mutate registry records. Use "zelma sessions list" to find
   the target ID.
+`
+
+const sessionsSendHelp = `Usage:
+  zelma sessions send <id> [message] [--json]
+  zelma sessions send <id> --stdin [--json]
+
+Status:
+  implemented: sends a message to a live active Codex session after strict
+  readiness revalidation.
+
+Output:
+  default: sent summary with id, source, byte_count, line_count and submitted.
+  --json: target identity plus message metadata. The message body is never
+  echoed.
+
+Contract:
+  target id: positive repo-local zelma session id from "zelma sessions list".
+  message source: exactly one of positional message or --stdin.
+  readiness: target registry record must be active, reachable in zellij, a
+  terminal pane, and compatible with recorded Codex session/opened path.
+
+Notes:
+  Does not focus panes, detect sessions, repair stale records or mutate the
+  registry. On not-ready diagnostics, inspect public zelma recovery hints
+  before retrying.
 `
 
 const sessionsCleanupHelp = `Usage:
@@ -994,6 +1031,432 @@ func newSessionsFocusCommand(stdout io.Writer) *cobra.Command {
 	return cmd
 }
 
+type sendReasonCode string
+
+const (
+	sendReasonConflictingMessageSources sendReasonCode = "conflicting_message_sources"
+	sendReasonMissingMessage            sendReasonCode = "missing_message"
+	sendReasonEmptyMessage              sendReasonCode = "empty_message"
+	sendReasonMessageReadFailed         sendReasonCode = "message_read_failed"
+	sendReasonSessionNotFound           sendReasonCode = "session_not_found"
+	sendReasonPaneNotFound              sendReasonCode = "pane_not_found"
+	sendReasonPaneNotTerminal           sendReasonCode = "pane_not_terminal"
+	sendReasonSessionStateNotActive     sendReasonCode = "session_state_not_active"
+	sendReasonRuntimeUnreachable        sendReasonCode = "runtime_unreachable"
+	sendReasonCodexRuntimeMissing       sendReasonCode = "codex_runtime_missing"
+	sendReasonCodexIdentityMismatch     sendReasonCode = "codex_identity_mismatch"
+	sendReasonRuntimeAmbiguous          sendReasonCode = "runtime_ambiguous"
+	sendReasonTargetNotReady            sendReasonCode = "target_not_ready"
+)
+
+type sendDiagnosticError struct {
+	Code                 sendReasonCode
+	Message              string
+	Retryable            bool
+	ManualActionRequired bool
+	RecoveryHint         string
+	NextCommand          []string
+	Err                  error
+}
+
+func (err *sendDiagnosticError) Error() string {
+	if err == nil {
+		return ""
+	}
+	message := fmt.Sprintf("send message: %s: %s", err.Code, err.Message)
+	if err.RecoveryHint != "" {
+		message += fmt.Sprintf("; recovery: %s", err.RecoveryHint)
+	}
+	return message
+}
+
+func (err *sendDiagnosticError) Unwrap() error {
+	if err == nil {
+		return nil
+	}
+	return err.Err
+}
+
+type sendMessageInput struct {
+	Source    string
+	Text      string
+	ByteCount int
+	LineCount int
+}
+
+type sendMessageMetadata struct {
+	Source    string `json:"source"`
+	ByteCount int    `json:"byte_count"`
+	LineCount int    `json:"line_count"`
+	Submitted bool   `json:"submitted"`
+}
+
+type sendResultJSON struct {
+	ID            int                 `json:"id"`
+	ZellijSession string              `json:"zellij_session"`
+	ZellijTab     string              `json:"zellij_tab,omitempty"`
+	ZellijTabName string              `json:"zellij_tab_name,omitempty"`
+	ZellijPane    string              `json:"zellij_pane"`
+	CodexSession  string              `json:"codex_session"`
+	OpenedPath    string              `json:"opened_path"`
+	State         registry.State      `json:"state"`
+	Message       sendMessageMetadata `json:"message"`
+}
+
+func newSessionsSendCommand(stdout io.Writer) *cobra.Command {
+	var jsonOutput bool
+	var stdinInput bool
+
+	cmd := &cobra.Command{
+		Use:   "send <id> [message]",
+		Short: "Send a message to a verified Codex session.",
+		Args:  cobra.RangeArgs(1, 2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			id, err := parseSessionIDArg(args[0])
+			if err != nil {
+				return commandFailure(cmd.CommandPath(), err, jsonOutput)
+			}
+
+			message, err := resolveSendMessageInput(args[1:], stdinInput)
+			if err != nil {
+				return commandFailure(cmd.CommandPath(), err, jsonOutput)
+			}
+
+			reg, err := readCurrentRegistry(cmd.CommandPath())
+			if err != nil {
+				return commandFailure(cmd.CommandPath(), err, jsonOutput)
+			}
+			session, ok := findSessionByID(reg, id)
+			if !ok {
+				return commandFailure(cmd.CommandPath(), sendFailure(
+					sendReasonSessionNotFound,
+					fmt.Sprintf("session id %d was not found in the current repository registry", id),
+					false,
+					true,
+					"run zelma sessions list --json to choose an existing repo-local session id",
+					[]string{"zelma", "sessions", "list", "--json"},
+					nil,
+				), jsonOutput)
+			}
+			if session.State != registry.StateActive {
+				return commandFailure(cmd.CommandPath(), sendFailure(
+					sendReasonSessionStateNotActive,
+					fmt.Sprintf("session id %d is %s; only active sessions can receive messages", id, session.State),
+					false,
+					true,
+					"run zelma sessions list --json to choose an active session or zelma sessions detect --json to reconcile candidates",
+					[]string{"zelma", "sessions", "list", "--json"},
+					nil,
+				), jsonOutput)
+			}
+
+			client := zellij.New(zellij.WithBinary(os.Getenv("ZELMA_ZELLIJ_BIN")))
+			if err := validateSendTargetReady(cmd.Context(), session, os.Getenv("ZELMA_CODEX_BIN"), client); err != nil {
+				return commandFailure(cmd.CommandPath(), err, jsonOutput)
+			}
+
+			err = client.SendTextToPane(cmd.Context(), zellij.SendTextRequest{
+				Session: session.ZellijSession,
+				PaneID:  session.ZellijPane,
+				Text:    message.Text,
+				Submit:  true,
+			})
+			if err != nil {
+				return commandFailure(cmd.CommandPath(), sendFailure(
+					sendReasonTargetNotReady,
+					"message was not submitted because the zellij adapter could not complete delivery to the verified target",
+					true,
+					true,
+					"run zelma sessions list --live --json to inspect the target before retrying send",
+					[]string{"zelma", "sessions", "list", "--live", "--json"},
+					err,
+				), jsonOutput)
+			}
+
+			if jsonOutput {
+				return writeSendResultJSON(stdout, session, message)
+			}
+			_, err = fmt.Fprintf(
+				stdout,
+				"sent id=%d source=%s byte_count=%d line_count=%d submitted=true\n",
+				session.ID,
+				message.Source,
+				message.ByteCount,
+				message.LineCount,
+			)
+			return err
+		},
+	}
+	cmd.Flags().BoolVar(&jsonOutput, "json", false, "Print send result JSON.")
+	cmd.Flags().BoolVar(&stdinInput, "stdin", false, "Read message text from stdin.")
+	return cmd
+}
+
+type sendLiveTargetRuntime interface {
+	ListSessions(ctx context.Context) ([]zellij.Session, error)
+	ListPanes(ctx context.Context, session string) ([]zellij.Pane, error)
+}
+
+func resolveSendMessageInput(args []string, stdinInput bool) (sendMessageInput, error) {
+	if stdinInput && len(args) > 0 {
+		return sendMessageInput{}, sendFailure(
+			sendReasonConflictingMessageSources,
+			"provide either a positional message or --stdin, not both",
+			false,
+			true,
+			"retry with exactly one message source: zelma sessions send <id> \"message\" --json or zelma sessions send <id> --stdin --json",
+			[]string{},
+			nil,
+		)
+	}
+	if !stdinInput && len(args) == 0 {
+		return sendMessageInput{}, sendFailure(
+			sendReasonMissingMessage,
+			"message text is required",
+			false,
+			true,
+			"retry with exactly one message source: zelma sessions send <id> \"message\" --json or zelma sessions send <id> --stdin --json",
+			[]string{},
+			nil,
+		)
+	}
+
+	source := "argument"
+	text := ""
+	if stdinInput {
+		data, err := io.ReadAll(sendInputReader)
+		if err != nil {
+			return sendMessageInput{}, sendFailure(
+				sendReasonMessageReadFailed,
+				"could not read message text from stdin",
+				true,
+				false,
+				"retry zelma sessions send <id> --stdin --json after stdin is readable",
+				[]string{},
+				err,
+			)
+		}
+		source = "stdin"
+		text = string(data)
+	} else {
+		text = args[0]
+	}
+	if text == "" {
+		return sendMessageInput{}, sendFailure(
+			sendReasonEmptyMessage,
+			"message text must not be empty",
+			false,
+			true,
+			"retry with a non-empty positional message or non-empty stdin",
+			[]string{},
+			nil,
+		)
+	}
+	return sendMessageInput{
+		Source:    source,
+		Text:      text,
+		ByteCount: len([]byte(text)),
+		LineCount: sendLineCount(text),
+	}, nil
+}
+
+func sendLineCount(text string) int {
+	if text == "" {
+		return 0
+	}
+	return strings.Count(text, "\n") + 1
+}
+
+func validateSendTargetReady(ctx context.Context, session registry.Session, configuredCodexBinary string, runtime sendLiveTargetRuntime) error {
+	liveSessions, err := runtime.ListSessions(ctx)
+	if err != nil {
+		return sendFailure(
+			sendReasonRuntimeUnreachable,
+			"could not list live zellij sessions before sending",
+			true,
+			true,
+			"run zelma sessions list --live --json to inspect runtime reachability before retrying send",
+			[]string{"zelma", "sessions", "list", "--live", "--json"},
+			err,
+		)
+	}
+	if !sendLiveSessionExists(liveSessions, session.ZellijSession) {
+		return sendFailure(
+			sendReasonSessionNotFound,
+			fmt.Sprintf("zellij session %q from session id %d was not found", session.ZellijSession, session.ID),
+			false,
+			true,
+			"run zelma sessions list --live --json to inspect the current session registry and live status",
+			[]string{"zelma", "sessions", "list", "--live", "--json"},
+			nil,
+		)
+	}
+
+	panes, err := runtime.ListPanes(ctx, session.ZellijSession)
+	if err != nil {
+		code := sendReasonRuntimeUnreachable
+		message := "could not list zellij panes before sending"
+		if zellij.IsSessionNotFound(err) {
+			code = sendReasonSessionNotFound
+			message = fmt.Sprintf("zellij session %q from session id %d was not found", session.ZellijSession, session.ID)
+		}
+		return sendFailure(
+			code,
+			message,
+			true,
+			true,
+			"run zelma sessions list --live --json to inspect the target before retrying send",
+			[]string{"zelma", "sessions", "list", "--live", "--json"},
+			err,
+		)
+	}
+
+	pane, ok := sendFindPane(panes, session.ZellijPane)
+	if !ok {
+		return sendFailure(
+			sendReasonPaneNotFound,
+			fmt.Sprintf("pane %q from session id %d was not found", session.ZellijPane, session.ID),
+			false,
+			true,
+			"run zelma sessions list --live --json to inspect stale or moved panes before retrying send",
+			[]string{"zelma", "sessions", "list", "--live", "--json"},
+			nil,
+		)
+	}
+	if pane.Exited {
+		return sendFailure(
+			sendReasonTargetNotReady,
+			fmt.Sprintf("pane %q from session id %d has exited", session.ZellijPane, session.ID),
+			false,
+			true,
+			"run zelma sessions detect --json to reconcile exited panes before retrying send",
+			[]string{"zelma", "sessions", "detect", "--json"},
+			nil,
+		)
+	}
+	if pane.ID.Kind != zellij.PaneKindTerminal {
+		return sendFailure(
+			sendReasonPaneNotTerminal,
+			fmt.Sprintf("pane %q from session id %d is not a terminal pane", session.ZellijPane, session.ID),
+			false,
+			true,
+			"run zelma sessions list --live --json to choose a terminal Codex session before retrying send",
+			[]string{"zelma", "sessions", "list", "--live", "--json"},
+			nil,
+		)
+	}
+	if normalizedLivePaneCWD(pane.PaneCWD) != filepath.Clean(session.OpenedPath) {
+		return sendFailure(
+			sendReasonCodexIdentityMismatch,
+			fmt.Sprintf("pane %q opened path no longer matches the registry record", session.ZellijPane),
+			false,
+			true,
+			"run zelma sessions detect --json to reconcile Codex session identity before retrying send",
+			[]string{"zelma", "sessions", "detect", "--json"},
+			nil,
+		)
+	}
+	if code, message := sendPaneCodexReadiness(session, pane, configuredCodexBinary); code != "" {
+		nextCommand := []string{"zelma", "sessions", "detect", "--json"}
+		if code == sendReasonRuntimeAmbiguous {
+			nextCommand = []string{"zelma", "sessions", "list", "--live", "--json"}
+		}
+		return sendFailure(
+			code,
+			message,
+			false,
+			true,
+			"run "+strings.Join(nextCommand, " ")+" to inspect or reconcile Codex session identity before retrying send",
+			nextCommand,
+			nil,
+		)
+	}
+	return nil
+}
+
+func sendLiveSessionExists(sessions []zellij.Session, name string) bool {
+	for _, session := range sessions {
+		if session.Name == name {
+			return true
+		}
+	}
+	return false
+}
+
+func sendFindPane(panes []zellij.Pane, paneID string) (zellij.Pane, bool) {
+	for _, pane := range panes {
+		if pane.ID.String() == paneID {
+			return pane, true
+		}
+	}
+	return zellij.Pane{}, false
+}
+
+func sendPaneCodexReadiness(session registry.Session, pane zellij.Pane, configuredCodexBinary string) (sendReasonCode, string) {
+	if pane.PaneCommand == nil || strings.TrimSpace(*pane.PaneCommand) == "" {
+		return sendReasonCodexRuntimeMissing, fmt.Sprintf("pane %q has no live command evidence for Codex", session.ZellijPane)
+	}
+	command := *pane.PaneCommand
+	hasCodexLaunchEvidence := detection.CodexCommandEntrypoint(command) != "" ||
+		livePaneCommandMatchesConfiguredBinary(command, configuredCodexBinary)
+	commandSession := codexSessionFromLivePaneCommand(command)
+	externalSession := ""
+	if hasCodexLaunchEvidence {
+		externalSession = externalSessionFromLivePaneCommand(command, true)
+	}
+
+	if commandSession != "" && commandSession != session.CodexSession {
+		return sendReasonCodexIdentityMismatch, fmt.Sprintf("pane %q resolves to a different Codex session", session.ZellijPane)
+	}
+	if externalSession != "" && externalSession != session.CodexSession {
+		return sendReasonCodexIdentityMismatch, fmt.Sprintf("pane %q resolves to a different Codex session", session.ZellijPane)
+	}
+	if commandSession == session.CodexSession || externalSession == session.CodexSession {
+		return "", ""
+	}
+	if hasCodexLaunchEvidence {
+		return sendReasonRuntimeAmbiguous, fmt.Sprintf("pane %q shows Codex launch evidence but does not prove the recorded Codex session", session.ZellijPane)
+	}
+	return sendReasonCodexRuntimeMissing, fmt.Sprintf("pane %q command evidence does not indicate Codex", session.ZellijPane)
+}
+
+func sendFailure(code sendReasonCode, message string, retryable, manualActionRequired bool, recoveryHint string, nextCommand []string, err error) error {
+	return &sendDiagnosticError{
+		Code:                 code,
+		Message:              message,
+		Retryable:            retryable,
+		ManualActionRequired: manualActionRequired,
+		RecoveryHint:         recoveryHint,
+		NextCommand:          append([]string(nil), nextCommand...),
+		Err:                  err,
+	}
+}
+
+func writeSendResultJSON(stdout io.Writer, session registry.Session, message sendMessageInput) error {
+	output := sendResultJSON{
+		ID:            session.ID,
+		ZellijSession: session.ZellijSession,
+		ZellijTab:     session.ZellijTab,
+		ZellijTabName: session.ZellijTabName,
+		ZellijPane:    session.ZellijPane,
+		CodexSession:  session.CodexSession,
+		OpenedPath:    session.OpenedPath,
+		State:         session.State,
+		Message: sendMessageMetadata{
+			Source:    message.Source,
+			ByteCount: message.ByteCount,
+			LineCount: message.LineCount,
+			Submitted: true,
+		},
+	}
+	data, err := json.MarshalIndent(output, "", "  ")
+	if err != nil {
+		return fmt.Errorf("encode send result JSON: %w", err)
+	}
+	_, err = fmt.Fprintf(stdout, "%s\n", data)
+	return err
+}
+
 func newSessionsCleanupCommand(stdout io.Writer) *cobra.Command {
 	var confirm bool
 	var jsonOutput bool
@@ -1483,6 +1946,17 @@ func recoveryDiagnosticForError(command string, err error) recoveryDiagnosticJSO
 		}
 		diagnostic.RecoveryHint = registryDiagnostic.RecoveryHint
 		diagnostic.NextCommand = nextCommandForCode(diagnostic.Code)
+		return diagnostic
+	}
+
+	var sendErr *sendDiagnosticError
+	if errors.As(err, &sendErr) {
+		diagnostic.Code = string(sendErr.Code)
+		diagnostic.Message = sendErr.Message
+		diagnostic.Retryable = sendErr.Retryable
+		diagnostic.ManualActionRequired = sendErr.ManualActionRequired
+		diagnostic.RecoveryHint = sendErr.RecoveryHint
+		diagnostic.NextCommand = append([]string(nil), sendErr.NextCommand...)
 		return diagnostic
 	}
 
