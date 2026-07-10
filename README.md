@@ -38,6 +38,9 @@
   screen/scrollback известной `zellij pane` по repo-local `zelma session id`.
 - `zelma sessions transcript <id> --json` — read-only bounded чтение Codex
   transcript events по `codex_session`, привязанному к `zelma session`.
+- `zelma monitor` — открывает read-only terminal monitor, где live/active
+  `zelma sessions` идут первыми, а stale/non-active записи и recovery hints
+  остаются видимым вторичным контекстом.
 
 Observation-команды не меняют `.zelma/sessions.json` и не сохраняют pane buffer,
 prompts, assistant answers, tool payloads или transcript content в durable state.

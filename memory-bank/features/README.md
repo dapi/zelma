@@ -129,3 +129,5 @@ audience: humans_and_agents
 - [FT-048: Distributable Codex Skill](FT-048/README.md) — repo-local Codex
   skill package rooted at `SKILL.md` for managing `zelma` sessions through the
   public CLI contract.
+- [FT-049: TUI Monitor For Live Sessions](FT-049/README.md) — read-only
+  terminal monitor for live zelma sessions.
