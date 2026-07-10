@@ -34,6 +34,9 @@
   в normal workflow его заменяет `sessions list`.
 - `zelma sessions focus <id>` — переключает `zellij` на tab/pane известной
   `zelma session`.
+- `zelma monitor` — открывает read-only terminal monitor, где live/active
+  `zelma sessions` идут первыми, а stale/non-active записи и recovery hints
+  остаются видимым вторичным контекстом.
 
 `sessions create` покрывает controlled workflow, где `zelma` создает pane сама.
 `sessions list` покрывает real-world workflow, где пользователь сначала вручную
