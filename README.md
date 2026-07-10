@@ -93,8 +93,8 @@ tab: текущий `zellij action new-tab` переключает focus в со
 Versioned binaries are published from git tags through GitHub Actions.
 
 ```bash
-git tag v0.3.0
-git push origin v0.3.0
+git tag v0.4.0
+git push origin v0.4.0
 ```
 
 The release workflow builds Linux, macOS and Windows archives and publishes them
@@ -103,7 +103,7 @@ to <https://github.com/dapi/zelma/releases> with `SHA256SUMS.txt`.
 ## Installation
 
 Download a versioned binary from
-<https://github.com/dapi/zelma/releases>. Replace `v0.3.0` with the version you
+<https://github.com/dapi/zelma/releases>. Replace `v0.4.0` with the version you
 want to install.
 
 ### macOS
@@ -111,7 +111,7 @@ want to install.
 Apple Silicon:
 
 ```bash
-version=v0.3.0
+version=v0.4.0
 curl -LO "https://github.com/dapi/zelma/releases/download/${version}/zelma_${version}_darwin_arm64.tar.gz"
 curl -LO "https://github.com/dapi/zelma/releases/download/${version}/SHA256SUMS.txt"
 shasum -a 256 -c SHA256SUMS.txt --ignore-missing
@@ -123,7 +123,7 @@ zelma help
 Intel:
 
 ```bash
-version=v0.3.0
+version=v0.4.0
 curl -LO "https://github.com/dapi/zelma/releases/download/${version}/zelma_${version}_darwin_amd64.tar.gz"
 curl -LO "https://github.com/dapi/zelma/releases/download/${version}/SHA256SUMS.txt"
 shasum -a 256 -c SHA256SUMS.txt --ignore-missing
@@ -137,7 +137,7 @@ zelma help
 x86_64:
 
 ```bash
-version=v0.3.0
+version=v0.4.0
 curl -LO "https://github.com/dapi/zelma/releases/download/${version}/zelma_${version}_linux_amd64.tar.gz"
 curl -LO "https://github.com/dapi/zelma/releases/download/${version}/SHA256SUMS.txt"
 sha256sum -c SHA256SUMS.txt --ignore-missing
@@ -149,7 +149,7 @@ zelma help
 ARM64:
 
 ```bash
-version=v0.3.0
+version=v0.4.0
 curl -LO "https://github.com/dapi/zelma/releases/download/${version}/zelma_${version}_linux_arm64.tar.gz"
 curl -LO "https://github.com/dapi/zelma/releases/download/${version}/SHA256SUMS.txt"
 sha256sum -c SHA256SUMS.txt --ignore-missing
@@ -163,7 +163,7 @@ zelma help
 x64:
 
 ```powershell
-$version = "v0.3.0"
+$version = "v0.4.0"
 Invoke-WebRequest "https://github.com/dapi/zelma/releases/download/$version/zelma_${version}_windows_amd64.zip" -OutFile "zelma.zip"
 Expand-Archive .\zelma.zip -DestinationPath .
 .\zelma_${version}_windows_amd64\zelma.exe help
@@ -172,7 +172,7 @@ Expand-Archive .\zelma.zip -DestinationPath .
 ARM64:
 
 ```powershell
-$version = "v0.3.0"
+$version = "v0.4.0"
 Invoke-WebRequest "https://github.com/dapi/zelma/releases/download/$version/zelma_${version}_windows_arm64.zip" -OutFile "zelma.zip"
 Expand-Archive .\zelma.zip -DestinationPath .
 .\zelma_${version}_windows_arm64\zelma.exe help

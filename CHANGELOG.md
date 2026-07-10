@@ -8,6 +8,28 @@
 - Future autonomous issue shipping supervisor improvements.
 - Further dashboard/status backend refinement for multi-agent work.
 
+## v0.4.0 - Observation, monitor and safe messaging
+
+### Added
+
+- `zelma sessions send` for sending a message to a verified Codex session without echoing message bodies.
+- `zelma sessions buffer <id> --json` for bounded read-only zellij pane screen observation.
+- `zelma sessions transcript <id> --json` for bounded read-only Codex transcript event observation.
+- `zelma monitor` live terminal monitor for observing active sessions and recovery hints.
+- Skill client support for send, buffer and transcript commands.
+- Product documentation for safe session messaging and live monitor workflows.
+
+### Fixed
+
+- Session transcript observation is more tolerant of real Codex transcript shapes.
+- Monitor refresh avoids overlapping update cycles.
+- `sessions list` shows candidate sessions in the default human output.
+- Safe session send validation now handles dash-prefixed message arguments and target command argument separation correctly.
+
+### Documentation
+
+- Moved the distributable `zelma` Codex skill to the repository root for direct install from GitHub.
+
 ## v0.3.0 - Dashboard and supervisor expansion
 
 ### Added

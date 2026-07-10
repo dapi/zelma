@@ -30,8 +30,8 @@ version tag matching `v*` is pushed.
 4. Create and push a version tag:
 
    ```bash
-   git tag v0.3.0
-   git push origin v0.3.0
+   git tag v0.4.0
+   git push origin v0.4.0
    ```
 
 5. GitHub Actions workflow `.github/workflows/release.yml` builds and publishes
@@ -63,11 +63,11 @@ python3 scripts/check_memory_bank_index.py
 git diff --check
 
 # create a release
-git tag v0.3.0
-git push origin v0.3.0
+git tag v0.4.0
+git push origin v0.4.0
 
 # inspect release artifacts
-gh release view v0.3.0 --repo dapi/zelma
+gh release view v0.4.0 --repo dapi/zelma
 ```
 
 ## Safety Rules
