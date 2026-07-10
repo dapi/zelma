@@ -292,6 +292,78 @@ func TestSendMessageFromStdinInvokesZelmaCLIWithStdin(t *testing.T) {
 	}
 }
 
+func TestObserveSessionBufferInvokesZelmaCLI(t *testing.T) {
+	root := t.TempDir()
+	stdout := writeFile(t, root, "stdout.json", `{
+  "version": 1,
+  "session_id": 2,
+  "source": "zellij_buffer",
+  "captured_at": "2026-07-10T00:00:00Z",
+  "truncated": true,
+  "limit": 2,
+  "items": [
+    {
+      "line": 3,
+      "text": "synthetic pane line"
+    }
+  ]
+}
+`)
+	calls := filepath.Join(root, "calls.txt")
+	client := fakeCLIClient(t, root, stdout, "", "0", calls)
+
+	got, err := client.ObserveSessionBuffer(context.Background(), 2, 2)
+
+	if err != nil {
+		t.Fatalf("ObserveSessionBuffer() error = %v", err)
+	}
+	assertCall(t, calls, root, "sessions", "buffer", "2", "--json", "--tail", "2")
+	if got.Version != 1 || got.Source != "zellij_buffer" || got.SessionID != 2 || len(got.Items) != 1 {
+		t.Fatalf("ObserveSessionBuffer() = %+v, want parsed buffer observation", got)
+	}
+	if got.Items[0].Line != 3 || got.Items[0].Text != "synthetic pane line" {
+		t.Fatalf("Buffer item = %+v, want parsed line", got.Items[0])
+	}
+}
+
+func TestObserveSessionTranscriptInvokesZelmaCLI(t *testing.T) {
+	root := t.TempDir()
+	stdout := writeFile(t, root, "stdout.json", `{
+  "version": 1,
+  "session_id": 2,
+  "source": "codex_transcript",
+  "captured_at": "2026-07-10T00:00:00Z",
+  "truncated": false,
+  "limit": 1,
+  "codex_session": "11111111-1111-4111-8111-111111111111",
+  "items": [
+    {
+      "index": 4,
+      "type": "assistant_message",
+      "payload": {
+        "text": "synthetic answer"
+      }
+    }
+  ]
+}
+`)
+	calls := filepath.Join(root, "calls.txt")
+	client := fakeCLIClient(t, root, stdout, "", "0", calls)
+
+	got, err := client.ObserveSessionTranscript(context.Background(), 2, 1)
+
+	if err != nil {
+		t.Fatalf("ObserveSessionTranscript() error = %v", err)
+	}
+	assertCall(t, calls, root, "sessions", "transcript", "2", "--json", "--tail", "1")
+	if got.Version != 1 || got.Source != "codex_transcript" || got.CodexSession == "" || len(got.Items) != 1 {
+		t.Fatalf("ObserveSessionTranscript() = %+v, want parsed transcript observation", got)
+	}
+	if got.Items[0].Index != 4 || got.Items[0].Type != "assistant_message" || !strings.Contains(string(got.Items[0].Payload), "synthetic answer") {
+		t.Fatalf("Transcript item = %+v, want parsed event", got.Items[0])
+	}
+}
+
 func TestCommandErrorPreservesDiagnosticsAndRecovery(t *testing.T) {
 	root := t.TempDir()
 	stderr := writeFile(t, root, "stderr.txt", "zelma sessions list: registry_unsupported_version: unsupported schema version 2\n")

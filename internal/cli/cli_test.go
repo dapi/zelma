@@ -106,6 +106,11 @@ func TestHelpRoutes(t *testing.T) {
 			wantOutput: []string{"Usage:", "zelma status --json"},
 		},
 		{
+			name:       "monitor",
+			args:       []string{"monitor", "--help"},
+			wantOutput: []string{"Usage:", "zelma monitor", "read-only terminal monitor"},
+		},
+		{
 			name:       "sessions list",
 			args:       []string{"sessions", "list", "--help"},
 			wantOutput: []string{"Usage:", "zelma sessions list"},
@@ -129,6 +134,16 @@ func TestHelpRoutes(t *testing.T) {
 			name:       "sessions send",
 			args:       []string{"sessions", "send", "--help"},
 			wantOutput: []string{"Usage:", "zelma sessions send", "--stdin"},
+		},
+		{
+			name:       "sessions buffer",
+			args:       []string{"sessions", "buffer", "--help"},
+			wantOutput: []string{"Usage:", "zelma sessions buffer"},
+		},
+		{
+			name:       "sessions transcript",
+			args:       []string{"sessions", "transcript", "--help"},
+			wantOutput: []string{"Usage:", "zelma sessions transcript"},
 		},
 		{
 			name:       "sessions cleanup",
@@ -185,6 +200,11 @@ func TestCommandHelpSnapshots(t *testing.T) {
 			want: statusHelp,
 		},
 		{
+			name: "monitor help",
+			args: []string{"monitor", "--help"},
+			want: monitorHelp,
+		},
+		{
 			name: "sessions create help",
 			args: []string{"sessions", "create", "--help"},
 			want: sessionsCreateHelp,
@@ -198,6 +218,16 @@ func TestCommandHelpSnapshots(t *testing.T) {
 			name: "sessions focus help",
 			args: []string{"sessions", "focus", "--help"},
 			want: sessionsFocusHelp,
+		},
+		{
+			name: "sessions buffer help",
+			args: []string{"sessions", "buffer", "--help"},
+			want: sessionsBufferHelp,
+		},
+		{
+			name: "sessions transcript help",
+			args: []string{"sessions", "transcript", "--help"},
+			want: sessionsTranscriptHelp,
 		},
 		{
 			name: "sessions cleanup help",
@@ -366,12 +396,15 @@ const rootHelpSnapshot = `COMMAND MAP
   zelma help              Show this command map.
   zelma setup             Add .zelma to this repository .gitignore. Status: implemented.
   zelma status            Print dashboard status snapshot. Status: implemented.
+  zelma monitor           Open a live zelma sessions terminal monitor. Status: implemented.
   zelma sessions help     Show the sessions command map.
   zelma sessions list     List known zelma sessions. Status: implemented.
   zelma sessions create   Create and register a confirmed Codex pane. Status: implemented.
   zelma sessions detect   Detect existing Codex panes. Status: implemented.
   zelma sessions focus    Focus a known zellij pane by zelma session ID. Status: implemented.
   zelma sessions send     Send a message to a verified Codex session. Status: implemented.
+  zelma sessions buffer   Read bounded pane screen/scrollback by zelma session ID. Status: implemented.
+  zelma sessions transcript  Read bounded Codex transcript events by zelma session ID. Status: implemented.
   zelma sessions cleanup  Propose or confirm stale record cleanup. Status: implemented.
   zelma supervisor help   Show the supervisor command map.
   zelma supervisor start-issue  Launch and supervise start-issue. Status: implemented.
@@ -380,8 +413,8 @@ OUTPUT CONVENTIONS
   help output: stdout, exit 0, plain text.
   setup changed: stdout, exit 0, "changed: prepared .zelma at <path>".
   setup unchanged: stdout, exit 0, "already configured: <path> contains .zelma".
-  sessions list: stdout, exit 0, active-only table by default or schema v1
-  registry JSON with --json; add --all for inactive records in human output;
+  sessions list: stdout, exit 0, active/candidate table by default or schema v1
+  registry JSON with --json; add --all for stale records in human output;
   auto-detects by default; add --no-detect for registry-only reads; add --live
   to include live/unreachable zellij status.
   sessions detect: stdout, exit 0, summary with active/candidate/stale counts,
@@ -389,11 +422,14 @@ OUTPUT CONVENTIONS
   sessions focus: stdout, exit 0, focused summary or JSON with --json.
   sessions send: stdout, exit 0, sent summary or JSON with target metadata;
   never echoes message body.
+  sessions buffer: stdout, exit 0, bounded zellij pane screen JSON with --json.
+  sessions transcript: stdout, exit 0, bounded Codex transcript event JSON with --json.
   sessions cleanup: stdout, exit 0, stale cleanup proposal by default; add
   --confirm to remove proposed stale records.
   sessions create --dry-run: stdout, exit 0, launch contract text or JSON.
   sessions create: stdout, exit 0, created/registered/skipped summary.
   status: stdout, exit 0, schema v1 dashboard snapshot JSON.
+  monitor: stdout, exit 0, interactive read-only live sessions TUI.
   supervisor start-issue: stdout, exit 0, terminal status summary by default
   or schema v1 supervisor JSON with launch, polling, review and cleanup state.
   machine-readable session data: use "zelma sessions list --json".
@@ -402,6 +438,7 @@ RECOVERY HINTS
   unknown command: run "zelma help".
   session inventory task: run "zelma sessions list --json".
   dashboard task: run "zelma status --json".
+  live monitor task: run "zelma monitor".
   setup task: run "zelma setup" from inside a git repository.
   issue supervision task: run "zelma supervisor start-issue <issue> --repo owner/name --base main --json".
 
@@ -410,7 +447,8 @@ HUMAN NOTES
   inventory command and auto-detects fresh-enough manual panes before rendering
   the repository-local registry. setup creates .zelma and configures
   repository-local ignore rules. status is the dashboard/backend snapshot
-  command and does not mutate the sessions registry.
+  command and monitor is the live human-facing view over the same status
+  contract. Neither command mutates the sessions registry.
 
 Usage:
   zelma [command]
@@ -423,12 +461,14 @@ const sessionsHelpSnapshot = `COMMAND MAP
   zelma sessions detect   Detect existing Codex panes. Status: implemented.
   zelma sessions focus    Focus a known zellij pane by zelma session ID. Status: implemented.
   zelma sessions send     Send a message to a verified Codex session. Status: implemented.
+  zelma sessions buffer   Read bounded pane screen/scrollback by zelma session ID. Status: implemented.
+  zelma sessions transcript  Read bounded Codex transcript events by zelma session ID. Status: implemented.
   zelma sessions cleanup  Propose or confirm stale record cleanup. Status: implemented.
 
 OUTPUT CONVENTIONS
   help output: stdout, exit 0, plain text.
-  list: stdout, exit 0, active-only table by default or schema v1 registry JSON
-  with --json; add --all for inactive records in human output; auto-detects by
+  list: stdout, exit 0, active/candidate table by default or schema v1 registry JSON
+  with --json; add --all for stale records in human output; auto-detects by
   default; add --no-detect for registry-only reads; add --live to include
   live/unreachable zellij status.
   create --dry-run: stdout, exit 0, resolved Codex command/opened path.
@@ -438,6 +478,10 @@ OUTPUT CONVENTIONS
   focus: stdout, exit 0, focused summary or focused session JSON with --json.
   send: stdout, exit 0, sent summary or JSON with target metadata; message body
   is never echoed.
+  buffer: stdout, exit 0, bounded zellij pane screen/scrollback JSON with
+  --json; default --tail 120 lines.
+  transcript: stdout, exit 0, bounded Codex transcript event JSON with --json;
+  default --tail 50 events.
   cleanup: stdout, exit 0, proposed/removed/kept summary with stale records;
   without --confirm, does not mutate registry.
   sessions registry output: preserves id, zellij_session, zellij_pane,
@@ -449,6 +493,8 @@ RECOVERY HINTS
   diagnostic/manual detect task: inspect "zelma sessions detect --help".
   focus task: inspect "zelma sessions focus --help".
   send task: inspect "zelma sessions send --help".
+  observation task: run "zelma sessions buffer <id> --json" or
+  "zelma sessions transcript <id> --json".
 
 HUMAN NOTES
   sessions list is the primary inventory command and auto-detects fresh-enough
@@ -1592,7 +1638,7 @@ func TestSessionsListJSONPreservesInactiveRecordsForCompatibility(t *testing.T) 
 	}
 }
 
-func TestSessionsListTableOutputShowsOnlyActiveByDefault(t *testing.T) {
+func TestSessionsListTableOutputShowsActiveAndCandidateByDefault(t *testing.T) {
 	root := newTestGitRepo(t)
 	writeRegistryFile(t, root, `{
   "version": 1,
@@ -1633,8 +1679,9 @@ func TestSessionsListTableOutputShowsOnlyActiveByDefault(t *testing.T) {
 	if stderr.Len() != 0 {
 		t.Fatalf("stderr = %q, want empty", stderr.String())
 	}
-	want := "ID  STATE   ZELLIJ_SESSION  ZELLIJ_TAB  ZELLIJ_PANE  CODEX_SESSION  OPENED_PATH\n" +
-		"1   active  zelma-main                  1            codex-a        /workspace/zelma\n"
+	want := "ID  STATE      ZELLIJ_SESSION     ZELLIJ_TAB  ZELLIJ_PANE  CODEX_SESSION  OPENED_PATH\n" +
+		"1   active     zelma-main                     1            codex-a        /workspace/zelma\n" +
+		"3   candidate  candidate-session              4                           /workspace/zelma\n"
 	if stdout.String() != want {
 		t.Fatalf("stdout mismatch\nwant:\n%s\ngot:\n%s", want, stdout.String())
 	}
@@ -1962,7 +2009,7 @@ func TestSessionsListLiveTableOutput(t *testing.T) {
 	}
 }
 
-func TestSessionsListLiveTableFiltersInactiveBeforeReconcile(t *testing.T) {
+func TestSessionsListLiveTableIncludesCandidateAndFiltersStaleBeforeReconcile(t *testing.T) {
 	root := newTestGitRepo(t)
 	paneRoot := resolvedPath(t, root)
 	writeRegistryFile(t, root, fmt.Sprintf(`{
@@ -1978,6 +2025,14 @@ func TestSessionsListLiveTableFiltersInactiveBeforeReconcile(t *testing.T) {
     },
     {
       "id": 2,
+      "zellij_session": "zelma-main",
+      "zellij_pane": "terminal_3",
+      "codex_session": "",
+      "opened_path": %q,
+      "state": "candidate"
+    },
+    {
+      "id": 3,
       "zellij_session": "hidden-stale",
       "zellij_pane": "terminal_2",
       "codex_session": "codex-stale",
@@ -1986,7 +2041,7 @@ func TestSessionsListLiveTableFiltersInactiveBeforeReconcile(t *testing.T) {
     }
   ]
 }
-`, paneRoot, paneRoot))
+	`, paneRoot, paneRoot, paneRoot))
 	now := time.Date(2026, 7, 8, 12, 0, 0, 0, time.UTC)
 	withNow(t, now)
 	if err := writeAutoDetectCache(root, now.Add(-time.Second)); err != nil {
@@ -2005,8 +2060,9 @@ func TestSessionsListLiveTableFiltersInactiveBeforeReconcile(t *testing.T) {
 	if stderr.Len() != 0 {
 		t.Fatalf("stderr = %q, want empty", stderr.String())
 	}
-	want := "ID  STATE   LIVE_STATUS  ZELLIJ_SESSION  ZELLIJ_TAB  ZELLIJ_PANE  CODEX_SESSION  OPENED_PATH\n" +
-		"1   active  live         zelma-main                  terminal_1   codex-live     " + paneRoot + "\n"
+	want := "ID  STATE      LIVE_STATUS  ZELLIJ_SESSION  ZELLIJ_TAB  ZELLIJ_PANE  CODEX_SESSION  OPENED_PATH\n" +
+		"1   active     live         zelma-main                  terminal_1   codex-live     " + paneRoot + "\n" +
+		"2   candidate  unreachable  zelma-main                  terminal_3                  " + paneRoot + "\n"
 	if stdout.String() != want {
 		t.Fatalf("stdout mismatch\nwant:\n%s\ngot:\n%s", want, stdout.String())
 	}
