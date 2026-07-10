@@ -97,6 +97,40 @@ type StaleCandidate struct {
 	Reason        string `json:"reason"`
 }
 
+type BufferObservation struct {
+	Version    int          `json:"version"`
+	SessionID  int          `json:"session_id"`
+	Source     string       `json:"source"`
+	CapturedAt string       `json:"captured_at"`
+	Truncated  bool         `json:"truncated"`
+	Limit      int          `json:"limit"`
+	Items      []BufferLine `json:"items"`
+}
+
+type BufferLine struct {
+	Line int    `json:"line"`
+	Text string `json:"text"`
+}
+
+type TranscriptObservation struct {
+	Version      int               `json:"version"`
+	SessionID    int               `json:"session_id"`
+	Source       string            `json:"source"`
+	CapturedAt   string            `json:"captured_at"`
+	Truncated    bool              `json:"truncated"`
+	Limit        int               `json:"limit"`
+	CodexSession string            `json:"codex_session"`
+	SessionFile  string            `json:"session_file,omitempty"`
+	Items        []TranscriptEvent `json:"items"`
+}
+
+type TranscriptEvent struct {
+	Index     int             `json:"index"`
+	Type      string          `json:"type"`
+	Timestamp string          `json:"timestamp,omitempty"`
+	Payload   json.RawMessage `json:"payload,omitempty"`
+}
+
 type Recovery struct {
 	Action      RecoveryAction `json:"action,omitempty"`
 	ReasonCode  string         `json:"reason_code,omitempty"`
@@ -208,6 +242,22 @@ func (client Client) DetectSessions(ctx context.Context) (DetectSummary, error) 
 
 func (client Client) FocusSession(ctx context.Context, id int) (Session, error) {
 	return runJSON[Session](ctx, client, []string{"sessions", "focus", strconv.Itoa(id), "--json"})
+}
+
+func (client Client) ObserveSessionBuffer(ctx context.Context, id int, tailLines int) (BufferObservation, error) {
+	args := []string{"sessions", "buffer", strconv.Itoa(id), "--json"}
+	if tailLines > 0 {
+		args = append(args, "--tail", strconv.Itoa(tailLines))
+	}
+	return runJSON[BufferObservation](ctx, client, args)
+}
+
+func (client Client) ObserveSessionTranscript(ctx context.Context, id int, tailEvents int) (TranscriptObservation, error) {
+	args := []string{"sessions", "transcript", strconv.Itoa(id), "--json"}
+	if tailEvents > 0 {
+		args = append(args, "--tail", strconv.Itoa(tailEvents))
+	}
+	return runJSON[TranscriptObservation](ctx, client, args)
 }
 
 func runJSON[T any](ctx context.Context, client Client, args []string) (T, error) {

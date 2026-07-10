@@ -129,6 +129,16 @@ func TestHelpRoutes(t *testing.T) {
 			wantOutput: []string{"Usage:", "zelma sessions focus"},
 		},
 		{
+			name:       "sessions buffer",
+			args:       []string{"sessions", "buffer", "--help"},
+			wantOutput: []string{"Usage:", "zelma sessions buffer"},
+		},
+		{
+			name:       "sessions transcript",
+			args:       []string{"sessions", "transcript", "--help"},
+			wantOutput: []string{"Usage:", "zelma sessions transcript"},
+		},
+		{
 			name:       "sessions cleanup",
 			args:       []string{"sessions", "cleanup", "--help"},
 			wantOutput: []string{"Usage:", "zelma sessions cleanup"},
@@ -201,6 +211,16 @@ func TestCommandHelpSnapshots(t *testing.T) {
 			name: "sessions focus help",
 			args: []string{"sessions", "focus", "--help"},
 			want: sessionsFocusHelp,
+		},
+		{
+			name: "sessions buffer help",
+			args: []string{"sessions", "buffer", "--help"},
+			want: sessionsBufferHelp,
+		},
+		{
+			name: "sessions transcript help",
+			args: []string{"sessions", "transcript", "--help"},
+			want: sessionsTranscriptHelp,
 		},
 		{
 			name: "sessions cleanup help",
@@ -375,6 +395,8 @@ const rootHelpSnapshot = `COMMAND MAP
   zelma sessions create   Create and register a confirmed Codex pane. Status: implemented.
   zelma sessions detect   Detect existing Codex panes. Status: implemented.
   zelma sessions focus    Focus a known zellij pane by zelma session ID. Status: implemented.
+  zelma sessions buffer   Read bounded pane screen/scrollback by zelma session ID. Status: implemented.
+  zelma sessions transcript  Read bounded Codex transcript events by zelma session ID. Status: implemented.
   zelma sessions cleanup  Propose or confirm stale record cleanup. Status: implemented.
   zelma supervisor help   Show the supervisor command map.
   zelma supervisor start-issue  Launch and supervise start-issue. Status: implemented.
@@ -390,6 +412,8 @@ OUTPUT CONVENTIONS
   sessions detect: stdout, exit 0, summary with active/candidate/stale counts,
   stale reason lines when found, or JSON with --json.
   sessions focus: stdout, exit 0, focused summary or JSON with --json.
+  sessions buffer: stdout, exit 0, bounded zellij pane screen JSON with --json.
+  sessions transcript: stdout, exit 0, bounded Codex transcript event JSON with --json.
   sessions cleanup: stdout, exit 0, stale cleanup proposal by default; add
   --confirm to remove proposed stale records.
   sessions create --dry-run: stdout, exit 0, launch contract text or JSON.
@@ -426,6 +450,8 @@ const sessionsHelpSnapshot = `COMMAND MAP
   zelma sessions create   Create and register a confirmed Codex pane. Status: implemented.
   zelma sessions detect   Detect existing Codex panes. Status: implemented.
   zelma sessions focus    Focus a known zellij pane by zelma session ID. Status: implemented.
+  zelma sessions buffer   Read bounded pane screen/scrollback by zelma session ID. Status: implemented.
+  zelma sessions transcript  Read bounded Codex transcript events by zelma session ID. Status: implemented.
   zelma sessions cleanup  Propose or confirm stale record cleanup. Status: implemented.
 
 OUTPUT CONVENTIONS
@@ -439,6 +465,10 @@ OUTPUT CONVENTIONS
   detect: stdout, exit 0, added/unchanged/skipped summary with
   active/candidate/stale counts, stale reasons when found, or JSON with --json.
   focus: stdout, exit 0, focused summary or focused session JSON with --json.
+  buffer: stdout, exit 0, bounded zellij pane screen/scrollback JSON with
+  --json; default --tail 120 lines.
+  transcript: stdout, exit 0, bounded Codex transcript event JSON with --json;
+  default --tail 50 events.
   cleanup: stdout, exit 0, proposed/removed/kept summary with stale records;
   without --confirm, does not mutate registry.
   sessions registry output: preserves id, zellij_session, zellij_pane,
@@ -449,6 +479,8 @@ RECOVERY HINTS
   managed create task: inspect "zelma sessions create --help".
   diagnostic/manual detect task: inspect "zelma sessions detect --help".
   focus task: inspect "zelma sessions focus --help".
+  observation task: run "zelma sessions buffer <id> --json" or
+  "zelma sessions transcript <id> --json".
 
 HUMAN NOTES
   sessions list is the primary inventory command and auto-detects fresh-enough

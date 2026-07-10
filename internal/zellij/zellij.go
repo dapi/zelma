@@ -59,6 +59,7 @@ type DumpScreenRequest struct {
 	Session string
 	PaneID  string
 	Full    bool
+	Tail    int
 }
 
 type WriteCharsRequest struct {
