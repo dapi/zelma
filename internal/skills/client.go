@@ -225,7 +225,7 @@ func (client Client) FocusSession(ctx context.Context, id int) (Session, error) 
 }
 
 func (client Client) SendMessage(ctx context.Context, id int, message string) (SendMessageResult, error) {
-	return runJSON[SendMessageResult](ctx, client, []string{"sessions", "send", strconv.Itoa(id), message, "--json"})
+	return runJSON[SendMessageResult](ctx, client, []string{"sessions", "send", strconv.Itoa(id), "--json", "--", message})
 }
 
 func (client Client) SendMessageFromStdin(ctx context.Context, id int, message []byte) (SendMessageResult, error) {
@@ -286,10 +286,17 @@ func safeCommandForError(command []string) []string {
 	if safe[4] == "--stdin" {
 		return safe
 	}
-	if strings.HasPrefix(safe[4], "-") {
+	messageIndex := len(safe) - 1
+	for i := 4; i < len(safe); i++ {
+		if safe[i] == "--" && i+1 < len(safe) {
+			messageIndex = i + 1
+			break
+		}
+	}
+	if len(safe) <= messageIndex {
 		return safe
 	}
-	safe[4] = "<redacted message>"
+	safe[messageIndex] = "<redacted message>"
 	return safe
 }
 

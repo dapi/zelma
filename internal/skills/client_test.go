@@ -240,7 +240,7 @@ func TestSendMessageInvokesZelmaCLI(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SendMessage() error = %v", err)
 	}
-	assertCall(t, calls, root, "sessions", "send", "2", "continue carefully", "--json")
+	assertCall(t, calls, root, "sessions", "send", "2", "--json", "--", "continue carefully")
 	if got.ID != 2 || got.ZellijPane != "terminal_75" || got.Message.Source != "argument" || !got.Message.Submitted {
 		t.Fatalf("SendMessage() = %+v, want sent active session metadata", got)
 	}
@@ -439,6 +439,27 @@ func TestSendNotReadySuggestsLiveListOnly(t *testing.T) {
 	assertRecoveryCommand(t, commandErr.Recovery, DefaultZelmaBinary, "sessions", "list", "--live", "--json")
 	if strings.Contains(commandErr.Error(), "SECRET_PROMPT_BODY") || strings.Contains(strings.Join(commandErr.Command, " "), "SECRET_PROMPT_BODY") {
 		t.Fatalf("CommandError leaked message body: command=%#v error=%q", commandErr.Command, commandErr.Error())
+	}
+}
+
+func TestSendMessageWithDashPrefixedPromptUsesSeparatorAndRedactsDiagnostics(t *testing.T) {
+	root := t.TempDir()
+	stderr := writeFile(t, root, "stderr.txt", "zelma sessions send: send message: codex_runtime_missing: pane command evidence does not indicate Codex\n")
+	calls := filepath.Join(root, "calls.txt")
+	client := fakeCLIClient(t, root, "", stderr, "1", calls)
+
+	_, err := client.SendMessage(context.Background(), 2, "-SECRET_PROMPT_BODY")
+
+	var commandErr *CommandError
+	if !errors.As(err, &commandErr) {
+		t.Fatalf("SendMessage() error = %T, want CommandError", err)
+	}
+	assertCall(t, calls, root, "sessions", "send", "2", "--json", "--", "-SECRET_PROMPT_BODY")
+	if strings.Contains(commandErr.Error(), "-SECRET_PROMPT_BODY") || strings.Contains(strings.Join(commandErr.Command, " "), "-SECRET_PROMPT_BODY") {
+		t.Fatalf("CommandError leaked dash-prefixed message body: command=%#v error=%q", commandErr.Command, commandErr.Error())
+	}
+	if !strings.Contains(strings.Join(commandErr.Command, " "), "<redacted message>") {
+		t.Fatalf("CommandError command = %#v, want redacted message placeholder", commandErr.Command)
 	}
 }
 
