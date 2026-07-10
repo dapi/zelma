@@ -372,8 +372,8 @@ OUTPUT CONVENTIONS
   help output: stdout, exit 0, plain text.
   setup changed: stdout, exit 0, "changed: prepared .zelma at <path>".
   setup unchanged: stdout, exit 0, "already configured: <path> contains .zelma".
-  sessions list: stdout, exit 0, active-only table by default or schema v1
-  registry JSON with --json; add --all for inactive records in human output;
+  sessions list: stdout, exit 0, active/candidate table by default or schema v1
+  registry JSON with --json; add --all for stale records in human output;
   auto-detects by default; add --no-detect for registry-only reads; add --live
   to include live/unreachable zellij status.
   sessions detect: stdout, exit 0, summary with active/candidate/stale counts,
@@ -416,8 +416,8 @@ const sessionsHelpSnapshot = `COMMAND MAP
 
 OUTPUT CONVENTIONS
   help output: stdout, exit 0, plain text.
-  list: stdout, exit 0, active-only table by default or schema v1 registry JSON
-  with --json; add --all for inactive records in human output; auto-detects by
+  list: stdout, exit 0, active/candidate table by default or schema v1 registry JSON
+  with --json; add --all for stale records in human output; auto-detects by
   default; add --no-detect for registry-only reads; add --live to include
   live/unreachable zellij status.
   create --dry-run: stdout, exit 0, resolved Codex command/opened path.
@@ -1577,7 +1577,7 @@ func TestSessionsListJSONPreservesInactiveRecordsForCompatibility(t *testing.T) 
 	}
 }
 
-func TestSessionsListTableOutputShowsOnlyActiveByDefault(t *testing.T) {
+func TestSessionsListTableOutputShowsActiveAndCandidateByDefault(t *testing.T) {
 	root := newTestGitRepo(t)
 	writeRegistryFile(t, root, `{
   "version": 1,
@@ -1618,8 +1618,9 @@ func TestSessionsListTableOutputShowsOnlyActiveByDefault(t *testing.T) {
 	if stderr.Len() != 0 {
 		t.Fatalf("stderr = %q, want empty", stderr.String())
 	}
-	want := "ID  STATE   ZELLIJ_SESSION  ZELLIJ_TAB  ZELLIJ_PANE  CODEX_SESSION  OPENED_PATH\n" +
-		"1   active  zelma-main                  1            codex-a        /workspace/zelma\n"
+	want := "ID  STATE      ZELLIJ_SESSION     ZELLIJ_TAB  ZELLIJ_PANE  CODEX_SESSION  OPENED_PATH\n" +
+		"1   active     zelma-main                     1            codex-a        /workspace/zelma\n" +
+		"3   candidate  candidate-session              4                           /workspace/zelma\n"
 	if stdout.String() != want {
 		t.Fatalf("stdout mismatch\nwant:\n%s\ngot:\n%s", want, stdout.String())
 	}
@@ -1947,7 +1948,7 @@ func TestSessionsListLiveTableOutput(t *testing.T) {
 	}
 }
 
-func TestSessionsListLiveTableFiltersInactiveBeforeReconcile(t *testing.T) {
+func TestSessionsListLiveTableIncludesCandidateAndFiltersStaleBeforeReconcile(t *testing.T) {
 	root := newTestGitRepo(t)
 	paneRoot := resolvedPath(t, root)
 	writeRegistryFile(t, root, fmt.Sprintf(`{
@@ -1963,6 +1964,14 @@ func TestSessionsListLiveTableFiltersInactiveBeforeReconcile(t *testing.T) {
     },
     {
       "id": 2,
+      "zellij_session": "zelma-main",
+      "zellij_pane": "terminal_3",
+      "codex_session": "",
+      "opened_path": %q,
+      "state": "candidate"
+    },
+    {
+      "id": 3,
       "zellij_session": "hidden-stale",
       "zellij_pane": "terminal_2",
       "codex_session": "codex-stale",
@@ -1971,7 +1980,7 @@ func TestSessionsListLiveTableFiltersInactiveBeforeReconcile(t *testing.T) {
     }
   ]
 }
-`, paneRoot, paneRoot))
+	`, paneRoot, paneRoot, paneRoot))
 	now := time.Date(2026, 7, 8, 12, 0, 0, 0, time.UTC)
 	withNow(t, now)
 	if err := writeAutoDetectCache(root, now.Add(-time.Second)); err != nil {
@@ -1990,8 +1999,9 @@ func TestSessionsListLiveTableFiltersInactiveBeforeReconcile(t *testing.T) {
 	if stderr.Len() != 0 {
 		t.Fatalf("stderr = %q, want empty", stderr.String())
 	}
-	want := "ID  STATE   LIVE_STATUS  ZELLIJ_SESSION  ZELLIJ_TAB  ZELLIJ_PANE  CODEX_SESSION  OPENED_PATH\n" +
-		"1   active  live         zelma-main                  terminal_1   codex-live     " + paneRoot + "\n"
+	want := "ID  STATE      LIVE_STATUS  ZELLIJ_SESSION  ZELLIJ_TAB  ZELLIJ_PANE  CODEX_SESSION  OPENED_PATH\n" +
+		"1   active     live         zelma-main                  terminal_1   codex-live     " + paneRoot + "\n" +
+		"2   candidate  unreachable  zelma-main                  terminal_3                  " + paneRoot + "\n"
 	if stdout.String() != want {
 		t.Fatalf("stdout mismatch\nwant:\n%s\ngot:\n%s", want, stdout.String())
 	}

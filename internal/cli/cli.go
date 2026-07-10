@@ -152,8 +152,8 @@ OUTPUT CONVENTIONS
   help output: stdout, exit 0, plain text.
   setup changed: stdout, exit 0, "changed: prepared .zelma at <path>".
   setup unchanged: stdout, exit 0, "already configured: <path> contains .zelma".
-  sessions list: stdout, exit 0, active-only table by default or schema v1
-  registry JSON with --json; add --all for inactive records in human output;
+  sessions list: stdout, exit 0, active/candidate table by default or schema v1
+  registry JSON with --json; add --all for stale records in human output;
   auto-detects by default; add --no-detect for registry-only reads; add --live
   to include live/unreachable zellij status.
   sessions detect: stdout, exit 0, summary with active/candidate/stale counts,
@@ -236,8 +236,8 @@ const sessionsHelp = `COMMAND MAP
 
 OUTPUT CONVENTIONS
   help output: stdout, exit 0, plain text.
-  list: stdout, exit 0, active-only table by default or schema v1 registry JSON
-  with --json; add --all for inactive records in human output; auto-detects by
+  list: stdout, exit 0, active/candidate table by default or schema v1 registry JSON
+  with --json; add --all for stale records in human output; auto-detects by
   default; add --no-detect for registry-only reads; add --live to include
   live/unreachable zellij status.
   create --dry-run: stdout, exit 0, resolved Codex command/opened path.
@@ -275,8 +275,8 @@ Status:
   repository-local sessions registry; --live adds live reachability.
 
 Output:
-  default: tabular human-readable active session inventory.
-  --all: include stale, candidate, closed and archived records in human output.
+  default: tabular human-readable active and candidate session inventory.
+  --all: include stale, closed and archived records in human output.
   --json: schema v1 registry JSON object with version and all sessions.
   --live: adds live_status values: live or unreachable.
   --no-detect: skip auto-detect and read only .zelma/sessions.json before
@@ -585,7 +585,7 @@ func newSessionsListCommand(stdout io.Writer) *cobra.Command {
 			if liveOutput {
 				client := zellij.New(zellij.WithBinary(os.Getenv("ZELMA_ZELLIJ_BIN")))
 				if !jsonOutput && !allOutput {
-					reg = filterRegistryByState(reg, registry.StateActive)
+					reg = filterRegistryByStates(reg, registry.StateActive, registry.StateCandidate)
 				}
 				liveReg, err := live.Reconcile(cmd.Context(), reg, client)
 				if err != nil {
@@ -600,14 +600,14 @@ func newSessionsListCommand(stdout io.Writer) *cobra.Command {
 				return writeSessionsJSON(stdout, reg)
 			}
 			if !allOutput {
-				reg = filterRegistryByState(reg, registry.StateActive)
+				reg = filterRegistryByStates(reg, registry.StateActive, registry.StateCandidate)
 			}
 			return writeSessionsTable(stdout, reg)
 		},
 	}
 	cmd.Flags().BoolVar(&jsonOutput, "json", false, "Print schema v1 JSON.")
 	cmd.Flags().BoolVar(&liveOutput, "live", false, "Include live zellij pane status without mutating the registry.")
-	cmd.Flags().BoolVar(&allOutput, "all", false, "Include inactive sessions in human-readable output.")
+	cmd.Flags().BoolVar(&allOutput, "all", false, "Include stale, closed and archived sessions in human-readable output.")
 	cmd.Flags().BoolVar(&noDetect, "no-detect", false, "Skip auto-detect and read only the sessions registry.")
 	return cmd
 }
@@ -1809,13 +1809,17 @@ func writeSessionsTable(stdout io.Writer, reg registry.Registry) error {
 	return tw.Flush()
 }
 
-func filterRegistryByState(reg registry.Registry, state registry.State) registry.Registry {
+func filterRegistryByStates(reg registry.Registry, states ...registry.State) registry.Registry {
+	wanted := make(map[registry.State]struct{}, len(states))
+	for _, state := range states {
+		wanted[state] = struct{}{}
+	}
 	filtered := registry.Registry{
 		Version:  reg.Version,
 		Sessions: make([]registry.Session, 0, len(reg.Sessions)),
 	}
 	for _, session := range reg.Sessions {
-		if session.State == state {
+		if _, ok := wanted[session.State]; ok {
 			filtered.Sessions = append(filtered.Sessions, session)
 		}
 	}

@@ -76,9 +76,9 @@ missing registry is treated as an empty registry.
 
 Output is schema v1 registry JSON and preserves all registry records for
 machine-readable compatibility, including active, candidate, stale, closed and
-archived states. The human table output of `zelma sessions list` is active-only
-by default; use `zelma sessions list --all` when a human needs the inactive
-records too.
+archived states. The human table output of `zelma sessions list` includes
+`active` and `candidate` records by default; use `zelma sessions list --all`
+when a human needs stale, closed or archived records too.
 
 ```json
 {
