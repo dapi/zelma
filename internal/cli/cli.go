@@ -44,6 +44,15 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 			fmt.Fprintln(stderr, err)
 			return 1
 		}
+		if isSessionsSendDashMessageArgumentError(args, err) {
+			err = sendDashPrefixedMessageArgumentError()
+			if rawJSONRequested(args) {
+				fmt.Fprintln(stderr, jsonArgumentFailure("zelma sessions send", err))
+				return 1
+			}
+			fmt.Fprintln(stderr, legacyCommandDiagnostic("zelma sessions send", err))
+			return 1
+		}
 		if command, ok := jsonFallbackCommandForArgs(root, args); ok {
 			if isCobraValidationError(err) {
 				fmt.Fprintln(stderr, jsonArgumentFailure(command.CommandPath(), err))
@@ -1415,7 +1424,9 @@ func sendPaneCodexReadiness(session registry.Session, pane zellij.Pane, configur
 		return "", ""
 	}
 	if hasCodexLaunchEvidence {
-		return sendReasonRuntimeAmbiguous, fmt.Sprintf("pane %q shows Codex launch evidence but does not prove the recorded Codex session", session.ZellijPane)
+		// Active records can be promoted from process/session metadata even when
+		// the original Codex launch command does not include a session UUID.
+		return "", ""
 	}
 	return sendReasonCodexRuntimeMissing, fmt.Sprintf("pane %q command evidence does not indicate Codex", session.ZellijPane)
 }
@@ -1836,6 +1847,47 @@ func jsonFallbackCommandForArgs(root *cobra.Command, args []string) (*cobra.Comm
 	return command, true
 }
 
+func isSessionsSendDashMessageArgumentError(args []string, err error) bool {
+	return isCobraValidationError(err) && hasDashPrefixedSessionsSendMessageArg(args)
+}
+
+func hasDashPrefixedSessionsSendMessageArg(args []string) bool {
+	if len(args) < 3 || args[0] != "sessions" || args[1] != "send" {
+		return false
+	}
+
+	seenID := false
+	for _, arg := range args[2:] {
+		if arg == "--" {
+			return false
+		}
+		if strings.HasPrefix(arg, "-") {
+			if seenID {
+				return true
+			}
+			if isSessionsSendBoolFlagToken(arg) {
+				continue
+			}
+			return false
+		}
+		if !seenID {
+			seenID = true
+		}
+	}
+	return false
+}
+
+func isSessionsSendBoolFlagToken(arg string) bool {
+	return arg == "--json" ||
+		arg == "--stdin" ||
+		strings.HasPrefix(arg, "--json=") ||
+		strings.HasPrefix(arg, "--stdin=")
+}
+
+func sendDashPrefixedMessageArgumentError() error {
+	return errors.New("message text starting with '-' must be passed after '--' or read with --stdin")
+}
+
 func rawJSONRequested(args []string) bool {
 	for _, arg := range args {
 		if arg == "--json" {
@@ -1873,6 +1925,14 @@ func isCobraValidationError(err error) bool {
 	}
 	var valueRequiredErr *pflag.ValueRequiredError
 	if errors.As(err, &valueRequiredErr) {
+		return true
+	}
+	var invalidValueErr *pflag.InvalidValueError
+	if errors.As(err, &invalidValueErr) {
+		return true
+	}
+	var invalidSyntaxErr *pflag.InvalidSyntaxError
+	if errors.As(err, &invalidSyntaxErr) {
 		return true
 	}
 	message := err.Error()

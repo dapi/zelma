@@ -3048,6 +3048,50 @@ func TestSessionsSendRejectsConflictingSourcesBeforeRuntimeWork(t *testing.T) {
 	}
 }
 
+func TestSessionsSendRedactsDashPrefixedMessageRejectedByCobra(t *testing.T) {
+	tests := []struct {
+		name string
+		args []string
+	}{
+		{
+			name: "unknown shorthand flag",
+			args: []string{"sessions", "send", "2", "-SECRET_PROMPT_BODY", "--json"},
+		},
+		{
+			name: "known bool flag with private value",
+			args: []string{"sessions", "send", "2", "--json=SECRET_PROMPT_BODY"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			root := newTestGitRepo(t)
+			t.Chdir(root)
+
+			var stdout, stderr bytes.Buffer
+
+			code := Run(context.Background(), tt.args, &stdout, &stderr)
+
+			if code != 1 {
+				t.Fatalf("Run() code = %d, want 1", code)
+			}
+			if stdout.Len() != 0 {
+				t.Fatalf("stdout = %q, want empty", stdout.String())
+			}
+			diagnostic := decodeSkillRecoveryDiagnostic(t, stderr.Bytes())
+			if diagnostic.Code != "cli_invalid_arguments" || diagnostic.CommandPath != "zelma sessions send" {
+				t.Fatalf("diagnostic = %+v, want cli_invalid_arguments for send", diagnostic)
+			}
+			if strings.Contains(stderr.String(), "SECRET_PROMPT_BODY") {
+				t.Fatalf("stderr = %q, must not echo message body", stderr.String())
+			}
+			if !strings.Contains(diagnostic.Message, "--") || !strings.Contains(diagnostic.HumanMessage, "--") {
+				t.Fatalf("diagnostic = %+v, want separator guidance", diagnostic)
+			}
+		})
+	}
+}
+
 func TestSessionsSendRejectsNonCodexTargetBeforeWrite(t *testing.T) {
 	root := newTestGitRepo(t)
 	openedPath := resolvedPath(t, root)
@@ -3175,7 +3219,7 @@ func TestValidateSendTargetReadyReasonCodes(t *testing.T) {
 			wantReason: sendReasonCodexIdentityMismatch,
 		},
 		{
-			name:    "codex evidence ambiguous",
+			name:    "active managed codex launch without command uuid",
 			session: baseSession,
 			runtime: fakeSendRuntime{
 				sessions: []zellij.Session{{Name: "zelma-main"}},
@@ -3185,7 +3229,7 @@ func TestValidateSendTargetReadyReasonCodes(t *testing.T) {
 					PaneCWD:     stringPtrForCLITest(openedPath),
 				}},
 			},
-			wantReason: sendReasonRuntimeAmbiguous,
+			wantSuccess: true,
 		},
 		{
 			name:    "external uuid without codex command is missing runtime",
@@ -3772,12 +3816,12 @@ if [ "$1" = "--session" ] && [ "$2" = "zelma-main" ] && [ "$3" = "action" ] && [
 JSON
   exit 0
 fi
-if [ "$1" = "--session" ] && [ "$2" = "zelma-main" ] && [ "$3" = "action" ] && [ "$4" = "write-chars" ] && [ "$5" = "--pane-id" ]; then
+if [ "$1" = "--session" ] && [ "$2" = "zelma-main" ] && [ "$3" = "action" ] && [ "$4" = "write-chars" ] && [ "$5" = "--pane-id" ] && [ "$7" = "--" ]; then
   {
     printf 'send_session=%s\n' "$2"
     printf 'send_pane=%s\n' "$6"
     printf 'send_payload='
-    printf '%s' "$7"
+    printf '%s' "$8"
     printf '\n'
   } >> ` + shellQuoteForTest(callsPath) + `
   ` + sendFailure + `  exit ` + sendExit + `

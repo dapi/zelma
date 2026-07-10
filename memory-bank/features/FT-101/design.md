@@ -127,7 +127,10 @@ Current code already has pieces that can be reused:
   conflicting or empty message fails before readiness checks.
 - `SD-03` Readiness must prove active registry state, reachable zellij session,
   recorded terminal pane, matching pane identity, Codex runtime evidence and
-  compatibility with recorded `codex_session` / `opened_path`.
+  compatibility with recorded `codex_session` / `opened_path`. Active records
+  whose Codex session was resolved from process/session metadata do not require
+  the live launch command to repeat the UUID when the pane and opened path still
+  match; an explicitly different live UUID remains a mismatch.
 - `SD-04` Send diagnostics use specific reason codes where possible:
   `session_not_found`, `pane_not_found`, `pane_not_terminal`,
   `session_state_not_active`, `runtime_unreachable`, `codex_runtime_missing`,

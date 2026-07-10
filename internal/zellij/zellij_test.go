@@ -534,10 +534,28 @@ func TestPaneObservationActionsRunExpectedCommands(t *testing.T) {
 
 	wantArgs := [][]string{
 		{"--session", "zelma-main", "action", "dump-screen", "--pane-id", "terminal_7", "--full"},
-		{"--session", "zelma-main", "action", "write-chars", "--pane-id", "terminal_7", "/review\n"},
-		{"--session", "zelma-main", "action", "write-chars", "--pane-id", "terminal_7", "continue carefully\n"},
+		{"--session", "zelma-main", "action", "write-chars", "--pane-id", "terminal_7", "--", "/review\n"},
+		{"--session", "zelma-main", "action", "write-chars", "--pane-id", "terminal_7", "--", "continue carefully\n"},
 		{"--session", "zelma-main", "action", "close-pane", "--pane-id", "terminal_7"},
 	}
+	if !reflect.DeepEqual(gotArgs, wantArgs) {
+		t.Fatalf("args = %#v, want %#v", gotArgs, wantArgs)
+	}
+}
+
+func TestSendTextToPaneSeparatesDashPrefixedPayload(t *testing.T) {
+	var gotArgs []string
+	client := New(WithBinary("fake-zellij"), WithTimeout(time.Minute))
+	client.run = func(ctx context.Context, binary string, args []string) commandResult {
+		gotArgs = append([]string(nil), args...)
+		return commandResult{}
+	}
+
+	if err := client.SendTextToPane(context.Background(), SendTextRequest{Session: "zelma-main", PaneID: "terminal_7", Text: "-SECRET_PROMPT_BODY", Submit: true}); err != nil {
+		t.Fatalf("SendTextToPane() error = %v, want nil", err)
+	}
+
+	wantArgs := []string{"--session", "zelma-main", "action", "write-chars", "--pane-id", "terminal_7", "--", "-SECRET_PROMPT_BODY\n"}
 	if !reflect.DeepEqual(gotArgs, wantArgs) {
 		t.Fatalf("args = %#v, want %#v", gotArgs, wantArgs)
 	}

@@ -247,7 +247,10 @@ metadata, but never the message body:
 Before any write, `zelma` checks that the registry record exists, is `active`,
 the zellij session and recorded pane are reachable, the pane is terminal, and
 live Codex evidence is compatible with the recorded `codex_session` and
-`opened_path`.
+`opened_path`. A live Codex launch command does not need to repeat the
+`codex_session` UUID when the active registry record was already resolved from
+process/session metadata and the live pane still matches the recorded
+`opened_path`; an explicitly different live UUID remains an identity mismatch.
 
 Stable send failure codes include:
 

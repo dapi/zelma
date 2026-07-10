@@ -570,11 +570,11 @@ func dumpScreenArgs(request DumpScreenRequest) []string {
 }
 
 func writeCharsArgs(request WriteCharsRequest) []string {
-	return []string{"--session", request.Session, "action", "write-chars", "--pane-id", request.PaneID, request.Chars}
+	return []string{"--session", request.Session, "action", "write-chars", "--pane-id", request.PaneID, "--", request.Chars}
 }
 
 func sendTextCommandString(binary string, request SendTextRequest) string {
-	return commandString(binary, []string{"--session", request.Session, "action", "write-chars", "--pane-id", request.PaneID, "<redacted chars>"})
+	return commandString(binary, []string{"--session", request.Session, "action", "write-chars", "--pane-id", request.PaneID, "--", "<redacted chars>"})
 }
 
 func closePaneArgs(request ClosePaneRequest) []string {
