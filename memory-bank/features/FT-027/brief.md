@@ -2,7 +2,7 @@
 title: "FT-027: Sessions List Live"
 doc_kind: feature
 doc_function: canonical
-purpose: "Канонический brief для `sessions list --live`, который сверяет registry с текущим zellij state."
+purpose: "Канонический brief для `instances list --live`, который сверяет registry с текущим zellij state."
 derived_from:
   - ../../product/roadmap.md
   - ../../epics/EP-007/brief.md
@@ -20,12 +20,12 @@ must_not_define:
 
 ### Проблема
 
-Обычный `sessions list` показывает known sessions из registry, но не отвечает,
+Обычный `instances list` показывает known instances из registry, но не отвечает,
 существуют ли соответствующие zellij panes прямо сейчас.
 
 ### Результат
 
-`sessions list --live` дополняет registry records live status из zellij без
+`instances list --live` дополняет registry records live status из zellij без
 разрушительных изменений registry.
 
 ### Объем Работ

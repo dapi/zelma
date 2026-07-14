@@ -47,11 +47,11 @@ Knowledge-файлы опциональны. Если они создаются 
   для Go CLI: binary scaffold, дерево команд Cobra, agent-first help и
   output/error contract.
 - [EP-002: Registry And Repo State](EP-002/README.md) — активный package для
-  repo-local registry sessions, `.zelma/sessions.json` и setup behavior.
+  repo-local registry sessions, `.zelma/instances.json` и setup behavior.
 - [EP-003: Zellij Read Integration And Detect](EP-003/README.md) — активный
   package для zellij introspection и консервативного обнаружения ручных panes.
 - [EP-004: Managed Create Workflow](EP-004/README.md) — активный package для
-  создания Codex panes через `zelma sessions create`.
+  создания Codex panes через `zelma instances create`.
 - [EP-005: Codex Session Identity](EP-005/README.md) — активный package для
   надежных ссылок на Codex session.
 - [EP-006: Agent Skill Pack](EP-006/README.md) — активный package для Codex

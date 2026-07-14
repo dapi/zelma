@@ -44,7 +44,7 @@ skill and route user intents to existing `zelma` commands safely.
 | `C4-E01` | Codex agent | External actor / agent runtime | Reads skill instructions; invokes commands | Must follow `SKILL.md` and user intent |
 | `C4-E02` | `SKILL.md` | Skill package artifact | Instructs agent which `zelma` command to run | Owns concise agent-facing routing only |
 | `C4-E03` | `zelma` CLI | System under feature | Receives public commands and returns JSON/diagnostics | Owns registry, zellij adapter and command behavior |
-| `C4-E04` | zellij / `.zelma/sessions.json` | External/runtime internals relative to skill | Accessed only through `zelma` CLI | Not directly called or parsed by the skill |
+| `C4-E04` | zellij / `.zelma/instances.json` | External/runtime internals relative to skill | Accessed only through `zelma` CLI | Not directly called or parsed by the skill |
 
 ## Selected Solution
 
@@ -88,12 +88,12 @@ skill and route user intents to existing `zelma` commands safely.
 
 | Contract ID | Input / Output | Producer / Consumer | Semantics / Constraints |
 | --- | --- | --- | --- |
-| `CTR-01` | User asks to list known sessions | Codex agent / `zelma sessions list --json` | Read registry through CLI; do not parse `.zelma/sessions.json` directly |
-| `CTR-02` | User asks for live status | Codex agent / `zelma sessions list --live --json` | Read-only live reachability check through CLI |
-| `CTR-03` | User asks to create a managed Codex pane | Codex agent / `zelma sessions create [path] --json` | Mutating create remains inside `zelma`; dry-run may be used to preview inputs |
-| `CTR-04` | User asks to detect/adopt manual panes | Codex agent / `zelma sessions detect --json` | Detection and registry upsert remain CLI-owned |
-| `CTR-05` | User asks to focus session id | Codex agent / `zelma sessions focus <id> --json` | Focus by positive numeric repo-local id |
-| `CTR-06` | User asks to cleanup stale sessions | Codex agent / `zelma sessions cleanup --json`; `--confirm` only with explicit removal intent | Preview is default; destructive confirm is gated |
+| `CTR-01` | User asks to list known instances | Codex agent / `zelma instances list --json` | Read registry through CLI; do not parse `.zelma/instances.json` directly |
+| `CTR-02` | User asks for live status | Codex agent / `zelma instances list --live --json` | Read-only live reachability check through CLI |
+| `CTR-03` | User asks to create a managed Codex pane | Codex agent / `zelma instances create [path] --json` | Mutating create remains inside `zelma`; dry-run may be used to preview inputs |
+| `CTR-04` | User asks to detect/adopt manual panes | Codex agent / `zelma instances detect --json` | Detection and registry upsert remain CLI-owned |
+| `CTR-05` | User asks to focus session id | Codex agent / `zelma instances focus <id> --json` | Focus by positive numeric repo-local id |
+| `CTR-06` | User asks to cleanup stale instances | Codex agent / `zelma instances cleanup --json`; `--confirm` only with explicit removal intent | Preview is default; destructive confirm is gated |
 | `CTR-07` | Command fails or reports partial state | `zelma` CLI / Codex agent | Preserve stdout/stderr diagnostics and use recovery expectations from skill contract |
 
 ## Invariants
@@ -101,7 +101,7 @@ skill and route user intents to existing `zelma` commands safely.
 - `INV-01` The skill calls only `zelma` commands and never instructs agents to
   call `zellij` directly.
 - `INV-02` The skill does not instruct agents to read or parse
-  `.zelma/sessions.json` directly.
+  `.zelma/instances.json` directly.
 - `INV-03` Cleanup confirmation requires explicit user intent.
 - `INV-04` `agents/openai.yaml` stays metadata-only and does not redefine
   command routing, recovery or acceptance semantics.

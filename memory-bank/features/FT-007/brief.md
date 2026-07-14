@@ -2,7 +2,7 @@
 title: "FT-007: Atomic Registry Writes And Lock"
 doc_kind: feature
 doc_function: canonical
-purpose: "Канонический brief для atomic writes и lock механизма вокруг `.zelma/sessions.json`."
+purpose: "Канонический brief для atomic writes и lock механизма вокруг `.zelma/instances.json`."
 derived_from:
   - ../../product/roadmap.md
   - ../../epics/EP-002/brief.md

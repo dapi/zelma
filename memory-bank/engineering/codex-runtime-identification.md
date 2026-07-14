@@ -24,8 +24,8 @@ canonical_for:
 Snapshot date: `2026-07-07`.
 
 This document defines how `zelma` should identify that a `zellij pane` is
-running Codex and resolve a `CodexSessionRef` for `sessions detect` and
-`sessions create`.
+running Codex and resolve a `CodexSessionRef` for `instances detect` and
+`instances create`.
 
 ## Verified Local Facts
 
@@ -52,7 +52,7 @@ must use synthetic `session_meta` records, not real transcripts.
 ## Design Goals
 
 - Prefer false negatives over false positives. A pane that only maybe contains
-  Codex remains a `DetectionCandidate`, not an `active` `ZelmaSession`.
+  Codex remains a `DetectionCandidate`, not an `active` `ZelmaInstance`.
 - Resolve `CodexSessionRef` without reading Codex conversation messages.
 - Keep zellij facts, Codex facts and registry writes separated by module
   boundary.
@@ -98,7 +98,7 @@ Rules:
 | Process argv contains `CODEX_EXTERNAL_SESSION_UUID=<uuid>` or `External session UUID: <uuid>` | `codex-adapter` | strong external ref | Resolves `CodexSessionRef` as wrapper-provided external identity |
 | Session file `session_meta.payload.session_id` or `id` is a UUID | `codex-adapter` | medium/strong depending on correlation | Candidate UUID source |
 | Session file cwd matches normalized opened path | `codex-adapter` | medium | Correlates Codex file to pane/repo |
-| Session file was created after a `zelma sessions create` launch timestamp | `codex-adapter` + `detection` | strong if unique | Resolves create result |
+| Session file was created after a `zelma instances create` launch timestamp | `codex-adapter` + `detection` | strong if unique | Resolves create result |
 | Exactly one live/recent session file matches cwd and observation window | `codex-adapter` + `detection` | medium | May resolve manual detect only if unambiguous |
 | User-supplied UUID in a future explicit command/flag | `cli` + `codex-adapter` | strong after validation | Manual ambiguity resolution |
 
@@ -156,12 +156,12 @@ Steps:
    - extract `payload.session_id` first, then `payload.id` if needed;
    - normalize `payload.cwd`;
    - keep only metadata whose cwd is equal to or inside the target repo root.
-6. For `sessions create`, correlate by launch timestamp and uniqueness:
+6. For `instances create`, correlate by launch timestamp and uniqueness:
    - record the timestamp before starting Codex;
    - after pane creation, wait briefly for a new session file;
    - accept the UUID only if exactly one matching session file appears for the
      opened path in the launch window.
-7. For `sessions detect`, correlate conservatively:
+7. For `instances detect`, correlate conservatively:
    - accept explicit `resume <uuid>` as strong;
    - accept a session-file match only if exactly one candidate matches cwd and
      recency policy;
@@ -179,8 +179,8 @@ Steps:
 | `active_ready` | All required refs are resolved and duplicate rules pass | Create/update one active record |
 | `stale_candidate` | Existing active record no longer validates against live Codex evidence | Reconciliation may mark stale per policy |
 
-`sessions list` should not silently promote unresolved candidates. Promotion
-belongs to `sessions detect`, `sessions create`, or a future explicit resolution
+`instances list` should not silently promote unresolved candidates. Promotion
+belongs to `instances detect`, `instances create`, or a future explicit resolution
 command.
 
 ## Ambiguity Policy
@@ -202,7 +202,7 @@ Rules:
 ## Privacy And Safety Rules
 
 - Read only Codex `session_meta` for automatic detection.
-- Never store Codex prompts, responses or full argv in `.zelma/sessions.json`.
+- Never store Codex prompts, responses or full argv in `.zelma/instances.json`.
 - Process argv may contain prompt text; adapters must extract only safe tokens
   such as binary name, `resume` UUID and `--cd` path.
 - Diagnostics may include counts and redacted IDs, but not transcript content.
@@ -236,8 +236,8 @@ regression-covered:
 
 ## Open Questions
 
-- Should a future `zelma sessions resolve` command be introduced, or should
-  `sessions detect --codex-session-id <uuid> --pane-id <pane>` be enough?
+- Should a future `zelma instances resolve` command be introduced, or should
+  `instances detect --codex-session-id <uuid> --pane-id <pane>` be enough?
 - What exact recency window is acceptable for manual detect without explicit
   UUID? This should be tuned with real fixtures after the first adapter exists.
 - Should `CodexSessionRef` store both `id` and `session_id` if Codex metadata

@@ -22,13 +22,13 @@ canonical_for:
 
 | Event ID | Event | Meaning | Producer | Consumers | Minimal facts |
 | --- | --- | --- | --- | --- | --- |
-| `DE-01` | `ZelmaSessionCreated` | `sessions create` produced a live Codex pane and registered it | CLI / Session Registry | CLI output, skills, logs/tests | Session id, zellij session, zellij pane, codex session, opened path, origin `create` |
-| `DE-02` | `CodexPaneDetected` | Detection found a zellij pane with evidence of Codex runtime through explicit `sessions detect` or default `sessions list` auto-detect | Detection | Session Registry | Zellij session, zellij pane, opened path evidence, Codex evidence |
-| `DE-03` | `ZelmaSessionRegistered` | Registry now contains a session record created from create or detect workflow | Session Registry | CLI output, skills, tests | Registry path, session id, state, origin |
-| `DE-04` | `ZelmaSessionBecameStale` | Previously active record no longer validates against runtime state | Reconciliation | CLI output, skills, cleanup workflow | Session id, previous refs, observed missing evidence |
-| `DE-05` | `ZelmaSessionRevalidated` | Stale or uncertain record was confirmed live again | Reconciliation | CLI output, skills | Session id, confirmed refs |
-| `DE-06` | `ZelmaSessionClosed` | User intentionally closed or removed a managed session record | Future close/remove command | CLI output, registry, skills | Session id, closure reason, timestamp if available |
-| `DE-07` | `SessionRegistryUpdated` | `.zelma/sessions.json` was written with a valid schema | Session Registry | CLI output, tests, diagnostics | Registry path, schema version, affected session ids |
+| `DE-01` | `ZelmaInstanceCreated` | `instances create` produced a live Codex pane and registered it | CLI / Instance Registry | CLI output, skills, logs/tests | Instance id, zellij session, zellij pane, codex session, opened path, origin `create` |
+| `DE-02` | `CodexPaneDetected` | Detection found a zellij pane with evidence of Codex runtime through explicit `instances detect` or default `instances list` auto-detect | Detection | Instance Registry | Zellij session, zellij pane, opened path evidence, Codex evidence |
+| `DE-03` | `ZelmaInstanceRegistered` | Registry now contains an instance record created from create or detect workflow | Instance Registry | CLI output, skills, tests | Registry path, instance id, state, origin |
+| `DE-04` | `ZelmaInstanceBecameStale` | Previously active record no longer validates against runtime state | Reconciliation | CLI output, skills, cleanup workflow | Instance id, previous refs, observed missing evidence |
+| `DE-05` | `ZelmaInstanceRevalidated` | Stale or uncertain record was confirmed live again | Reconciliation | CLI output, skills | Instance id, confirmed refs |
+| `DE-06` | `ZelmaInstanceClosed` | User intentionally closed or removed a managed instance record | Future close/remove command | CLI output, registry, skills | Instance id, closure reason, timestamp if available |
+| `DE-07` | `InstanceRegistryUpdated` | `.zelma/instances.json` was written with a valid schema | Instance Registry | CLI output, tests, diagnostics | Registry path, schema version, affected instance ids |
 
 ## Event Rules
 
@@ -43,8 +43,8 @@ canonical_for:
   observed pane twice must not create duplicate active records.
 - Registry update events are meaningful only after the JSON write has succeeded
   and validation passed.
-- Ordering matters for create/register flows: `ZelmaSessionCreated` precedes
-  `ZelmaSessionRegistered` conceptually, even if implementation logs a single
+- Ordering matters for create/register flows: `ZelmaInstanceCreated` precedes
+  `ZelmaInstanceRegistered` conceptually, even if implementation logs a single
   combined operation.
 - Technical retry, queue, lock и error handling rules фиксируй в
   [`../engineering/architecture.md`](../engineering/architecture.md).

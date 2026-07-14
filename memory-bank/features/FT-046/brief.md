@@ -24,7 +24,7 @@ must_not_define:
 
 ### Проблема
 
-`sessions detect` может оставлять Codex pane в `candidate`, когда command
+`instances detect` может оставлять Codex pane в `candidate`, когда command
 metadata из `zellij action list-panes --json --all` и `session_meta` lookup не
 дают однозначный `CodexSessionRef`. Это особенно заметно, когда несколько
 Codex processes работают в одном repo path: cwd совпадает, но session id нельзя
@@ -37,7 +37,7 @@ evidence source для точного Codex session id. Если такой св
 
 ### Результат
 
-`sessions detect` использует PID-correlated process evidence только при
+`instances detect` использует PID-correlated process evidence только при
 необходимости: после того как более простые sources не разрешили
 `CodexSessionRef`. При успешной корреляции ровно одного live Codex process с
 pane feature извлекает только безопасный session ref и переводит запись в
@@ -59,7 +59,7 @@ candidate.
   или ссылку на единственный безопасно подтвержденный Codex session file.
 - `REQ-04` Возвращать `candidate_ambiguous` или `candidate_unresolved`, если
   pane/process correlation дает ноль, несколько или stale PID candidates.
-- `REQ-05` Показывать PID fallback decision в `sessions detect --explain`
+- `REQ-05` Показывать PID fallback decision в `instances detect --explain`
   без raw argv/env и без сохранения PID в registry.
 - `REQ-06` Покрыть unsupported-platform behavior: отсутствие PID surface не
   считается ошибкой detect и не ломает существующие evidence paths.
@@ -68,7 +68,7 @@ candidate.
 
 - `NS-01` Нет превращения PID самого по себе в `CodexSessionRef`.
 - `NS-02` Нет хранения PID, raw argv, process environment или process tree в
-  `.zelma/sessions.json`.
+  `.zelma/instances.json`.
 - `NS-03` Нет чтения Codex transcript content, user prompts, assistant answers
   или tool payloads.
 - `NS-04` Нет ptrace/debugger/memory inspection и других invasive process
@@ -105,10 +105,10 @@ candidate.
 - `EC-01` Candidate с неоднозначным `session_meta` по cwd становится `active`,
   если ровно один live Codex PID надежно связан с pane и дает безопасный UUID.
 - `EC-02` Если PID surface отсутствует, недоступен или неоднозначен,
-  `sessions detect` оставляет candidate с explain reason.
+  `instances detect` оставляет candidate с explain reason.
 - `EC-03` Registry после successful detect содержит `codex_session`, но не
   содержит PID, raw argv/env или process-tree details.
-- `EC-04` Existing `sessions detect` behavior without `--explain` remains
+- `EC-04` Existing `instances detect` behavior without `--explain` remains
   backward-compatible.
 
 ### Traceability Matrix
@@ -126,7 +126,7 @@ candidate.
 
 - `SC-01` Two Codex panes share one repo cwd; session file lookup is ambiguous,
   but one pane has a uniquely correlated Codex PID with safe UUID evidence, so
-  `sessions detect` registers it as `active`.
+  `instances detect` registers it as `active`.
 - `SC-02` PID correlation finds multiple plausible Codex child processes for
   one pane; detect returns candidate with ambiguity explanation.
 - `SC-03` Platform or zellij version does not expose a usable PID surface;

@@ -42,7 +42,7 @@ func TestViewShowsEmptyLiveAndOtherRecords(t *testing.T) {
 
 	view := app.View()
 
-	for _, want := range []string{"No live zelma sessions.", "OTHER", "> 4   stale"} {
+	for _, want := range []string{"No live zelma instances.", "OTHER", "> 4   stale"} {
 		if !strings.Contains(view, want) {
 			t.Fatalf("View() = %q, want substring %q", view, want)
 		}

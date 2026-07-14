@@ -2,7 +2,7 @@
 title: "FT-006: Sessions Schema V1"
 doc_kind: feature
 doc_function: canonical
-purpose: "Канонический brief для versioned schema `.zelma/sessions.json`."
+purpose: "Канонический brief для versioned schema `.zelma/instances.json`."
 derived_from:
   - ../../product/roadmap.md
   - ../../epics/EP-002/brief.md
@@ -28,12 +28,12 @@ Registry должен хранить zellij session, zellij pane, Codex session 
 
 ### Результат
 
-Есть versioned JSON schema v1 для `.zelma/sessions.json` и fixtures, по которым
+Есть versioned JSON schema v1 для `.zelma/instances.json` и fixtures, по которым
 можно проверять чтение/запись registry.
 
 ### Объем Работ
 
-- `REQ-01` Определить top-level version и sessions collection.
+- `REQ-01` Определить top-level version и instances collection.
 - `REQ-02` Определить поля session record: zellij session, zellij pane, Codex session ref, opened path и state.
 - `REQ-03` Добавить fixtures для empty, minimal и representative registry.
 

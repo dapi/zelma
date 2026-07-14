@@ -36,8 +36,8 @@ Diagnostics are exposed through `registry.DiagnosticError`, so callers can use
 | `registry_missing_required_field` | A required root/session field is absent. | Restore the missing field manually. |
 | `registry_unsupported_version` | `version` is not schema v1. | Use v1 or a future migration command. |
 | `registry_invalid_field` | A field is empty, unsupported, relative or non-normalized. | Correct the field manually. |
-| `registry_duplicate_session` | Two active records describe the same pane and identity. | Remove the duplicate active record. |
-| `registry_conflicting_session` | Two active records claim the same pane with different identity data. | Inspect and keep one authoritative active record. |
+| `registry_duplicate_instance` | Two active records describe the same pane and identity. | Remove the duplicate active record. |
+| `registry_conflicting_instance` | Two active records claim the same pane with different identity data. | Inspect and keep one authoritative active record. |
 | `registry_read_failed` | Registry file cannot be read. | Inspect path and filesystem permissions. |
 
 ## Recovery Contract
@@ -54,4 +54,4 @@ as a stop condition until a future explicit migration or repair command exists.
 - Unit tests assert codes, paths and non-empty recovery hints for parse,
   required-field, version, invalid-field, duplicate and conflict scenarios.
 - File-level regression test verifies invalid JSON diagnostics do not mutate
-  `sessions.json`.
+  `instances.json`.

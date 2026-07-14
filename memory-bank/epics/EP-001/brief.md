@@ -33,13 +33,13 @@ command stubs `list/create/detect`, agent-first help и contract tests для
 ## Набросок Объема
 
 - `EP-001-REQ-01` Создать Go module и buildable `cmd/zelma`.
-- `EP-001-REQ-02` Завести Cobra command tree для `zelma setup` и `zelma sessions`.
+- `EP-001-REQ-02` Завести Cobra command tree для `zelma setup` и `zelma instances`.
 - `EP-001-REQ-03` Сделать help output пригодным для агентов в первую очередь.
 - `EP-001-REQ-04` Зафиксировать predictable output/error contract тестами.
 
 ## Что Не Входит
 
-- `EP-001-NS-01` Нет registry persistence и `.zelma/sessions.json`.
+- `EP-001-NS-01` Нет registry persistence и `.zelma/instances.json`.
 - `EP-001-NS-02` Нет live `zellij` integration.
 - `EP-001-NS-03` Нет Codex session identity.
 

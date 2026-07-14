@@ -75,7 +75,7 @@ func TestDecodeRepresentativeFixturePreservesSessionRefs(t *testing.T) {
 func TestDecodeBackfillsMissingSessionIDs(t *testing.T) {
 	got, err := Parse([]byte(`{
   "version": 1,
-  "sessions": [
+  "instances": [
     {
       "zellij_session": "main",
       "zellij_pane": "terminal_1",
@@ -110,72 +110,72 @@ func TestDecodeRejectsInvalidRegistry(t *testing.T) {
 	}{
 		{
 			name:    "missing version",
-			json:    `{"sessions":[]}`,
+			json:    `{"instances":[]}`,
 			wantErr: "version is required",
 		},
 		{
 			name:    "unsupported version",
-			json:    `{"version":2,"sessions":[]}`,
+			json:    `{"version":2,"instances":[]}`,
 			wantErr: "unsupported schema version 2",
 		},
 		{
-			name:    "missing sessions collection",
+			name:    "missing instances collection",
 			json:    `{"version":1}`,
-			wantErr: "sessions is required",
+			wantErr: "instances is required",
 		},
 		{
 			name:    "unknown top-level field",
-			json:    `{"version":1,"sessions":[],"extra":true}`,
+			json:    `{"version":1,"instances":[],"extra":true}`,
 			wantErr: "unknown field",
 		},
 		{
 			name:    "missing session field",
-			json:    `{"version":1,"sessions":[{"zellij_session":"main","zellij_pane":"1","codex_session":"codex","state":"active"}]}`,
+			json:    `{"version":1,"instances":[{"zellij_session":"main","zellij_pane":"1","codex_session":"codex","state":"active"}]}`,
 			wantErr: "opened_path is required",
 		},
 		{
 			name:    "active without codex session",
-			json:    `{"version":1,"sessions":[{"zellij_session":"main","zellij_pane":"1","codex_session":"","opened_path":"/workspace/zelma","state":"active"}]}`,
+			json:    `{"version":1,"instances":[{"zellij_session":"main","zellij_pane":"1","codex_session":"","opened_path":"/workspace/zelma","state":"active"}]}`,
 			wantErr: "codex_session is required for active state",
 		},
 		{
 			name:    "relative opened path",
-			json:    `{"version":1,"sessions":[{"zellij_session":"main","zellij_pane":"1","codex_session":"codex","opened_path":"workspace/zelma","state":"active"}]}`,
+			json:    `{"version":1,"instances":[{"zellij_session":"main","zellij_pane":"1","codex_session":"codex","opened_path":"workspace/zelma","state":"active"}]}`,
 			wantErr: "opened_path must be absolute",
 		},
 		{
 			name:    "non-normalized opened path",
-			json:    `{"version":1,"sessions":[{"zellij_session":"main","zellij_pane":"1","codex_session":"codex","opened_path":"/workspace/zelma/../zelma","state":"active"}]}`,
+			json:    `{"version":1,"instances":[{"zellij_session":"main","zellij_pane":"1","codex_session":"codex","opened_path":"/workspace/zelma/../zelma","state":"active"}]}`,
 			wantErr: "opened_path must be normalized",
 		},
 		{
 			name:    "unsupported state",
-			json:    `{"version":1,"sessions":[{"zellij_session":"main","zellij_pane":"1","codex_session":"codex","opened_path":"/workspace/zelma","state":"paused"}]}`,
+			json:    `{"version":1,"instances":[{"zellij_session":"main","zellij_pane":"1","codex_session":"codex","opened_path":"/workspace/zelma","state":"paused"}]}`,
 			wantErr: `state "paused" is unsupported`,
 		},
 		{
 			name:    "duplicate active pane",
-			json:    `{"version":1,"sessions":[{"zellij_session":"main","zellij_pane":"1","codex_session":"codex-a","opened_path":"/workspace/a","state":"active"},{"zellij_session":"main","zellij_pane":"1","codex_session":"codex-a","opened_path":"/workspace/a","state":"active"}]}`,
+			json:    `{"version":1,"instances":[{"zellij_session":"main","zellij_pane":"1","codex_session":"codex-a","opened_path":"/workspace/a","state":"active"},{"zellij_session":"main","zellij_pane":"1","codex_session":"codex-a","opened_path":"/workspace/a","state":"active"}]}`,
 			wantErr: "duplicates active zellij pane",
 		},
 		{
 			name:    "conflicting active pane",
-			json:    `{"version":1,"sessions":[{"zellij_session":"main","zellij_pane":"1","codex_session":"codex-a","opened_path":"/workspace/a","state":"active"},{"zellij_session":"main","zellij_pane":"1","codex_session":"codex-b","opened_path":"/workspace/b","state":"active"}]}`,
+			json:    `{"version":1,"instances":[{"zellij_session":"main","zellij_pane":"1","codex_session":"codex-a","opened_path":"/workspace/a","state":"active"},{"zellij_session":"main","zellij_pane":"1","codex_session":"codex-b","opened_path":"/workspace/b","state":"active"}]}`,
 			wantErr: "conflicts with active zellij pane",
 		},
 		{
 			name:    "duplicate zelma session id",
-			json:    `{"version":1,"sessions":[{"id":7,"zellij_session":"main","zellij_pane":"1","codex_session":"codex-a","opened_path":"/workspace/a","state":"active"},{"id":7,"zellij_session":"main","zellij_pane":"2","codex_session":"codex-b","opened_path":"/workspace/b","state":"active"}]}`,
-			wantErr: "duplicates zelma session id",
+			json:    `{"version":1,"instances":[{"id":7,"zellij_session":"main","zellij_pane":"1","codex_session":"codex-a","opened_path":"/workspace/a","state":"active"},{"id":7,"zellij_session":"main","zellij_pane":"2","codex_session":"codex-b","opened_path":"/workspace/b","state":"active"}]}`,
+			wantErr: "duplicates zelma instance id",
 		},
 		{
 			name:    "negative zelma session id",
-			json:    `{"version":1,"sessions":[{"id":-1,"zellij_session":"main","zellij_pane":"1","codex_session":"codex-a","opened_path":"/workspace/a","state":"active"}]}`,
+			json:    `{"version":1,"instances":[{"id":-1,"zellij_session":"main","zellij_pane":"1","codex_session":"codex-a","opened_path":"/workspace/a","state":"active"}]}`,
 			wantErr: "id must be a positive integer",
 		},
 		{
 			name:    "trailing data",
-			json:    `{"version":1,"sessions":[]}[]`,
+			json:    `{"version":1,"instances":[]}[]`,
 			wantErr: "trailing data",
 		},
 	}
@@ -207,44 +207,44 @@ func TestDecodeReturnsMachineReadableDiagnostics(t *testing.T) {
 		},
 		{
 			name:     "unknown field",
-			json:     `{"version":1,"sessions":[],"extra":true}`,
+			json:     `{"version":1,"instances":[],"extra":true}`,
 			wantCode: ErrorCodeUnknownField,
 		},
 		{
 			name:     "missing field",
 			json:     `{"version":1}`,
 			wantCode: ErrorCodeMissingField,
-			wantPath: "sessions",
+			wantPath: "instances",
 		},
 		{
 			name:     "unsupported version",
-			json:     `{"version":2,"sessions":[]}`,
+			json:     `{"version":2,"instances":[]}`,
 			wantCode: ErrorCodeUnsupportedVersion,
 			wantPath: "version",
 		},
 		{
 			name:     "invalid session field",
-			json:     `{"version":1,"sessions":[{"zellij_session":"main","zellij_pane":"1","codex_session":"codex","opened_path":"workspace/zelma","state":"active"}]}`,
+			json:     `{"version":1,"instances":[{"zellij_session":"main","zellij_pane":"1","codex_session":"codex","opened_path":"workspace/zelma","state":"active"}]}`,
 			wantCode: ErrorCodeInvalidField,
-			wantPath: "sessions[0].opened_path",
+			wantPath: "instances[0].opened_path",
 		},
 		{
 			name:     "duplicate session",
-			json:     `{"version":1,"sessions":[{"zellij_session":"main","zellij_pane":"1","codex_session":"codex-a","opened_path":"/workspace/a","state":"active"},{"zellij_session":"main","zellij_pane":"1","codex_session":"codex-a","opened_path":"/workspace/a","state":"active"}]}`,
+			json:     `{"version":1,"instances":[{"zellij_session":"main","zellij_pane":"1","codex_session":"codex-a","opened_path":"/workspace/a","state":"active"},{"zellij_session":"main","zellij_pane":"1","codex_session":"codex-a","opened_path":"/workspace/a","state":"active"}]}`,
 			wantCode: ErrorCodeDuplicateSession,
-			wantPath: "sessions[1]",
+			wantPath: "instances[1]",
 		},
 		{
 			name:     "conflicting session",
-			json:     `{"version":1,"sessions":[{"zellij_session":"main","zellij_pane":"1","codex_session":"codex-a","opened_path":"/workspace/a","state":"active"},{"zellij_session":"main","zellij_pane":"1","codex_session":"codex-b","opened_path":"/workspace/b","state":"active"}]}`,
+			json:     `{"version":1,"instances":[{"zellij_session":"main","zellij_pane":"1","codex_session":"codex-a","opened_path":"/workspace/a","state":"active"},{"zellij_session":"main","zellij_pane":"1","codex_session":"codex-b","opened_path":"/workspace/b","state":"active"}]}`,
 			wantCode: ErrorCodeConflictingSession,
-			wantPath: "sessions[1]",
+			wantPath: "instances[1]",
 		},
 		{
 			name:     "duplicate zelma session id",
-			json:     `{"version":1,"sessions":[{"id":3,"zellij_session":"main","zellij_pane":"1","codex_session":"codex-a","opened_path":"/workspace/a","state":"active"},{"id":3,"zellij_session":"main","zellij_pane":"2","codex_session":"codex-b","opened_path":"/workspace/b","state":"active"}]}`,
+			json:     `{"version":1,"instances":[{"id":3,"zellij_session":"main","zellij_pane":"1","codex_session":"codex-a","opened_path":"/workspace/a","state":"active"},{"id":3,"zellij_session":"main","zellij_pane":"2","codex_session":"codex-b","opened_path":"/workspace/b","state":"active"}]}`,
 			wantCode: ErrorCodeDuplicateSession,
-			wantPath: "sessions[1].id",
+			wantPath: "instances[1].id",
 		},
 	}
 
@@ -274,8 +274,8 @@ func TestDecodeReturnsMachineReadableDiagnostics(t *testing.T) {
 
 func TestDiagnoseFileInvalidJSONDoesNotMutateFile(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "sessions.json")
-	original := []byte(`{"version":1,"sessions":[`)
+	path := filepath.Join(dir, "instances.json")
+	original := []byte(`{"version":1,"instances":[`)
 	if err := os.WriteFile(path, original, 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -813,7 +813,7 @@ func TestWriteFileNormalizesNilSessionsToReadableEmptyArray(t *testing.T) {
 	}
 
 	content := readTestFile(t, path)
-	if strings.Contains(content, `"sessions": null`) {
+	if strings.Contains(content, `"instances": null`) {
 		t.Fatalf("registry must not encode nil sessions as null:\n%s", content)
 	}
 

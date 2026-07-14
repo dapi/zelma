@@ -17,7 +17,7 @@ func TestStaleCleanupProposalConfirmAndRepeatE2E(t *testing.T) {
 	runCommand(t, repoRoot, "git", "init", "--quiet")
 
 	openedPath := resolvedCleanupPath(t, repoRoot)
-	registryPath := filepath.Join(repoRoot, ".zelma", "sessions.json")
+	registryPath := filepath.Join(repoRoot, ".zelma", "instances.json")
 	initialRegistry := cleanupRegistryJSON(t, cleanupTestRegistry{
 		Version: 1,
 		Sessions: []cleanupTestSession{
@@ -46,7 +46,7 @@ func TestStaleCleanupProposalConfirmAndRepeatE2E(t *testing.T) {
 	})
 	writeE2EFile(t, registryPath, initialRegistry)
 
-	proposal := runZelma(t, bin, repoRoot, nil, "sessions", "cleanup", "--json")
+	proposal := runZelma(t, bin, repoRoot, nil, "instances", "cleanup", "--json")
 	if proposal.code != 0 {
 		t.Fatalf("proposal code = %d, want 0; stderr = %q", proposal.code, proposal.stderr)
 	}
@@ -58,7 +58,7 @@ func TestStaleCleanupProposalConfirmAndRepeatE2E(t *testing.T) {
 	}, []int{2, 3})
 	assertFileContent(t, registryPath, initialRegistry)
 
-	confirmed := runZelma(t, bin, repoRoot, nil, "sessions", "cleanup", "--confirm", "--json")
+	confirmed := runZelma(t, bin, repoRoot, nil, "instances", "cleanup", "--confirm", "--json")
 	if confirmed.code != 0 {
 		t.Fatalf("confirm code = %d, want 0; stderr = %q", confirmed.code, confirmed.stderr)
 	}
@@ -71,7 +71,7 @@ func TestStaleCleanupProposalConfirmAndRepeatE2E(t *testing.T) {
 
 	remaining := readE2ERegistry(t, registryPath)
 	if len(remaining.Sessions) != 1 {
-		t.Fatalf("remaining sessions = %+v, want only active session", remaining.Sessions)
+		t.Fatalf("remaining instances = %+v, want only active session", remaining.Sessions)
 	}
 	if remaining.Sessions[0].ID != 1 ||
 		remaining.Sessions[0].ZellijPane != "terminal_1" ||
@@ -79,7 +79,7 @@ func TestStaleCleanupProposalConfirmAndRepeatE2E(t *testing.T) {
 		t.Fatalf("remaining session = %+v, want active terminal_1 with id 1", remaining.Sessions[0])
 	}
 
-	repeat := runZelma(t, bin, repoRoot, nil, "sessions", "cleanup", "--confirm", "--json")
+	repeat := runZelma(t, bin, repoRoot, nil, "instances", "cleanup", "--confirm", "--json")
 	if repeat.code != 0 {
 		t.Fatalf("repeat confirm code = %d, want 0; stderr = %q", repeat.code, repeat.stderr)
 	}
@@ -109,7 +109,7 @@ type cleanupProposal struct {
 
 type cleanupTestRegistry struct {
 	Version  int                  `json:"version"`
-	Sessions []cleanupTestSession `json:"sessions"`
+	Sessions []cleanupTestSession `json:"instances"`
 }
 
 type cleanupTestSession struct {

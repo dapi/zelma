@@ -31,13 +31,13 @@ must_not_define:
 
 ### Problem
 
-GitHub issue #101 описывает разрыв в публичном управлении `zelma sessions`:
+GitHub issue #101 описывает разрыв в публичном управлении `zelma instances`:
 агент или человек может list/create/detect/focus существующие Codex panes, но не
 может доставить follow-up message в известную managed Codex session через
 публичный `zelma` command.
 
 Из-за этого callers вынуждены использовать ad hoc `zellij` commands. Такой путь
-обходит readiness checks, numeric `ZelmaSessionID`, skill boundary и защиту от
+обходит readiness checks, numeric `ZelmaInstanceID`, skill boundary и защиту от
 опасного случая, когда прежняя pane еще существует, но Codex уже вышел и в pane
 остался обычный shell.
 
@@ -45,17 +45,17 @@ GitHub issue #101 описывает разрыв в публичном упра
 
 | Metric ID | Metric | Baseline | Target | Measurement method |
 | --- | --- | --- | --- | --- |
-| `MET-01` | Public send flow availability | Нет `zelma sessions send` command | `zelma sessions send <id> [message] --json` и `zelma sessions send <id> --stdin --json` доступны | CLI help, CLI tests and machine-readable compatibility checks |
+| `MET-01` | Public send flow availability | Нет `zelma instances send` command | `zelma instances send <id> [message] --json` и `zelma instances send <id> --stdin --json` доступны | CLI help, CLI tests and machine-readable compatibility checks |
 | `MET-02` | Runtime safety before send | Callers can bypass `zelma` through direct zellij input | Send refuses unless target active record is live-revalidated as the intended Codex runtime | Readiness-gate tests for active/stale/candidate/unreachable/non-Codex/ambiguous targets |
 | `MET-03` | Prompt privacy in diagnostics | Direct zellij errors may include typed payload | Success/failure output and adapter diagnostics never echo message body | Static and runtime diagnostic tests with sentinel message body |
-| `MET-04` | Skill contract routing | `SKILL.md` has no send-message intent | Skill routes send-message intents only through public `zelma sessions send` commands | Static skill checks against `SKILL.md` and `../../engineering/skill-contract.md` |
+| `MET-04` | Skill contract routing | `SKILL.md` has no send-message intent | Skill routes send-message intents only through public `zelma instances send` commands | Static skill checks against `SKILL.md` and `../../engineering/skill-contract.md` |
 
 ### Scope
 
 - `REQ-01` Add guarded public CLI command
-  `zelma sessions send <id> [message] --json` and
-  `zelma sessions send <id> --stdin --json`.
-- `REQ-02` Use only repo-local positive numeric `ZelmaSessionID` as target
+  `zelma instances send <id> [message] --json` and
+  `zelma instances send <id> --stdin --json`.
+- `REQ-02` Use only repo-local positive numeric `ZelmaInstanceID` as target
   selector.
 - `REQ-03` Support message text passed as a single CLI argument.
 - `REQ-04` Support message text read from STDIN for longer prompts and
@@ -77,14 +77,14 @@ GitHub issue #101 описывает разрыв в публичном упра
   `next_command`.
 - `REQ-11` Update Codex skill instructions and engineering skill contract so
   send-message intents route only through `zelma`, not direct `zellij` or direct
-  `.zelma/sessions.json` parsing.
+  `.zelma/instances.json` parsing.
 
 ### Non-Scope
 
 - `NS-01` Do not support fuzzy matching by path, pane title, zellij pane id,
   zellij session name or Codex session id.
 - `NS-02` Do not send messages to arbitrary panes outside the repo-local
-  `zelma sessions` registry.
+  `zelma instances` registry.
 - `NS-03` Do not treat focus as a prerequisite; send must target the recorded
   pane explicitly.
 - `NS-04` Do not silently re-detect, repair ambiguous identity or promote
@@ -102,9 +102,9 @@ GitHub issue #101 описывает разрыв в публичном упра
 - `ASM-02` Issue comment "Decisions from FPF review" provides accepted local
   decisions `DL-001` through `DL-008` in `decision-log.md`; review-improve
   cycle 1 adds `DL-009` for the selected zellij binding.
-- `ASM-03` `ZelmaSessionID` is already repo-local, positive and numeric through
+- `ASM-03` `ZelmaInstanceID` is already repo-local, positive and numeric through
   `../FT-045/brief.md`.
-- `ASM-04` `zelma sessions focus <id>` already proves a public command can
+- `ASM-04` `zelma instances focus <id>` already proves a public command can
   address a registry-backed pane by numeric session id, but focus is not a send
   prerequisite.
 - `ASM-05` The zellij adapter already has a `WriteChars` capability used by
@@ -136,9 +136,9 @@ No unresolved blocking problem-space or solution-space decisions remain after
 
 ### Exit Criteria
 
-- `EC-01` `zelma sessions send <id> [message] --json` succeeds for a live,
+- `EC-01` `zelma instances send <id> [message] --json` succeeds for a live,
   active, Codex-verified target and returns JSON without message body.
-- `EC-02` `zelma sessions send <id> --stdin --json` accepts multiline STDIN and
+- `EC-02` `zelma instances send <id> --stdin --json` accepts multiline STDIN and
   returns JSON metadata without message body.
 - `EC-03` Missing, conflicting and empty message inputs return stable JSON
   diagnostics and do not call the zellij adapter.
@@ -152,7 +152,7 @@ No unresolved blocking problem-space or solution-space decisions remain after
 - `EC-07` Failure diagnostics and adapter errors do not leak message content and
   provide only public `zelma` recovery hints.
 - `EC-08` `SKILL.md` and `../../engineering/skill-contract.md` route
-  send-message intent through `zelma sessions send` only and keep the
+  send-message intent through `zelma instances send` only and keep the
   no-direct-zellij/no-direct-registry boundary.
 
 ### Traceability matrix
@@ -173,12 +173,12 @@ No unresolved blocking problem-space or solution-space decisions remain after
 
 ### Acceptance Scenarios
 
-- `SC-01` A caller runs `zelma sessions send 2 "please continue" --json`;
+- `SC-01` A caller runs `zelma instances send 2 "please continue" --json`;
   `zelma` validates session id `2`, verifies the target is the intended live
   Codex pane, writes to that pane and returns success metadata without the
   message text.
 - `SC-02` A caller pipes a multiline prompt into
-  `zelma sessions send 2 --stdin --json`; `zelma` preserves the multiline
+  `zelma instances send 2 --stdin --json`; `zelma` preserves the multiline
   message content for delivery, appends/performs the controlled submit action
   once, and returns metadata without the message text.
 - `SC-03` A registry record exists and the pane still exists, but Codex has
@@ -189,8 +189,8 @@ No unresolved blocking problem-space or solution-space decisions remain after
 - `SC-05` When zellij or registry state prevents readiness, JSON diagnostics
   include a stable reason code and public `zelma` recovery hint.
 - `SC-06` A Codex agent handling a user send-message intent follows `SKILL.md`
-  and uses `zelma sessions send <id> ... --json` or
-  `zelma sessions send <id> --stdin --json`, not direct `zellij`.
+  and uses `zelma instances send <id> ... --json` or
+  `zelma instances send <id> --stdin --json`, not direct `zellij`.
 
 ### Negative / Edge Scenarios
 
@@ -218,7 +218,7 @@ No unresolved blocking problem-space or solution-space decisions remain after
 | `CHK-03` | `EC-04`, `EC-07`, `NEG-01`-`NEG-05` | CLI/readiness tests for invalid targets and privacy sentinel | Send is refused before adapter write; diagnostics omit message body | `artifacts/ft-101/verify/chk-03/` |
 | `CHK-04` | `EC-04`, `EC-05`, `SC-03`, `SC-04` | Unit tests for readiness service using fake registry and live zellij pane facts | Only active, terminal, Codex-compatible target passes | `artifacts/ft-101/verify/chk-04/` |
 | `CHK-05` | `EC-05`, `EC-06`, `REQ-08` | Zellij adapter tests for selected delivery/submit command construction | Commands target explicit recorded pane and deterministic submit behavior | `artifacts/ft-101/verify/chk-05/` |
-| `CHK-06` | `EC-08`, `SC-06`, `NEG-06` | Static checks and tests for `SKILL.md`, `../../engineering/skill-contract.md` and `internal/skills` wrapper | Send intent routes through public `zelma sessions send`; no direct `zellij` or registry parser path | `artifacts/ft-101/verify/chk-06/` |
+| `CHK-06` | `EC-08`, `SC-06`, `NEG-06` | Static checks and tests for `SKILL.md`, `../../engineering/skill-contract.md` and `internal/skills` wrapper | Send intent routes through public `zelma instances send`; no direct `zellij` or registry parser path | `artifacts/ft-101/verify/chk-06/` |
 | `CHK-07` | All exit criteria | Run `go test ./...`, `python3 scripts/check_memory_bank_index.py`, `git diff --check` and the project-name typo check from `AGENTS.md` | Required local checks pass; typo check has no accidental project-name misspelling beyond canonical docs that intentionally mention the typo check | `artifacts/ft-101/verify/chk-07/` |
 
 ### Test matrix

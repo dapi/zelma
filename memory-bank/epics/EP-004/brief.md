@@ -2,7 +2,7 @@
 title: "EP-004: Brief Managed Create Workflow"
 doc_kind: epic
 doc_function: brief
-purpose: "Легкий brief для managed `sessions create`: zellij pane, Codex launch и registry record."
+purpose: "Легкий brief для managed `instances create`: zellij pane, Codex launch и registry record."
 derived_from:
   - ../../product/roadmap.md
   - ../../engineering/zellij-integration.md
@@ -19,12 +19,12 @@ must_not_define:
 
 ## Проблема
 
-Пользователю нужна команда, которая создает новую zelma session без ручной
-настройки zellij pane и без ручной записи `.zelma/sessions.json`.
+Пользователю нужна команда, которая создает новую zelma instance без ручной
+настройки zellij pane и без ручной записи `.zelma/instances.json`.
 
 ## Результат
 
-`zelma sessions create` создает zellij pane, запускает Codex в нужном path,
+`zelma instances create` создает zellij pane, запускает Codex в нужном path,
 получает достаточно evidence для подтверждения и записывает active record в
 registry.
 

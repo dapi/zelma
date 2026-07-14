@@ -20,7 +20,7 @@ must_not_define:
 
 ## Цель текущего плана
 
-Добавить `zelma sessions send` и обновить skill contract так, чтобы сообщение
+Добавить `zelma instances send` и обновить skill contract так, чтобы сообщение
 можно было безопасно доставить в существующую active Codex session только после
 строгой live-readiness проверки, без утечки prompt body в output/diagnostics.
 
@@ -40,15 +40,15 @@ must_not_define:
 
 | Path / module | Current role | Why relevant | Reuse / mirror |
 | --- | --- | --- | --- |
-| `../../../internal/cli/cli.go` | Cobra command tree, help text, JSON diagnostics, current session commands | New `sessions send` command belongs here | Mirror list/create/focus command structure and JSON diagnostic shape |
+| `../../../internal/cli/cli.go` | Cobra command tree, help text, JSON diagnostics, current session commands | New `instances send` command belongs here | Mirror list/create/focus command structure and JSON diagnostic shape |
 | `../../../internal/cli/cli_test.go` | CLI help/output/behavior tests | Send needs command/help snapshots, argument errors and privacy tests | Add focused send tests near existing session command tests |
 | `../../../internal/cli/machine_readable_compat_test.go` | JSON compatibility and diagnostic tests | Send JSON and error diagnostics are agent-facing | Add send success/error compatibility examples |
 | `../../../internal/zellij/zellij.go` and `adapter.go` | Zellij adapter control methods | Existing `WriteChars` can be reused or wrapped by `SendTextToPane` | Keep raw zellij command details behind adapter |
 | `../../../internal/zellij/zellij_test.go` | Adapter command construction tests | Must prove explicit pane targeting and submit behavior | Add deterministic delivery tests |
 | `../../../internal/live/reconcile.go` | Live reachability snapshot | Useful contrast: not enough for send readiness | Do not treat live reachability alone as readiness |
 | `../../../internal/detection/` and `../../../internal/codex/` | Codex command/evidence parsing | Readiness needs compatible Codex evidence without prompt leakage | Reuse safe evidence helpers |
-| `../../../internal/registry/` | Registry schema, states and id lookup | Send targets numeric `ZelmaSessionID` and state gates | Reuse read/validate helpers; no schema change expected |
-| `../../../internal/skills/client.go` and tests | Skill wrapper over public CLI JSON | Needs send wrapper only through `zelma sessions send` | Follow existing runJSON/error handling patterns; handle stdin if wrapper supports it |
+| `../../../internal/registry/` | Registry schema, states and id lookup | Send targets numeric `ZelmaInstanceID` and state gates | Reuse read/validate helpers; no schema change expected |
+| `../../../internal/skills/client.go` and tests | Skill wrapper over public CLI JSON | Needs send wrapper only through `zelma instances send` | Follow existing runJSON/error handling patterns; handle stdin if wrapper supports it |
 | `../../../SKILL.md` | Repo-local Codex skill instructions | Must route send-message intent safely | Add send intent, boundaries and not-ready recovery guidance |
 | `../../../internal/e2e/` | End-to-end fake zellij harness | Required for wrong/focused pane and shell-not-Codex scenarios | Add or extend e2e only if unit/CLI tests cannot prove behavior |
 
@@ -83,7 +83,7 @@ must_not_define:
 
 | Precondition ID | Canonical ref | Required state | Used by steps | Blocks start |
 | --- | --- | --- | --- | --- |
-| `PRE-01` | `SD-01`, `CTR-01` | Numeric `ZelmaSessionID` remains available in registry/session JSON | `STEP-01`, `STEP-03` | yes |
+| `PRE-01` | `SD-01`, `CTR-01` | Numeric `ZelmaInstanceID` remains available in registry/session JSON | `STEP-01`, `STEP-03` | yes |
 | `PRE-02` | `SD-03`, `INV-01` | Readiness implementation has access to registry and live zellij pane facts before delivery | `STEP-03`, `STEP-04` | yes |
 | `PRE-03` | `SD-06`, `INV-05` | Message body must be treated as private data in all outputs | `STEP-02`, `STEP-05`, `STEP-07` | yes |
 | `PRE-04` | `SD-08`, `CTR-10` | Adapter mechanism is deterministic under fake zellij tests | `STEP-04`, `STEP-08` | yes |
@@ -109,7 +109,7 @@ must_not_define:
 
 | Step ID | Actor | Implements | Goal | Touchpoints | Artifact | Verifies | Evidence IDs | Check command / procedure | Blocked by | Needs approval | Escalate if |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `STEP-01` | agent | `REQ-01`, `REQ-02`, `SOL-01` | Register `sessions send` command, help route and JSON flag | `internal/cli/cli.go`, `internal/cli/cli_test.go` | Command skeleton and help snapshots | `CHK-01`, `CHK-07` | `EVID-01`, `EVID-07` | `go test ./internal/cli` | `PRE-01` | `none` | Command shape requires non-numeric target |
+| `STEP-01` | agent | `REQ-01`, `REQ-02`, `SOL-01` | Register `instances send` command, help route and JSON flag | `internal/cli/cli.go`, `internal/cli/cli_test.go` | Command skeleton and help snapshots | `CHK-01`, `CHK-07` | `EVID-01`, `EVID-07` | `go test ./internal/cli` | `PRE-01` | `none` | Command shape requires non-numeric target |
 | `STEP-02` | agent | `REQ-03`-`REQ-05`, `SOL-02`, `CTR-02`-`CTR-04` | Implement message source parsing and early diagnostics | `internal/cli/cli.go`, CLI tests | Source parser and tests | `CHK-01`, `CHK-02`, `CHK-03` | `EVID-01`, `EVID-02`, `EVID-03` | `go test ./internal/cli` | `PRE-03` | `none` | Empty-message behavior needs product change |
 | `STEP-03` | agent | `REQ-06`, `REQ-07`, `SOL-03`, `SOL-04` | Implement readiness service and reason codes | `internal/cli/cli.go` or new focused internal package; tests | Ready/not-ready target result | `CHK-03`, `CHK-04` | `EVID-03`, `EVID-04` | `go test ./internal/cli ./internal/detection ./internal/codex` | `PRE-01`, `PRE-02` | `none` | Existing evidence helpers cannot distinguish shell from Codex |
 | `STEP-04` | agent | `REQ-08`, `SOL-05`, `SD-08`, `CTR-10` | Add delivery adapter method using explicit-pane `write-chars` with `message + "\n"` when `submit=true` | `internal/zellij/zellij.go`, adapter tests | `SendTextToPane` or equivalent wrapper over adapter | `CHK-05` | `EVID-05` | `go test ./internal/zellij` | `PRE-04`, `STEP-03` | `none` | deterministic fake-zellij tests cannot prove the selected binding |

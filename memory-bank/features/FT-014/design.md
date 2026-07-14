@@ -2,7 +2,7 @@
 title: "FT-014: Detect Upsert Idempotency Design"
 doc_kind: feature-design
 doc_function: canonical
-purpose: "Selected design for idempotent `zelma sessions detect` candidate registry upsert."
+purpose: "Selected design for idempotent `zelma instances detect` candidate registry upsert."
 derived_from:
   - brief.md
   - ../../domain/rules.md
@@ -17,7 +17,7 @@ audience: humans_and_agents
 
 ## Selected Design
 
-`zelma sessions detect` remains conservative. It reads live zellij sessions and
+`zelma instances detect` remains conservative. It reads live zellij sessions and
 panes through `internal/zellij`, classifies panes through the FT-013
 `internal/detection.ClassifyPane` contract, converts `candidate` verdicts into
 unresolved registry records, then writes through `internal/registry`.

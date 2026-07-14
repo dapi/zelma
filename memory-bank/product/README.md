@@ -38,8 +38,8 @@ feature acceptance criteria. Delivery sequencing изолирован в
 Пример:
 
 - Product: "Пользователь должен быстро увидеть все Codex panes текущего
-  репозитория через `zelma sessions list`".
-- Domain: "`active` `zelma session` не существует без `zellij session`,
+  репозитория через `zelma instances list`".
+- Domain: "`active` `zelma instance` не существует без `zellij session`,
   `zellij pane`, `codex session` и `opened path`".
 
 ## Граница С PRD

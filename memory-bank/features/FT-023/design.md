@@ -19,7 +19,7 @@ audience: humans_and_agents
 ## Selected Design
 
 Implement skill wrappers as a thin Go package at `internal/skills`. The package
-executes the `zelma` binary with the documented `sessions` commands and parses
+executes the `zelma` binary with the documented `instances` commands and parses
 only successful JSON stdout. CLI stderr is preserved on failures and mapped to a
 small recovery response for agents.
 
@@ -31,18 +31,18 @@ They depend on the command contract documented in
 
 | ID | Wrapper | CLI command |
 | --- | --- | --- |
-| `CTR-01` | `ListSessions` | `zelma sessions list --json` |
-| `CTR-02` | `ListSessions` with live option | `zelma sessions list --live --json` |
-| `CTR-03` | `PreviewCreateSession` | `zelma sessions create [path] --dry-run --json` |
-| `CTR-04` | `CreateSession` | `zelma sessions create [path] --json` |
-| `CTR-05` | `DetectSessions` | `zelma sessions detect --json` |
-| `CTR-06` | `FocusSession` | `zelma sessions focus <id> --json` |
+| `CTR-01` | `ListSessions` | `zelma instances list --json` |
+| `CTR-02` | `ListSessions` with live option | `zelma instances list --live --json` |
+| `CTR-03` | `PreviewCreateSession` | `zelma instances create [path] --dry-run --json` |
+| `CTR-04` | `CreateSession` | `zelma instances create [path] --json` |
+| `CTR-05` | `DetectSessions` | `zelma instances detect --json` |
+| `CTR-06` | `FocusSession` | `zelma instances focus <id> --json` |
 | `CTR-06` | command failure | preserve exit code, stdout, stderr and agent recovery text |
 
 ## Invariants
 
 - Wrappers call `zelma`; they do not call `zellij`.
-- Wrappers parse CLI stdout; they do not read `.zelma/sessions.json`.
+- Wrappers parse CLI stdout; they do not read `.zelma/instances.json`.
 - Wrappers keep diagnostics from stderr attached to failures.
 - Wrappers reject malformed or trailing JSON on successful CLI exits.
 
@@ -52,7 +52,7 @@ They depend on the command contract documented in
 | --- | --- | --- |
 | `FM-01` | CLI exits non-zero | Return `CommandError` with exit code and stderr. |
 | `FM-02` | Registry schema diagnostic | Stop and ask for valid schema v1 recovery before mutation. |
-| `FM-03` | Create partial failure | Suggest uncached `zelma sessions detect --json` instead of blind retry. |
+| `FM-03` | Create partial failure | Suggest uncached `zelma instances detect --json` instead of blind retry. |
 | `FM-04` | Successful command emits invalid JSON | Return `DecodeError` with preserved stdout for debugging. |
 
 ## Verification

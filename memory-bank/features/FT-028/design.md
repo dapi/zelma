@@ -15,7 +15,7 @@ audience: humans_and_agents
 
 ## Selected Design
 
-`zelma sessions detect` uses the same successful zellij inventory pass for
+`zelma instances detect` uses the same successful zellij inventory pass for
 candidate detection and stale reconciliation. It records observed zellij
 sessions and pane keys while reading `list-sessions` and `list-panes`. After
 detected pane upsert, it compares existing `active` registry records with that

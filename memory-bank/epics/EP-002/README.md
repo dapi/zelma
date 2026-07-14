@@ -2,7 +2,7 @@
 title: "EP-002: Registry And Repo State"
 doc_kind: epic
 doc_function: index
-purpose: "Навигация по draft package epic для repo-local registry и `.zelma/sessions.json`."
+purpose: "Навигация по draft package epic для repo-local registry и `.zelma/instances.json`."
 derived_from:
   - ../../dna/governance.md
   - brief.md

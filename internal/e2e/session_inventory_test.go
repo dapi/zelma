@@ -29,7 +29,7 @@ func TestAgentSessionInventoryLiveJSONE2E(t *testing.T) {
 		}
 		registryPath := writeSessionInventoryRegistry(t, repoRoot, fmt.Sprintf(`{
   "version": 1,
-  "sessions": [
+  "instances": [
     {
       "id": 1,
       "zellij_session": "zelma-main",
@@ -59,7 +59,7 @@ func TestAgentSessionInventoryLiveJSONE2E(t *testing.T) {
 		callsPath := filepath.Join(t.TempDir(), "zellij-calls.txt")
 		fakeZellij := writeSessionInventoryFakeZellij(t, callsPath, "zelma-main\n", sessionInventoryPanesJSON(t, repoRoot))
 
-		result := runZelma(t, bin, repoRoot, isolatedZelmaEnv(t, fakeZellij), "sessions", "list", "--live", "--json")
+		result := runZelma(t, bin, repoRoot, isolatedZelmaEnv(t, fakeZellij), "instances", "list", "--live", "--json")
 
 		if result.code != 0 {
 			t.Fatalf("list code = %d, want 0; stderr = %q", result.code, result.stderr)
@@ -69,7 +69,7 @@ func TestAgentSessionInventoryLiveJSONE2E(t *testing.T) {
 		}
 		want := fmt.Sprintf(`{
   "version": 1,
-  "sessions": [
+  "instances": [
     {
       "id": 1,
       "zellij_session": "zelma-main",
@@ -108,7 +108,7 @@ func TestAgentSessionInventoryLiveJSONE2E(t *testing.T) {
 		}
 		after := readTextFile(t, registryPath)
 		if after != before {
-			t.Fatalf("sessions registry changed by list --live --json\nbefore:\n%s\nafter:\n%s", before, after)
+			t.Fatalf("instances registry changed by list --live --json\nbefore:\n%s\nafter:\n%s", before, after)
 		}
 		assertFakeZellijCalls(t, callsPath,
 			"list-sessions --short --no-formatting\n"+
@@ -120,7 +120,7 @@ func TestAgentSessionInventoryLiveJSONE2E(t *testing.T) {
 		repoRoot := newE2EGitRepo(t)
 		registryPath := writeSessionInventoryRegistry(t, repoRoot, `{
   "version": 1,
-  "sessions": []
+  "instances": []
 }
 `)
 		writeFreshAutoDetectCache(t, repoRoot)
@@ -129,7 +129,7 @@ func TestAgentSessionInventoryLiveJSONE2E(t *testing.T) {
 		callsPath := filepath.Join(t.TempDir(), "zellij-calls.txt")
 		fakeZellij := writeSessionInventoryFakeZellij(t, callsPath, "", "[]")
 
-		result := runZelma(t, bin, repoRoot, isolatedZelmaEnv(t, fakeZellij), "sessions", "list", "--live", "--json")
+		result := runZelma(t, bin, repoRoot, isolatedZelmaEnv(t, fakeZellij), "instances", "list", "--live", "--json")
 
 		if result.code != 0 {
 			t.Fatalf("list code = %d, want 0; stderr = %q", result.code, result.stderr)
@@ -139,7 +139,7 @@ func TestAgentSessionInventoryLiveJSONE2E(t *testing.T) {
 		}
 		want := `{
   "version": 1,
-  "sessions": []
+  "instances": []
 }
 `
 		if result.stdout != want {
@@ -147,11 +147,11 @@ func TestAgentSessionInventoryLiveJSONE2E(t *testing.T) {
 		}
 		inventory := decodeLiveInventory(t, result.stdout)
 		if len(inventory.Sessions) != 0 {
-			t.Fatalf("sessions = %+v, want empty inventory", inventory.Sessions)
+			t.Fatalf("instances = %+v, want empty inventory", inventory.Sessions)
 		}
 		after := readTextFile(t, registryPath)
 		if after != before {
-			t.Fatalf("empty sessions registry changed by list --live --json\nbefore:\n%s\nafter:\n%s", before, after)
+			t.Fatalf("empty instances registry changed by list --live --json\nbefore:\n%s\nafter:\n%s", before, after)
 		}
 		assertFakeZellijCalls(t, callsPath, "list-sessions --short --no-formatting\n")
 	})
@@ -159,7 +159,7 @@ func TestAgentSessionInventoryLiveJSONE2E(t *testing.T) {
 
 type liveInventory struct {
 	Version  int           `json:"version"`
-	Sessions []liveSession `json:"sessions"`
+	Sessions []liveSession `json:"instances"`
 }
 
 type liveSession struct {
@@ -204,7 +204,7 @@ func writeSessionInventoryRegistry(t *testing.T, repoRoot, content string) strin
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	path := filepath.Join(dir, "sessions.json")
+	path := filepath.Join(dir, "instances.json")
 	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -218,7 +218,7 @@ func writeFreshAutoDetectCache(t *testing.T, repoRoot string) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	config := []byte(`{"sessions_list":{"auto_detect_ttl":"24h"}}` + "\n")
+	config := []byte(`{"instances_list":{"auto_detect_ttl":"24h"}}` + "\n")
 	if err := os.WriteFile(filepath.Join(dir, "config.json"), config, 0o644); err != nil {
 		t.Fatal(err)
 	}

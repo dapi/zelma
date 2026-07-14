@@ -2,7 +2,7 @@
 title: "FT-049: TUI Monitor For Live Sessions"
 doc_kind: feature
 doc_function: canonical
-purpose: "Canonical brief для delivery-единицы, добавляющей human-friendly read-only TUI monitor для live zelma sessions."
+purpose: "Canonical brief для delivery-единицы, добавляющей human-friendly read-only TUI monitor для live zelma instances."
 derived_from:
   - ../../flows/feature-flow.md
   - ../../product/context.md
@@ -28,7 +28,7 @@ must_not_define:
 
 ### Problem
 
-Issue 103 notes that `zelma sessions list --live --json` and
+Issue 103 notes that `zelma instances list --live --json` and
 `zelma status --json` already expose machine-readable session state, but a
 human operator has no live terminal monitor that quickly answers: which sessions
 are running and worth attention now?
@@ -40,18 +40,18 @@ an interactive first screen with live work visually and navigationally primary.
 
 | Metric ID | Metric | Baseline | Target | Measurement method |
 | --- | --- | --- | --- | --- |
-| `MET-01` | Live-first TUI availability | No TUI monitor command | `zelma monitor` opens a read-only TUI with live/active sessions first by default | CLI/help review and TUI rendering tests |
+| `MET-01` | Live-first TUI availability | No TUI monitor command | `zelma monitor` opens a read-only TUI with live/active instances first by default | CLI/help review and TUI rendering tests |
 | `MET-02` | Active/stale prioritization | Mixed records require interpreting JSON/table output | Mixed active and stale snapshot renders live/active records above non-active records by default | Deterministic render/order tests |
-| `MET-03` | Reuse of existing contracts | UI could drift into registry internals | TUI consumes status/list-equivalent service contracts and does not parse `.zelma/sessions.json` directly in the UI layer | Code review/static search and tests with fake provider |
+| `MET-03` | Reuse of existing contracts | UI could drift into registry internals | TUI consumes status/list-equivalent service contracts and does not parse `.zelma/instances.json` directly in the UI layer | Code review/static search and tests with fake provider |
 
 ### Scope
 
 - `REQ-01` Add one canonical TUI command, `zelma monitor`, and document it in
   CLI help.
 - `REQ-02` Render a terminal UI over `zelma status --json`,
-  `zelma sessions list --live --json`, or an internal service behind those same
-  contracts; the UI layer must not parse `.zelma/sessions.json` directly.
-- `REQ-03` Make live/active sessions visually and navigationally primary in the
+  `zelma instances list --live --json`, or an internal service behind those same
+  contracts; the UI layer must not parse `.zelma/instances.json` directly.
+- `REQ-03` Make live/active instances visually and navigationally primary in the
   default view.
 - `REQ-04` Keep stale, blocked, completed or otherwise non-active records
   visible through a secondary section, filter or toggle without placing them
@@ -62,7 +62,7 @@ an interactive first screen with live work visually and navigationally primary.
 - `REQ-06` Support bounded refresh/polling plus a manual refresh key.
 - `REQ-07` Support keyboard navigation over visible sessions.
 - `REQ-08` Focus the selected live session through existing
-  `zelma sessions focus <id>` behavior or an equivalent internal adapter that
+  `zelma instances focus <id>` behavior or an equivalent internal adapter that
   preserves that command contract.
 - `REQ-09` Surface degraded states and recovery hints from the status backend
   when zellij is unavailable or a pane cannot be revalidated.
@@ -110,11 +110,11 @@ No unresolved blocking problem-space decisions remain after
 
 - `EC-01` `zelma monitor` appears in root help and opens the TUI without extra
   flags.
-- `EC-02` Live/active sessions render before stale/non-active records in the
+- `EC-02` Live/active instances render before stale/non-active records in the
   default view.
-- `EC-03` With no live sessions, the TUI shows an empty-live state plus known
+- `EC-03` With no live instances, the TUI shows an empty-live state plus known
   stale/non-active records or recovery hints.
-- `EC-04` The UI layer does not parse `.zelma/sessions.json` directly.
+- `EC-04` The UI layer does not parse `.zelma/instances.json` directly.
 - `EC-05` Selecting a live session and invoking focus delegates to the existing
   focus contract and reports a user-readable failure on focus errors.
 - `EC-06` Refresh is bounded and does not mutate registry state beyond
@@ -139,12 +139,12 @@ No unresolved blocking problem-space decisions remain after
 
 ### Acceptance Scenarios
 
-- `SC-01` Running `zelma monitor` with live sessions shows live/active sessions
+- `SC-01` Running `zelma monitor` with live instances shows live/active instances
   first without requiring extra flags.
-- `SC-02` With mixed active and stale records, active/live sessions remain
+- `SC-02` With mixed active and stale records, active/live instances remain
   visually and navigationally primary; stale records do not appear above live
   work by default.
-- `SC-03` With no live sessions, the TUI shows an empty-live state and still
+- `SC-03` With no live instances, the TUI shows an empty-live state and still
   exposes stale/non-active records or recovery hints.
 - `SC-04` The TUI obtains session data through status/list-equivalent contracts
   and not through direct UI-layer registry parsing.
@@ -157,7 +157,7 @@ No unresolved blocking problem-space decisions remain after
 
 ### Negative / Edge Scenarios
 
-- `NEG-01` A TUI implementation reads `.zelma/sessions.json` directly in the UI
+- `NEG-01` A TUI implementation reads `.zelma/instances.json` directly in the UI
   layer; the feature must be rejected.
 - `NEG-02` Focus is offered for a non-live or missing selected session without a
   guarded user-readable failure; the feature must be rejected.

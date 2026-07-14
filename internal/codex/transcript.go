@@ -124,7 +124,7 @@ func FindTranscriptFile(sessionID string, options MetadataDiscoveryOptions) (str
 	if len(matches) == 0 {
 		externalMatch := findExternalTranscriptMatch(externalCandidates, sessionID)
 		if externalMatch == "" {
-			return "", transcriptDiagnostic(ErrorCodeTranscriptMissing, "no Codex transcript file matches codex_session", "run zelma sessions detect --json to refresh session identity, or verify CODEX_HOME", nil)
+			return "", transcriptDiagnostic(ErrorCodeTranscriptMissing, "no Codex transcript file matches codex_session", "run zelma instances detect --json to refresh session identity, or verify CODEX_HOME", nil)
 		}
 		return externalMatch, nil
 	}

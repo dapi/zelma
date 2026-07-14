@@ -2,7 +2,7 @@
 title: "FT-045: Numeric Zelma Session IDs"
 doc_kind: feature
 doc_function: canonical
-purpose: "Канонический brief для коротких уникальных numeric ID у каждой zelma session."
+purpose: "Канонический brief для коротких уникальных numeric ID у каждой zelma instance."
 derived_from:
   - ../../product/roadmap.md
   - ../../domain/model.md
@@ -23,15 +23,15 @@ must_not_define:
 
 ### Проблема
 
-`sessions list` показывает длинные external refs (`zellij_session`,
-`zellij_pane`, `codex_session`), но у `zelma session` нет короткого
+`instances list` показывает длинные external refs (`zellij_session`,
+`zellij_pane`, `codex_session`), но у `zelma instance` нет короткого
 repo-local identifier. Пользователю и future commands сложно ссылаться на
 конкретную запись без копирования pane/session refs.
 
 ### Результат
 
-Каждая запись `ZelmaSession` имеет уникальный положительный integer `id`,
-начинающийся с `1` внутри repo-local `.zelma/sessions.json`.
+Каждая запись `ZelmaInstance` имеет уникальный положительный integer `id`,
+начинающийся с `1` внутри repo-local `.zelma/instances.json`.
 
 ### Объем Работ
 
@@ -41,7 +41,7 @@ repo-local identifier. Пользователю и future commands сложно 
 - `REQ-03` Сохранять уже назначенные positive IDs и назначать новым records
   следующий positive ID.
 - `REQ-04` Reject duplicate positive IDs и invalid negative IDs.
-- `REQ-05` Показывать ID в `sessions list` и `sessions list --live` как первый
+- `REQ-05` Показывать ID в `instances list` и `instances list --live` как первый
   table column.
 - `REQ-06` Включать ID в JSON output для sessions, stale records и stale
   candidate summaries.
@@ -57,7 +57,7 @@ repo-local identifier. Пользователю и future commands сложно 
 ### Критерии Готовности
 
 - `EC-01` Старый registry без `sessions[].id` читается и выводится с ID `1..n`.
-- `EC-02` Mutating commands write positive IDs into `.zelma/sessions.json`.
+- `EC-02` Mutating commands write positive IDs into `.zelma/instances.json`.
 - `EC-03` Existing positive IDs remain stable across repeated detect/list.
 - `EC-04` Duplicate or negative IDs produce registry diagnostics.
 

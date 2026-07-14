@@ -24,14 +24,14 @@ Supervisor должен надежно получать machine-readable invento
 
 ### Результат
 
-`zelma sessions list --live --json` покрыт e2e-тестом с registry fixture и zellij adapter fixture, который проверяет active, stale и empty states.
+`zelma instances list --live --json` покрыт e2e-тестом с registry fixture и zellij adapter fixture, который проверяет active, stale и empty states.
 
 ### Объем Работ
 
 - `REQ-01` Добавить e2e fixture для registry с несколькими sessions.
 - `REQ-02` Смоделировать live zellij state для active и missing pane.
 - `REQ-03` Проверить JSON contract для active, stale и empty list.
-- `REQ-04` Проверить, что команда не меняет `.zelma/sessions.json`.
+- `REQ-04` Проверить, что команда не меняет `.zelma/instances.json`.
 
 ### Что Не Входит
 
@@ -48,10 +48,10 @@ Supervisor должен надежно получать machine-readable invento
 
 ### Сценарии Приемки
 
-- `SC-01` Given registry with active pane, when `sessions list --live --json`, then output contains live session metadata.
-- `SC-02` Given registry with missing pane, when `sessions list --live --json`, then output marks it stale.
-- `SC-03` Given empty registry, when command runs, then output is an empty sessions list.
+- `SC-01` Given registry with active pane, when `instances list --live --json`, then output contains live session metadata.
+- `SC-02` Given registry with missing pane, when `instances list --live --json`, then output marks it stale.
+- `SC-03` Given empty registry, when command runs, then output is an empty instances list.
 
 ### Обязательное E2E-Покрытие
 
-Feature считается готовой только после e2e-теста, который исполняет `zelma sessions list --live --json` через CLI entrypoint.
+Feature считается готовой только после e2e-теста, который исполняет `zelma instances list --live --json` через CLI entrypoint.

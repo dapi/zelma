@@ -25,7 +25,7 @@ func TestAgentHandoffReloadsRegistryAndSkipsDuplicateCreateE2E(t *testing.T) {
 	}
 	registryPath := writeSessionInventoryRegistry(t, repoRoot, fmt.Sprintf(`{
   "version": 1,
-  "sessions": [
+  "instances": [
     {
       "id": 1,
       "zellij_session": "zelma-main",
@@ -58,14 +58,14 @@ func TestAgentHandoffReloadsRegistryAndSkipsDuplicateCreateE2E(t *testing.T) {
 	env := isolatedZelmaEnv(t, fakeZellij)
 	env = append(env, "ZELMA_CODEX_BIN="+fakeCodex)
 
-	listed := runZelma(t, bin, repoRoot, env, "sessions", "list", "--live", "--json")
+	listed := runZelma(t, bin, repoRoot, env, "instances", "list", "--live", "--json")
 	if listed.code != 0 {
 		t.Fatalf("list code = %d, want 0; stderr = %q", listed.code, listed.stderr)
 	}
 	assertEmptyStderr(t, listed)
 	inventory := decodeLiveInventory(t, listed.stdout)
 	if len(inventory.Sessions) != 2 {
-		t.Fatalf("live sessions = %+v, want active and stale records", inventory.Sessions)
+		t.Fatalf("live instances = %+v, want active and stale records", inventory.Sessions)
 	}
 	if inventory.Sessions[0].ID != 1 ||
 		inventory.Sessions[0].State != "active" ||
@@ -78,21 +78,21 @@ func TestAgentHandoffReloadsRegistryAndSkipsDuplicateCreateE2E(t *testing.T) {
 		t.Fatalf("stale handoff session = %+v, want stale/unreachable", inventory.Sessions[1])
 	}
 
-	created := runZelma(t, bin, repoRoot, env, "sessions", "create", "--json")
+	created := runZelma(t, bin, repoRoot, env, "instances", "create", "--json")
 	if created.code != 0 {
 		t.Fatalf("create code = %d, want 0; stderr = %q", created.code, created.stderr)
 	}
 	assertEmptyStderr(t, created)
 	createResult := decodeManagedCreateResult(t, created.stdout)
 	if createResult.Created != 0 || createResult.Registered != 0 || createResult.Skipped != 1 {
-		t.Fatalf("create summary = %+v, want skipped duplicate active session", createResult)
+		t.Fatalf("create summary = %+v, want skipped duplicate active instance", createResult)
 	}
-	if createResult.Session.ID != 1 ||
-		createResult.Session.ZellijPane != "terminal_1" ||
-		createResult.Session.CodexSession != "11111111-1111-4111-8111-111111111111" ||
-		createResult.Session.OpenedPath != repoRoot ||
-		createResult.Session.State != "active" {
-		t.Fatalf("create session = %+v, want existing active session", createResult.Session)
+	if createResult.Instance.ID != 1 ||
+		createResult.Instance.ZellijPane != "terminal_1" ||
+		createResult.Instance.CodexSession != "11111111-1111-4111-8111-111111111111" ||
+		createResult.Instance.OpenedPath != repoRoot ||
+		createResult.Instance.State != "active" {
+		t.Fatalf("create instance = %+v, want existing active instance", createResult.Instance)
 	}
 	if after := readTextFile(t, registryPath); after != before {
 		t.Fatalf("registry changed during handoff\nbefore:\n%s\nafter:\n%s", before, after)

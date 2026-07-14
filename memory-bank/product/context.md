@@ -45,7 +45,7 @@ workflows, где в одном репозитории одновременно 
 
 `zelma` должна сделать этот слой явным: создать или обнаружить Codex pane,
 связать его с `zellij session`, `zellij pane`, `codex session` и открытым путем,
-а затем сохранить эту связь в `.zelma/sessions.json` в корне репозитория.
+а затем сохранить эту связь в `.zelma/instances.json` в корне репозитория.
 
 Граница продукта: `zelma` управляет учетом и запуском Codex-сессий в `zellij`;
 она не заменяет Codex, не является терминальным мультиплексором и не берет на
@@ -53,14 +53,14 @@ workflows, где в одном репозитории одновременно 
 
 ## Core Product Workflows
 
-- `WF-01` Managed create: пользователь запускает `zelma sessions create`, CLI
+- `WF-01` Managed create: пользователь запускает `zelma instances create`, CLI
   создает новый `zellij pane`, стартует в нем Codex и регистрирует `zelma
-  session` в `.zelma/sessions.json`.
+  session` в `.zelma/instances.json`.
 - `WF-02` Manual detect: пользователь вручную создал `zellij pane`, запустил в
-  нем Codex, затем запускает `zelma sessions detect`; CLI обнаруживает pane и
+  нем Codex, затем запускает `zelma instances detect`; CLI обнаруживает pane и
   добавляет запись в реестр без дублирования уже известных сессий.
-- `WF-03` Session inventory: пользователь запускает `zelma sessions list` и
-  видит актуальный список `zelma sessions` текущего репозитория с привязкой к
+- `WF-03` Session inventory: пользователь запускает `zelma instances list` и
+  видит актуальный список `zelma instances` текущего репозитория с привязкой к
   `zellij session`, pane, Codex session и path.
 - `WF-04` Skill-driven management: Codex skill вызывает `zelma` CLI, чтобы
   создавать, обнаруживать или перечислять сессии без ручного разбора panes.
@@ -77,18 +77,18 @@ workflows, где в одном репозитории одновременно 
 
 | Metric ID | Metric | Baseline | Target | Measurement method |
 | --- | --- | --- | --- | --- |
-| `MET-01` | Доля live Codex panes текущего репозитория, корректно отраженных в `.zelma/sessions.json` | `unknown` | >= 95% после `sessions detect` | Fixtures + manual validation against `zellij` state |
-| `MET-02` | Успешность `sessions create` | `unknown` | >= 99% в поддерживаемой среде | CLI integration tests |
-| `MET-03` | Время до ответа `sessions list` | `unknown` | < 500 ms для обычного локального реестра | CLI benchmark / integration test |
+| `MET-01` | Доля live Codex panes текущего репозитория, корректно отраженных в `.zelma/instances.json` | `unknown` | >= 95% после `instances detect` | Fixtures + manual validation against `zellij` state |
+| `MET-02` | Успешность `instances create` | `unknown` | >= 99% в поддерживаемой среде | CLI integration tests |
+| `MET-03` | Время до ответа `instances list` | `unknown` | < 500 ms для обычного локального реестра | CLI benchmark / integration test |
 
 ## Product Constraints
 
 - `PCON-01` `zellij` является обязательной runtime-зависимостью для управления
   panes; без него `zelma` может только читать/валидировать локальный реестр.
-- `PCON-02` `.zelma/sessions.json` является repo-local source of truth для
-  `zelma sessions`; глобальный кросс-репозиторный реестр не входит в первый
+- `PCON-02` `.zelma/instances.json` является repo-local source of truth для
+  `zelma instances`; глобальный кросс-репозиторный реестр не входит в первый
   scope.
-- `PCON-03` `sessions detect` должен быть идемпотентным и не должен брать под
+- `PCON-03` `instances detect` должен быть идемпотентным и не должен брать под
   контроль panes, в которых Codex не запущен.
 - `PCON-04` CLI и skills должны использовать одну предметную модель; skill не
   должен обходить CLI-контракты прямой записью несовместимого JSON.

@@ -39,7 +39,7 @@ repo-local `.gitignore`, не ломая существующее содержи
 
 ### Что Не Входит
 
-- `NS-01` Нет создания `.zelma/sessions.json`.
+- `NS-01` Нет создания `.zelma/instances.json`.
 - `NS-02` Нет изменения global gitignore.
 - `NS-03` Нет удаления или переписывания существующих пользовательских правил.
 - `NS-04` Нет zellij или Codex integration.

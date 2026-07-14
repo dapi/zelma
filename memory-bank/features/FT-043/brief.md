@@ -23,14 +23,14 @@ must_not_define:
 
 ### Проблема
 
-`sessions detect` остается в `candidate`, когда несколько `session_meta` файлов
+`instances detect` остается в `candidate`, когда несколько `session_meta` файлов
 имеют один `opened_path`. При этом live Codex pane может уже содержать явную
 identity в command argv, например `codex resume <uuid>` или wrapper-injected
 external session UUID.
 
 ### Результат
 
-`sessions detect` извлекает UUID из безопасных command evidence и регистрирует
+`instances detect` извлекает UUID из безопасных command evidence и регистрирует
 record как `active`, если остальные active invariants известны.
 
 ### Объем Работ
@@ -72,5 +72,5 @@ record как `active`, если остальные active invariants извес
 
 - Unit tests для command evidence parser.
 - Detection tests для переноса argv UUID в candidate.
-- CLI regression test для `sessions detect` active summary без session log
+- CLI regression test для `instances detect` active summary без session log
   match.

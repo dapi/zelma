@@ -25,7 +25,7 @@ func TestAgentDashboardStatusBackendE2E(t *testing.T) {
 	}
 	registryPath := writeSessionInventoryRegistry(t, repoRoot, fmt.Sprintf(`{
   "version": 1,
-  "sessions": [
+  "instances": [
     {
       "id": 1,
       "zellij_session": "zelma-main",
@@ -71,7 +71,7 @@ func TestAgentDashboardStatusBackendE2E(t *testing.T) {
 		`"unreachable": 1`,
 		`"dashboard_status": "active"`,
 		`"dashboard_status": "stale"`,
-		`"recovery_hint": "inspect zellij session and pane reachability; run zelma sessions detect or cleanup to reconcile stale records"`,
+		`"recovery_hint": "inspect zellij session and pane reachability; run zelma instances detect or cleanup to reconcile stale records"`,
 	} {
 		if !strings.Contains(result.stdout, want) {
 			t.Fatalf("status stdout = %s, want substring %q", result.stdout, want)
@@ -79,7 +79,7 @@ func TestAgentDashboardStatusBackendE2E(t *testing.T) {
 	}
 	after := readTextFile(t, registryPath)
 	if after != before {
-		t.Fatalf("sessions registry changed by status --json\nbefore:\n%s\nafter:\n%s", before, after)
+		t.Fatalf("instances registry changed by status --json\nbefore:\n%s\nafter:\n%s", before, after)
 	}
 	assertFakeZellijCalls(t, callsPath,
 		"list-sessions --short --no-formatting\n"+

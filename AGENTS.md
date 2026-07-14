@@ -7,15 +7,15 @@
 
 - `memory-bank/` — durable knowledge layer проекта.
 - `memory-bank/product/` — продуктовый контекст, пользователи, метрики и roadmap.
-- `memory-bank/domain/` — предметная модель `zelma sessions`, правила, состояния и события.
+- `memory-bank/domain/` — предметная модель `zelma instances`, правила, состояния и события.
 - `memory-bank/dna/` — governance-ядро документации.
 - `memory-bank/flows/` — reusable lifecycle docs и governed templates.
 - `memory-bank/prd/` — instantiated Product Requirements Documents.
 - `memory-bank/use-cases/` — instantiated канонические сценарии проекта.
 - `memory-bank/engineering/`, `memory-bank/ops/` — engineering и операционный контекст.
 - `memory-bank/adr/` и `memory-bank/features/` — пустые или минимальные точки назначения для instantiated документов.
-- `.zelma/` — будущий runtime-каталог проекта; `sessions.json` в нем является
-  локальным реестром `zelma sessions`.
+- `.zelma/` — runtime-каталог проекта; `instances.json` в нем является
+  локальным реестром `zelma instances`.
 
 Пока runtime-код не создан, не выдумывайте структуру `src/` без отдельного
 решения или feature package. Product/domain-факты фиксируйте в `memory-bank/`
@@ -48,7 +48,7 @@
 
 ## Коммиты и pull request
 
-Следуйте конвенции из `memory-bank/engineering/git-workflow.md`: короткие commit messages в настоящем времени, например `docs: define zelma session domain`.
+Следуйте конвенции из `memory-bank/engineering/git-workflow.md`: короткие commit messages в настоящем времени, например `docs: define zelma instance domain`.
 
 В pull request опишите:
 

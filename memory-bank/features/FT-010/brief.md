@@ -21,7 +21,7 @@ must_not_define:
 
 ### Проблема
 
-`sessions detect` должен сначала узнать доступные zellij sessions. Этот доступ
+`instances detect` должен сначала узнать доступные zellij sessions. Этот доступ
 нужно изолировать в adapter, чтобы domain logic не зависела напрямую от
 `os/exec` и формата zellij CLI.
 

@@ -2,7 +2,7 @@
 title: Codex Skill Contract
 doc_kind: engineering
 doc_function: canonical
-purpose: "Agent-facing contract for Codex skills that manage zelma sessions through the CLI."
+purpose: "Agent-facing contract for Codex skills that manage zelma instances through the CLI."
 derived_from:
   - ../features/FT-023/brief.md
   - ../features/FT-024/brief.md
@@ -20,34 +20,34 @@ audience: humans_and_agents
 
 # Codex Skill Contract
 
-Codex skills manage `zelma sessions` by calling the `zelma` CLI. The skill layer
-does not read `.zelma/sessions.json` directly, does not parse zellij output, and
+Codex skills manage `zelma instances` by calling the `zelma` CLI. The skill layer
+does not read `.zelma/instances.json` directly, does not parse zellij output, and
 does not call `zellij` directly. `zelma` owns registry schema, live zellij
 inspection, stale detection and cleanup behavior.
 
 ## Purpose
 
 Use the skill contract when an agent needs to inspect, create, discover or clean
-up Codex sessions for the current repository.
+up Codex instances for the current repository.
 
 The skill should choose commands from the user's intent:
 
 | Intent | Command | Why |
 | --- | --- | --- |
-| Show current managed sessions | `zelma sessions list --json` | Primary inventory command; auto-detects fresh-enough manual panes before returning schema v1 JSON. |
-| Show registry only without probing | `zelma sessions list --no-detect --json` | Stable registry-only inventory for callers that must avoid zellij/Codex probing. |
-| Check whether known sessions still have live panes | `zelma sessions list --live --json` | Auto-detects first unless cache is fresh, then adds live status. |
-| Create a managed Codex pane | `zelma sessions create [path] --json` | Controlled workflow that creates and registers a confirmed pane. |
-| Preview create inputs | `zelma sessions create [path] --dry-run --json` | Resolve Codex command and opened path without side effects. |
-| Run an explicit diagnostic detect pass | `zelma sessions detect --json` | Detect live zellij panes and upsert candidate or active records outside the normal list workflow. |
-| Focus a known session pane | `zelma sessions focus <id> --json` | Switch zellij UI to a registry-backed tab/pane without registry mutation. |
-| Send a message to a known session pane | `zelma sessions send <id> [message] --json` or `zelma sessions send <id> --stdin --json` | Deliver text only after `zelma` revalidates active Codex readiness; never use direct `zellij` fallback. |
-| Observe a session pane screen | `zelma sessions buffer <id> --json` | Read bounded current zellij screen/scrollback for an explicit repo-local session id without registry mutation. |
-| Observe Codex transcript events | `zelma sessions transcript <id> --json` | Read bounded Codex transcript events for an explicit repo-local session id with a resolved `codex_session` without registry mutation. |
-| Review stale cleanup | `zelma sessions cleanup --json` | Propose stale records without mutation. |
-| Remove stale records after explicit user intent | `zelma sessions cleanup --confirm --json` | Mutating cleanup for records already marked `stale`. |
+| Show current managed instances | `zelma instances list --json` | Primary inventory command; auto-detects fresh-enough manual panes before returning schema v1 JSON. |
+| Show registry only without probing | `zelma instances list --no-detect --json` | Stable registry-only inventory for callers that must avoid zellij/Codex probing. |
+| Check whether known instances still have live panes | `zelma instances list --live --json` | Auto-detects first unless cache is fresh, then adds live status. |
+| Create a managed Codex pane | `zelma instances create [path] --json` | Controlled workflow that creates and registers a confirmed pane. |
+| Preview create inputs | `zelma instances create [path] --dry-run --json` | Resolve Codex command and opened path without side effects. |
+| Run an explicit diagnostic detect pass | `zelma instances detect --json` | Detect live zellij panes and upsert candidate or active records outside the normal list workflow. |
+| Focus a known instance pane | `zelma instances focus <id> --json` | Switch zellij UI to a registry-backed tab/pane without registry mutation. |
+| Send a message to a known instance pane | `zelma instances send <id> [message] --json` or `zelma instances send <id> --stdin --json` | Deliver text only after `zelma` revalidates active Codex readiness; never use direct `zellij` fallback. |
+| Observe an instance pane screen | `zelma instances buffer <id> --json` | Read bounded current zellij screen/scrollback for an explicit repo-local instance id without registry mutation. |
+| Observe Codex transcript events | `zelma instances transcript <id> --json` | Read bounded Codex transcript events for an explicit repo-local instance id with a resolved `codex_session` without registry mutation. |
+| Review stale cleanup | `zelma instances cleanup --json` | Propose stale records without mutation. |
+| Remove stale records after explicit user intent | `zelma instances cleanup --confirm --json` | Mutating cleanup for records already marked `stale`. |
 
-If the agent needs current inventory, prefer `sessions list --json`. Use
+If the agent needs current inventory, prefer `instances list --json`. Use
 `--no-detect` only when the caller explicitly needs a registry-only read with no
 zellij/Codex probing. Use `--live` when live reachability matters; it may contact
 zellij even when auto-detect is skipped by cache freshness. Keep standalone
@@ -56,8 +56,12 @@ zellij even when auto-detect is skipped by cache freshness. Keep standalone
 records.
 
 Use observation commands only when the user or orchestrator explicitly asks to
-inspect a session's current work. `list`, `status`, `detect`, `focus` and
+inspect an instance's current work. `list`, `status`, `detect`, `focus` and
 `cleanup` must not read pane buffers or Codex transcript contents implicitly.
+
+`zelma instances` is the only public resource command. The pre-rename resource
+command path is intentionally removed, and schema v1 JSON uses
+`instances`/`instance` fields.
 
 ## Command Contracts
 
@@ -75,23 +79,23 @@ stderr are a stable JSON object with:
 - `next_command`: safe public `zelma` command to run next, or an empty array
   when no automatic command is safe.
 
-### `zelma sessions list --json`
+### `zelma instances list --json`
 
 Runs auto-detect by default unless the last successful auto-detect timestamp is
-fresh according to `sessions_list.auto_detect_ttl` in `.zelma/config.json`
-(default `5s`), then reads the repository-local `.zelma/sessions.json`. A
+fresh according to `instances_list.auto_detect_ttl` in `.zelma/config.json`
+(default `5s`), then reads the repository-local `.zelma/instances.json`. A
 missing registry is treated as an empty registry.
 
 Output is schema v1 registry JSON and preserves all registry records for
-machine-readable compatibility, including active, candidate, stale, closed and
-archived states. The human table output of `zelma sessions list` includes
-`active` and `candidate` records by default; use `zelma sessions list --all`
+machine-readable use, including active, candidate, stale, closed and
+archived states. The human table output of `zelma instances list` includes
+`active` and `candidate` records by default; use `zelma instances list --all`
 when a human needs stale, closed or archived records too.
 
 ```json
 {
   "version": 1,
-  "sessions": [
+  "instances": [
     {
       "id": 1,
       "zellij_session": "zelma-main",
@@ -107,10 +111,10 @@ when a human needs stale, closed or archived records too.
 ```
 
 With `--no-detect`, the command skips auto-detect and reads only
-`.zelma/sessions.json`. With `--live`, each session also includes `live_status`
+`.zelma/instances.json`. With `--live`, each instance also includes `live_status`
 with `live` or `unreachable`. The live view does not persist `live_status`.
 
-### `zelma sessions create [path] --json`
+### `zelma instances create [path] --json`
 
 Creates a zellij pane through `zelma`, confirms launch evidence, and registers a
 record only after confirmation. Omit `path` to open the repository root. If
@@ -120,20 +124,20 @@ root.
 Before launching a new pane, create checks for an existing live `active` record
 with the same `opened_path`. In that handoff case it does not create a duplicate
 pane and returns `created: 0`, `registered: 0`, `skipped: 1` plus the existing
-session, so the caller can continue polling or focus that session.
+instance, so the caller can continue polling or focus that instance.
 
 Otherwise, the successful JSON object includes the stable create counters plus
-the registered session row returned by the registry upsert. `session` is the
+the registered instance row returned by the registry upsert. `instance` is the
 matching `active` record when one exists for the zellij pane key; otherwise it
 is the matching `candidate` record. Historical `closed` and `stale` records are
-not returned as the create result session.
+not returned as the create result instance.
 
 ```json
 {
   "created": 1,
   "registered": 1,
   "skipped": 0,
-  "session": {
+  "instance": {
     "id": 1,
     "zellij_session": "zelma-main",
     "zellij_tab": "tab_1",
@@ -149,10 +153,10 @@ not returned as the create result session.
 New records are `candidate` unless Codex session evidence resolves
 unambiguously. If pane creation succeeds but confirmation or registry write
 fails, `zelma` does not claim to clean up the zellij pane; recovery should run
-`zelma sessions detect --json` after the environment issue is understood. This
-explicit detect command bypasses the `sessions list` auto-detect cache.
+`zelma instances detect --json` after the environment issue is understood. This
+explicit detect command bypasses the `instances list` auto-detect cache.
 
-### `zelma sessions create [path] --dry-run --json`
+### `zelma instances create [path] --dry-run --json`
 
 Resolves the launch contract without creating a pane or writing the registry.
 
@@ -166,11 +170,11 @@ The JSON object includes:
 Use dry run when the agent needs to validate inputs, explain what would run, or
 debug Codex binary/path resolution before a mutating create.
 
-### `zelma sessions detect --json`
+### `zelma instances detect --json`
 
 Reads live zellij sessions and panes through `zelma`, classifies Codex panes,
 and upserts registry records. This command is kept for diagnostic/manual detect
-passes; normal inventory should use `zelma sessions list --json`. It does not
+passes; normal inventory should use `zelma instances list --json`. It does not
 create panes and does not delete stale records.
 
 The successful JSON summary is:
@@ -190,19 +194,19 @@ When existing active records are proven missing by a successful live inventory,
 the output may include `stale_candidates` with reason codes. Those records are
 marked stale; removal is a separate cleanup command.
 
-Use `zelma sessions detect --json --explain` when the agent needs per-candidate
+Use `zelma instances detect --json --explain` when the agent needs per-candidate
 evidence diagnostics. The output adds optional `candidate_explanations` records
 with zellij identity, `opened_path`, `codex_session` when resolved, and
 `evidence_verdict` / `evidence_source` / `evidence_reason`. Default
 `--json` omits this field for compatibility.
 
-### `zelma sessions focus <id> --json`
+### `zelma instances focus <id> --json`
 
 Reads the registry, finds the record by positive repo-local `id`, and sends
 zellij focus actions through `zelma`. This command changes zellij UI focus but
-does not mutate `.zelma/sessions.json`.
+does not mutate `.zelma/instances.json`.
 
-The successful JSON object is the focused session record:
+The successful JSON object is the focused instance record:
 
 ```json
 {
@@ -216,11 +220,11 @@ The successful JSON object is the focused session record:
 }
 ```
 
-### `zelma sessions send <id> [message] --json`
+### `zelma instances send <id> [message] --json`
 
-Sends a message to an existing active Codex session after `zelma` revalidates
+Sends a message to an existing active Codex instance after `zelma` revalidates
 that the registry record still points to the intended live terminal pane. The
-target selector is only the positive repo-local `id` from `zelma sessions list`.
+target selector is only the positive repo-local `id` from `zelma instances list`.
 The message source is exactly one of:
 
 - one positional `message` argument;
@@ -229,7 +233,7 @@ The message source is exactly one of:
 Do not pass both sources. Do not call `zellij` directly and do not type into the
 terminal manually as fallback.
 
-The successful JSON object includes target/session identity and message
+The successful JSON object includes target/instance identity and message
 metadata, but never the message body:
 
 ```json
@@ -263,10 +267,10 @@ Stable send failure codes include:
 - `conflicting_message_sources`
 - `missing_message`
 - `empty_message`
-- `session_not_found`
+- `instance_not_found`
 - `pane_not_found`
 - `pane_not_terminal`
-- `session_state_not_active`
+- `instance_state_not_active`
 - `runtime_unreachable`
 - `codex_runtime_missing`
 - `codex_identity_mismatch`
@@ -275,16 +279,16 @@ Stable send failure codes include:
 
 On any not-ready send diagnostic, stop and present the diagnostic. Use only the
 public `next_command` returned by `zelma`, typically
-`zelma sessions list --live --json` or `zelma sessions detect --json`. The skill
+`zelma instances list --live --json` or `zelma instances detect --json`. The skill
 must not repair, focus or send through direct zellij commands.
 
-### `zelma sessions send <id> --stdin --json`
+### `zelma instances send <id> --stdin --json`
 
 Same target and readiness contract as positional send, but the message body is
 read from stdin. Use this form for multiline prompts or text that should not be
 placed in the command arguments. Empty stdin is rejected with `empty_message`.
 
-### `zelma sessions buffer <id> --json`
+### `zelma instances buffer <id> --json`
 
 Reads the registry, finds the active record by positive repo-local `id`, and
 reads the current pane screen through the zellij adapter. This command is
@@ -308,12 +312,12 @@ read-only and does not persist pane content. Output is bounded by
 }
 ```
 
-### `zelma sessions transcript <id> --json`
+### `zelma instances transcript <id> --json`
 
 Reads the registry, finds the active record by positive repo-local `id`, and
 uses its `codex_session` to read matching Codex JSONL events through the codex
 adapter. This command is read-only and does not persist prompts, assistant
-answers, tool payloads or transcript content in `.zelma/sessions.json`. Output
+answers, tool payloads or transcript content in `.zelma/instances.json`. Output
 is bounded by `--tail <events>`; default `50`.
 
 ```json
@@ -334,7 +338,7 @@ is bounded by `--tail <events>`; default `50`.
 }
 ```
 
-### `zelma sessions cleanup --json`
+### `zelma instances cleanup --json`
 
 Reads the registry and proposes cleanup for records whose state is already
 `stale`. Without `--confirm`, this command does not mutate the registry.
@@ -346,7 +350,7 @@ The JSON object includes:
 - `summary.kept`
 - `stale_records` when stale records exist
 
-### `zelma sessions cleanup --confirm --json`
+### `zelma instances cleanup --confirm --json`
 
 Removes only records whose registry state is `stale`. Active, candidate, closed
 and archived records are never removed by this command.
@@ -369,23 +373,23 @@ contains:
 | Registry JSON is invalid | `stop`; tell the user to restore valid schema v1 JSON before mutating commands. |
 | Codex binary is missing during create | `stop`; fix Codex installation or `ZELMA_CODEX_BIN`, then retry. |
 | zellij is unavailable or command execution fails | `stop`; fix zellij availability/session before retrying. |
-| Created pane cannot be confirmed | `detect`; run `zelma sessions detect --json` and inspect the pane. |
-| Registry write fails after pane creation | `detect`; fix filesystem/lock issue, then run `zelma sessions detect --json` before retrying create. |
-| Registry is empty but live panes are likely | `detect`; run `zelma sessions detect --json`. |
-| `list --live` or `detect` marks sessions stale | `inspect`; present stale records and use `cleanup --json` for proposal. |
+| Created pane cannot be confirmed | `detect`; run `zelma instances detect --json` and inspect the pane. |
+| Registry write fails after pane creation | `detect`; fix filesystem/lock issue, then run `zelma instances detect --json` before retrying create. |
+| Registry is empty but live panes are likely | `detect`; run `zelma instances detect --json`. |
+| `list --live` or `detect` marks instances stale | `inspect`; present stale records and use `cleanup --json` for proposal. |
 
 Recovery `next_command` values must stay within the public `zelma` CLI. They
-must not call `zellij` directly, read `.zelma/sessions.json`, or suggest
+must not call `zellij` directly, read `.zelma/instances.json`, or suggest
 `cleanup --confirm` without explicit user intent.
 
 ## Boundaries
 
 - Skills call `zelma`; they do not call `zellij` directly.
 - Skills parse `zelma` machine-readable output; they do not parse
-  `.zelma/sessions.json` as a separate implementation path.
-- Skills do not remove records except through `zelma sessions cleanup --confirm`.
+  `.zelma/instances.json` as a separate implementation path.
+- Skills do not remove records except through `zelma instances cleanup --confirm`.
 - Skills do not assume cleanup of created panes after partial `create` failures.
 - Skills keep human-readable stderr diagnostics attached to recovery responses.
 - Skills do not read pane buffers or Codex transcript files directly; explicit
-  observation must go through `zelma sessions buffer <id> --json` or
-  `zelma sessions transcript <id> --json`.
+  observation must go through `zelma instances buffer <id> --json` or
+  `zelma instances transcript <id> --json`.

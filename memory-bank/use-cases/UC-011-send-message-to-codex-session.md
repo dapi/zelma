@@ -31,12 +31,12 @@ Human или supervising agent.
 ## Trigger
 
 Нужно передать дополнительную инструкцию, ревью-команду или follow-up prompt в
-уже созданную/обнаруженную `zelma session`.
+уже созданную/обнаруженную `zelma instance`.
 
 ## Preconditions
 
 - Команда запускается внутри целевого repository worktree.
-- `.zelma/sessions.json` содержит repo-local numeric `ZelmaSessionID`.
+- `.zelma/instances.json` содержит repo-local numeric `ZelmaInstanceID`.
 - Target session должна быть `active`.
 - Zellij runtime доступен для live revalidation.
 - Target pane должна быть terminal pane с совместимым Codex runtime evidence.
@@ -44,9 +44,9 @@ Human или supervising agent.
 ## Main Flow
 
 1. Actor получает target id через публичный inventory flow, например
-   `zelma sessions list --live --json`.
-2. Actor вызывает `zelma sessions send <id> [message] --json` или передает
-   multiline prompt через `zelma sessions send <id> --stdin --json`.
+   `zelma instances list --live --json`.
+2. Actor вызывает `zelma instances send <id> [message] --json` или передает
+   multiline prompt через `zelma instances send <id> --stdin --json`.
 3. `zelma` валидирует target id и message source.
 4. `zelma` revalidates registry record against live zellij/Codex evidence.
 5. Если readiness проходит, `zelma` доставляет message в recorded pane and
@@ -79,10 +79,10 @@ Human или supervising agent.
 
 ## Business Rules
 
-- `BR-01` Send target is repo-local numeric `ZelmaSessionID`.
+- `BR-01` Send target is repo-local numeric `ZelmaInstanceID`.
 - `BR-02` Registry state alone is insufficient; live Codex readiness is required
   before delivery.
-- `BR-03` Direct zellij commands and direct `.zelma/sessions.json` parsing are
+- `BR-03` Direct zellij commands and direct `.zelma/instances.json` parsing are
   not valid skill paths for this scenario.
 - `BR-04` Message body is private prompt content and must not be echoed in
   success or failure output.

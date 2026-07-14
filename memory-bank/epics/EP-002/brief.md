@@ -2,7 +2,7 @@
 title: "EP-002: Brief Registry And Repo State"
 doc_kind: epic
 doc_function: brief
-purpose: "Легкий brief для repo-local registry: `.zelma/sessions.json`, repo root state и безопасные операции чтения/записи."
+purpose: "Легкий brief для repo-local registry: `.zelma/instances.json`, repo root state и безопасные операции чтения/записи."
 derived_from:
   - ../../product/roadmap.md
   - ../../domain/model.md
@@ -26,7 +26,7 @@ must_not_define:
 
 ## Результат
 
-`.zelma/sessions.json` становится versioned registry known sessions текущего
+`.zelma/instances.json` становится versioned registry known instances текущего
 repo, с predictable validation, duplicate prevention и безопасными writes.
 `zelma setup` подготавливает repo-local state и добавляет `.zelma` в
 `.gitignore`, чтобы registry не попадал в git.
@@ -37,7 +37,7 @@ repo, с predictable validation, duplicate prevention и безопасными 
 - `EP-002-REQ-02` Зафиксировать registry schema v1.
 - `EP-002-REQ-03` Реализовать atomic writes и lock для concurrent access.
 - `EP-002-REQ-04` Добавить validation/recovery для поврежденного или устаревшего registry.
-- `EP-002-REQ-05` Реализовать первый read surface через `sessions list`.
+- `EP-002-REQ-05` Реализовать первый read surface через `instances list`.
 - `EP-002-REQ-06` Реализовать `zelma setup`, который идемпотентно добавляет `.zelma` в `.gitignore`.
 
 ## Что Не Входит

@@ -2,7 +2,7 @@
 title: "FT-049: Design"
 doc_kind: feature
 doc_function: canonical
-purpose: "Solution-space документ для TUI monitor live zelma sessions."
+purpose: "Solution-space документ для TUI monitor live zelma instances."
 derived_from:
   - brief.md
   - ../FT-027/design.md
@@ -25,9 +25,9 @@ must_not_define:
 | --- | --- | --- |
 | `design.md` | Feature-local solution owner | `SOL-*`, `ALT-*`, `TRD-*`, `C4-*`, `SD-*`, `CTR-*`, `INV-*`, `FM-*`, `RB-*` |
 | `ui-reference/README.md` | Support UI reference | `UI-*`, screen states, key controls and low-fidelity mockups |
-| `../FT-027/design.md` | Existing live list contract | `sessions list --live` read-only live status semantics |
+| `../FT-027/design.md` | Existing live list contract | `instances list --live` read-only live status semantics |
 | `../FT-042/brief.md` | Existing status backend contract | Versioned dashboard snapshot and recovery hints |
-| `../FT-047/brief.md` | Existing focus behavior | `zelma sessions focus <id>` contract |
+| `../FT-047/brief.md` | Existing focus behavior | `zelma instances focus <id>` contract |
 
 ## Context
 
@@ -53,7 +53,7 @@ main queue.
 | `C4-E02` | Monitor command | Initializes TUI model, provider, focus adapter and bounded refresh config | Status provider, focus adapter |
 | `C4-E03` | Status provider | Returns snapshots using `status.Build` or the same model as `zelma status --json` | `internal/status`, `internal/live`, registry loader |
 | `C4-E04` | TUI model/view | Sorts sessions, renders live-first screen states, handles keys | Status provider, focus adapter |
-| `C4-E05` | Focus adapter | Focuses selected live session through existing focus contract | `sessions focus` equivalent zellij adapter path |
+| `C4-E05` | Focus adapter | Focuses selected live session through existing focus contract | `instances focus` equivalent zellij adapter path |
 
 ## Selected Solution
 
@@ -63,7 +63,7 @@ main queue.
 - `SOL-02` Build a monitor-specific model over `internal/status.Snapshot`
   semantics rather than parsing registry internals from the UI. This closes
   `REQ-02`, `REQ-03`, `REQ-04`, `REQ-05` and `REQ-09`.
-- `SOL-03` Render two ordered groups: live/active sessions first, then
+- `SOL-03` Render two ordered groups: live/active instances first, then
   non-active records and degraded/recovery context. Hidden filtering is allowed
   only as an optional toggle; live-first remains the default.
 - `SOL-04` Use bounded refresh with the 5s default interval from `SD-07` and a
@@ -79,8 +79,8 @@ main queue.
 | Alternative ID | Option | Why not selected |
 | --- | --- | --- |
 | `ALT-01` | `zelma tui` as canonical command | Too broad for issue 103; future TUI surfaces could outgrow the live monitor. |
-| `ALT-02` | `zelma sessions monitor` as canonical command | More explicit but longer; issue 103 asks for a quick operational monitor and proposes `zelma monitor`. |
-| `ALT-03` | TUI reads `.zelma/sessions.json` directly and reimplements status logic | Rejected by issue 103, FT-027 and FT-042 boundaries. |
+| `ALT-02` | `zelma instances monitor` as canonical command | More explicit but longer; issue 103 asks for a quick operational monitor and proposes `zelma monitor`. |
+| `ALT-03` | TUI reads `.zelma/instances.json` directly and reimplements status logic | Rejected by issue 103, FT-027 and FT-042 boundaries. |
 | `ALT-04` | Hide stale/non-active records completely by default | Rejected because issue 103 says stale/missing/historical records should remain available. |
 | `ALT-05` | Add a background daemon for live refresh | Rejected by issue 103 non-scope and FT-049 `NS-04`. |
 
@@ -123,9 +123,9 @@ main queue.
 
 ## Invariants
 
-- `INV-01` The UI layer does not read or parse `.zelma/sessions.json`
+- `INV-01` The UI layer does not read or parse `.zelma/instances.json`
   directly.
-- `INV-02` Default ordering keeps live/active sessions above stale/non-active
+- `INV-02` Default ordering keeps live/active instances above stale/non-active
   records.
 - `INV-03` Refresh does not perform cleanup, removal or monitor-specific
   registry mutation.

@@ -21,7 +21,7 @@ must_not_define:
 
 ### Проблема
 
-`sessions create` должен запускать Codex предсказуемо: в нужном path, с
+`instances create` должен запускать Codex предсказуемо: в нужном path, с
 ожидаемой командой и без скрытых assumptions о пользовательском shell.
 
 ### Результат

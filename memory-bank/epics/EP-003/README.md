@@ -14,7 +14,7 @@ audience: humans_and_agents
 
 ## О разделе
 
-Draft package для read-only zellij integration и `zelma sessions detect`.
+Draft package для read-only zellij integration и `zelma instances detect`.
 
 ## Аннотированный индекс
 

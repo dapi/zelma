@@ -88,8 +88,8 @@ Runner contract:
 - put the mounted `zelma` binary and fake `codex` wrapper on `PATH`;
 - start a named `zellij` session through `script`;
 - wait for readiness with `zellij list-sessions`;
-- run focused assertions for `sessions create`, `sessions detect`,
-  `sessions list --live` and `--json` outputs;
+- run focused assertions for `instances create`, `instances detect`,
+  `instances list --live` and `--json` outputs;
 - always kill the test `zellij` session before exiting.
 
 ## Browser Testing
@@ -105,7 +105,7 @@ verification без отдельной feature или продукта, кото
 - Docker для e2e checks in CI-compatible environment;
 - `zellij` для создания и обнаружения panes;
 - Codex CLI/runtime для запуска и идентификации Codex-сессий;
-- локальная файловая система для `.zelma/sessions.json`.
+- локальная файловая система для `.zelma/instances.json`.
 
 База данных, background service или daemon не входят в текущий scope.
 

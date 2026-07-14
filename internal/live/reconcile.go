@@ -26,7 +26,7 @@ type Session struct {
 
 type Registry struct {
 	Version  int       `json:"version"`
-	Sessions []Session `json:"sessions"`
+	Sessions []Session `json:"instances"`
 }
 
 func Reconcile(ctx context.Context, reg registry.Registry, inventory Inventory) (Registry, error) {

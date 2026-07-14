@@ -50,7 +50,7 @@ must_not_define:
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | Git worktree root discovery | `REQ-01`, `REQ-02`, `SC-01`, `CHK-01`, `SOL-01`, `SOL-02`, `CTR-01` | none | Unit tests with temp Git repository and nested directories | `go test ./...` | none yet | none | `none` |
 | Unsupported repo diagnostic | `REQ-03`, `SC-02`, `NEG-01`, `CHK-02`, `SOL-03`, `CTR-02`, `FM-01` | none | Unit test for resolver error and CLI/error rendering where command surface exists | `go test ./...` | none yet | End-to-end CLI command may wait until a repo-requiring command exists | `none` |
-| Non-scope guard | `NS-01`, `NS-03`, `NS-04`, `INV-02`, `INV-03` | none | Static search/code review | `rg -n "sessions.json|zellij|\\.gitignore" internal cmd` | none yet | review remains manual for mutation semantics | `none` |
+| Non-scope guard | `NS-01`, `NS-03`, `NS-04`, `INV-02`, `INV-03` | none | Static search/code review | `rg -n "instances.json|zellij|\\.gitignore" internal cmd` | none yet | review remains manual for mutation semantics | `none` |
 
 ## Open Questions / Ambiguities
 
@@ -99,7 +99,7 @@ No unresolved `OQ-*` blockers remain for this plan.
 | `STEP-01` | agent | `REQ-01`, `SOL-01`, `SD-02` | Add `internal/repo` package API | `internal/repo` | resolver interface/function | `CHK-01` | `EVID-01` | code review + tests in `STEP-02` | `PRE-01`, `PRE-02` | none | implementation requires registry/zellij state |
 | `STEP-02` | agent | `REQ-01`, `REQ-02`, `SOL-01`, `SOL-02`, `CTR-01` | Implement and test nested Git worktree root detection | `internal/repo` | passing resolver tests | `CHK-01` | `EVID-01` | `go test ./...` | `STEP-01` | none | temp Git fixture cannot be created |
 | `STEP-03` | agent | `REQ-03`, `SOL-03`, `CTR-02`, `FM-01`, `FM-02` | Implement typed unsupported-repo failure and diagnostic mapping | `internal/repo`, `internal/cli` if needed | error contract and tests | `CHK-02` | `EVID-02` | `go test ./...` | `STEP-02` | none | CLI command surface is insufficient to expose diagnostic |
-| `STEP-04` | agent | `NS-01`, `NS-03`, `NS-04`, `INV-02`, `INV-03` | Confirm no registry, `.gitignore` or zellij side effects | `cmd`, `internal` | review note | `CHK-01`, `CHK-02` | `EVID-01`, `EVID-02` | `rg -n "sessions.json|zellij|\\.gitignore" internal cmd` | `STEP-03` | `AG-01` if scope expansion is needed | side-effect behavior appears necessary |
+| `STEP-04` | agent | `NS-01`, `NS-03`, `NS-04`, `INV-02`, `INV-03` | Confirm no registry, `.gitignore` or zellij side effects | `cmd`, `internal` | review note | `CHK-01`, `CHK-02` | `EVID-01`, `EVID-02` | `rg -n "instances.json|zellij|\\.gitignore" internal cmd` | `STEP-03` | `AG-01` if scope expansion is needed | side-effect behavior appears necessary |
 
 ## Parallelizable Work
 

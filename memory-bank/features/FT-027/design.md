@@ -2,7 +2,7 @@
 title: "FT-027: Sessions List Live Design"
 doc_kind: feature
 doc_function: design
-purpose: "Фиксирует выбранный read-only contract для `sessions list --live`."
+purpose: "Фиксирует выбранный read-only contract для `instances list --live`."
 derived_from:
   - brief.md
 status: active
@@ -13,7 +13,7 @@ audience: humans_and_agents
 
 ## Contract
 
-`zelma sessions list --live` is a read-only view over the existing sessions
+`zelma instances list --live` is a read-only view over the existing sessions
 registry enriched with current zellij reachability.
 
 The registry remains the canonical owner of:
@@ -25,7 +25,7 @@ The registry remains the canonical owner of:
 - `state`
 
 The live view adds only `live_status` in command output. It does not persist
-`live_status` into `.zelma/sessions.json`.
+`live_status` into `.zelma/instances.json`.
 
 ## Live Status
 
@@ -49,9 +49,9 @@ JSON output keeps the existing schema shape:
 - existing session fields;
 - per-session `live_status`.
 
-As of GitHub issue #86, plain `sessions list` and `sessions list --json`
+As of GitHub issue #86, plain `instances list` and `instances list --json`
 auto-detect by default before rendering inventory. Use
-`sessions list --no-detect` for the registry-only contract that does not run the
+`instances list --no-detect` for the registry-only contract that does not run the
 detect pass. `--live` still owns only live-status enrichment and does not persist
 `live_status`.
 

@@ -39,7 +39,7 @@ func TestEnvironmentSmokeDiagnosticsE2E(t *testing.T) {
 	}
 	assertOneZelmaGitignoreEntry(t, filepath.Join(repoRoot, ".gitignore"))
 
-	list := runZelma(t, bin, repoRoot, nil, "sessions", "list", "--no-detect", "--json")
+	list := runZelma(t, bin, repoRoot, nil, "instances", "list", "--no-detect", "--json")
 	if list.code != 0 {
 		t.Fatalf("list code = %d, want 0; stderr = %q", list.code, list.stderr)
 	}
@@ -48,13 +48,13 @@ func TestEnvironmentSmokeDiagnosticsE2E(t *testing.T) {
 	}
 	if strings.TrimSpace(list.stdout) != `{
   "version": 1,
-  "sessions": []
+  "instances": []
 }` {
 		t.Fatalf("list stdout = %q, want empty schema v1 registry JSON", list.stdout)
 	}
 
 	missingZellij := filepath.Join(t.TempDir(), "missing-zellij")
-	detect := runZelma(t, bin, repoRoot, []string{"ZELMA_ZELLIJ_BIN=" + missingZellij}, "sessions", "detect", "--json")
+	detect := runZelma(t, bin, repoRoot, []string{"ZELMA_ZELLIJ_BIN=" + missingZellij}, "instances", "detect", "--json")
 	if detect.code != 1 {
 		t.Fatalf("detect code = %d, want 1", detect.code)
 	}
@@ -62,7 +62,7 @@ func TestEnvironmentSmokeDiagnosticsE2E(t *testing.T) {
 		t.Fatalf("detect stdout = %q, want empty on diagnostic failure", detect.stdout)
 	}
 	for _, want := range []string{
-		"zelma sessions detect:",
+		"zelma instances detect:",
 		"zellij_missing_binary",
 		"install zellij or configure the adapter binary path",
 	} {

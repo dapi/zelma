@@ -30,7 +30,7 @@ func TestManualPaneAdoptionDetectE2E(t *testing.T) {
 		"CODEX_HOME=" + t.TempDir(),
 	}
 
-	first := runZelma(t, bin, repoRoot, env, "sessions", "detect", "--json")
+	first := runZelma(t, bin, repoRoot, env, "instances", "detect", "--json")
 	if first.code != 0 {
 		t.Fatalf("first detect code = %d, want 0; stderr = %q", first.code, first.stderr)
 	}
@@ -42,7 +42,7 @@ func TestManualPaneAdoptionDetectE2E(t *testing.T) {
 		t.Fatalf("first detect summary = %+v, want added=1 unchanged=0 skipped=1 candidate=1", firstSummary)
 	}
 
-	registryPath := filepath.Join(repoRoot, ".zelma", "sessions.json")
+	registryPath := filepath.Join(repoRoot, ".zelma", "instances.json")
 	afterFirst := readFile(t, registryPath)
 	if count := strings.Count(afterFirst, `"zellij_pane": "terminal_1"`); count != 1 {
 		t.Fatalf("registry after first detect has terminal_1 count = %d, want 1; content = %s", count, afterFirst)
@@ -51,7 +51,7 @@ func TestManualPaneAdoptionDetectE2E(t *testing.T) {
 		t.Fatalf("registry after first detect contains skipped non-Codex pane: %s", afterFirst)
 	}
 
-	second := runZelma(t, bin, repoRoot, env, "sessions", "detect", "--json")
+	second := runZelma(t, bin, repoRoot, env, "instances", "detect", "--json")
 	if second.code != 0 {
 		t.Fatalf("second detect code = %d, want 0; stderr = %q", second.code, second.stderr)
 	}

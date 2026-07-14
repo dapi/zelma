@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Added
+
+- `zelma instances` as the canonical command resource for managed Codex instances.
+
+### Changed
+
+- Removed the old `zelma sessions` command path instead of keeping a compatibility alias.
+- Renamed the repo-local registry contract from `.zelma/sessions.json` with `sessions` root key to `.zelma/instances.json` with `instances` root key.
+
 ### Next Roadmap Candidates
 
 - Follow-up hardening from real Codex/zellij usage.
@@ -12,9 +21,9 @@
 
 ### Added
 
-- `zelma sessions send` for sending a message to a verified Codex session without echoing message bodies.
-- `zelma sessions buffer <id> --json` for bounded read-only zellij pane screen observation.
-- `zelma sessions transcript <id> --json` for bounded read-only Codex transcript event observation.
+- `zelma instances send` for sending a message to a verified Codex session without echoing message bodies.
+- `zelma instances buffer <id> --json` for bounded read-only zellij pane screen observation.
+- `zelma instances transcript <id> --json` for bounded read-only Codex transcript event observation.
 - `zelma monitor` live terminal monitor for observing active sessions and recovery hints.
 - Skill client support for send, buffer and transcript commands.
 - Product documentation for safe session messaging and live monitor workflows.
@@ -23,7 +32,7 @@
 
 - Session transcript observation is more tolerant of real Codex transcript shapes.
 - Monitor refresh avoids overlapping update cycles.
-- `sessions list` shows candidate sessions in the default human output.
+- `instances list` shows candidate sessions in the default human output.
 - Safe session send validation now handles dash-prefixed message arguments and target command argument separation correctly.
 
 ### Documentation
@@ -54,10 +63,10 @@
 
 ### Added
 
-- Repo-local numeric `zelma session` IDs in registry and CLI output.
-- `zelma sessions focus <id>` with table and JSON output.
+- Repo-local numeric `zelma instance` IDs in registry and CLI output.
+- `zelma instances focus <id>` with table and JSON output.
 - Zellij tab metadata capture for sessions when available.
-- `zelma sessions detect --explain` evidence reporting for text and JSON output.
+- `zelma instances detect --explain` evidence reporting for text and JSON output.
 - One-pass Codex session evidence lookup for detect.
 - Codex session ID extraction from safe `codex resume <uuid>` argv evidence.
 - Optional PID-correlated process evidence path for pane/session resolution.
@@ -80,18 +89,18 @@
 
 ### Added
 
-- Go/Cobra CLI with agent-first help for `zelma`, `zelma setup` and `zelma sessions`.
-- Repo-local `.zelma/sessions.json` registry with schema v1, validation, atomic writes and file locking.
+- Go/Cobra CLI with agent-first help for `zelma`, `zelma setup` and `zelma instances`.
+- Repo-local `.zelma/instances.json` registry with schema v1, validation, atomic writes and file locking.
 - `zelma setup` to idempotently add `.zelma` to `.gitignore`.
-- `zelma sessions list` with table and JSON output.
+- `zelma instances list` with table and JSON output.
 - Zellij adapters for listing sessions and panes through the `zellij` CLI.
 - Conservative Codex pane detection and idempotent registry upsert.
-- Managed `zelma sessions create` flow with Codex launch contract, zellij pane creation, confirmation and recovery diagnostics.
+- Managed `zelma instances create` flow with Codex launch contract, zellij pane creation, confirmation and recovery diagnostics.
 - Codex session evidence discovery and parsing from privacy-safe metadata sources.
 - Candidate vs active state rules using resolved Codex session evidence.
-- `zelma sessions list --live` for read-only live/unreachable status.
-- Stale detection during `zelma sessions detect`.
-- `zelma sessions cleanup` proposal flow, with destructive cleanup gated behind `--confirm`.
+- `zelma instances list --live` for read-only live/unreachable status.
+- Stale detection during `zelma instances detect`.
+- `zelma instances cleanup` proposal flow, with destructive cleanup gated behind `--confirm`.
 - Machine-readable compatibility tests for CLI JSON outputs.
 - Thin skill wrapper package over the public `zelma` CLI.
 - Agent recovery flows mapping CLI diagnostics to safe next actions.

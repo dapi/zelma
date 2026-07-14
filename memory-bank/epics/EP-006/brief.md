@@ -24,7 +24,7 @@ wrappers над CLI, а не вторым независимым implementation 
 
 ## Результат
 
-Codex skills вызывают `zelma sessions list/create/detect`, понимают stable JSON
+Codex skills вызывают `zelma instances list/create/detect`, понимают stable JSON
 output и дают agents recovery guidance без дублирования domain logic.
 
 ## Набросок Объема

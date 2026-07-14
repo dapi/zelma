@@ -15,7 +15,7 @@ audience: humans_and_agents
 
 ## Selected Design
 
-`zelma sessions create` and `zelma sessions detect` both write registry records
+`zelma instances create` and `zelma instances detect` both write registry records
 through the same detected-record upsert policy. A record becomes `active` only
 when all active invariants are known:
 
@@ -38,12 +38,12 @@ the pane's `opened_path`.
 | `CTR-01` | Full evidence promotes detected records to `active`. | Session Registry |
 | `CTR-02` | Missing, invalid or ambiguous Codex evidence keeps records `candidate`. | Session Registry |
 | `CTR-03` | Existing `active` records for the same zellij pane are not overwritten by weaker detected evidence. | Session Registry |
-| `CTR-04` | `sessions detect` output reports active/candidate counts in addition to added/unchanged/skipped. | CLI |
+| `CTR-04` | `instances detect` output reports active/candidate counts in addition to added/unchanged/skipped. | CLI |
 
 ## Invariants
 
 - `INV-01` `active` records satisfy domain rule `DR-01`.
-- `INV-02` Candidate records remain visible in `sessions list`, keep their
+- `INV-02` Candidate records remain visible in `instances list`, keep their
   `state` field as `candidate`, and always include normalized absolute
   `opened_path`.
 - `INV-03` Ambiguous session logs are not used to promote a pane.

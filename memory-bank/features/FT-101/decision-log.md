@@ -37,10 +37,10 @@ solution facts живут в `design.md`, execution sequencing живет в
 ### Available Facts
 
 - Issue #101 requires a public CLI flow for sending text to a known
-  `zelma session`.
+  `zelma instance`.
 - Issue #101 says the target is likely numeric repo-local session id.
 - `../FT-045/brief.md` already defines positive numeric repo-local
-  `ZelmaSessionID`.
+  `ZelmaInstanceID`.
 - Direct zellij calls would bypass `zelma` readiness checks and skill contract.
 
 ### Decision
@@ -48,16 +48,16 @@ solution facts живут в `design.md`, execution sequencing живет в
 Use guarded public CLI commands:
 
 ```bash
-zelma sessions send <id> [message] --json
-zelma sessions send <id> --stdin --json
+zelma instances send <id> [message] --json
+zelma instances send <id> --stdin --json
 ```
 
-`<id>` is the repo-local numeric `ZelmaSessionID`. Do not support fuzzy matching
+`<id>` is the repo-local numeric `ZelmaInstanceID`. Do not support fuzzy matching
 by path, pane, title or Codex session id in this delivery unit.
 
 ### Rationale
 
-Numeric `ZelmaSessionID` is the existing repo-local user-facing identity. Other
+Numeric `ZelmaInstanceID` is the existing repo-local user-facing identity. Other
 selectors would cross external runtime/domain boundaries and create ambiguity
 before a write action.
 
@@ -122,7 +122,7 @@ None.
 
 - Issue #101 says registry record alone is insufficient.
 - A pane can still exist after Codex exits, leaving an ordinary shell.
-- `../../domain/rules.md` requires active sessions to include zellij session,
+- `../../domain/rules.md` requires active instances to include zellij session,
   zellij pane, Codex session and normalized opened path.
 - `../../engineering/codex-runtime-identification.md` requires conservative
   Codex evidence and prefers false negatives over false positives.
@@ -175,10 +175,10 @@ None.
 
 Use specific reason codes where possible:
 
-- `session_not_found`
+- `instance_not_found`
 - `pane_not_found`
 - `pane_not_terminal`
-- `session_state_not_active`
+- `instance_state_not_active`
 - `runtime_unreachable`
 - `codex_runtime_missing`
 - `codex_identity_mismatch`
@@ -186,8 +186,8 @@ Use specific reason codes where possible:
 - `target_not_ready`
 
 Recovery hints must stay within public `zelma` commands, such as
-`zelma sessions list --live --json`, `zelma sessions detect --json --explain`,
-or `zelma sessions focus <id> --json`. Do not suggest direct `zellij`
+`zelma instances list --live --json`, `zelma instances detect --json --explain`,
+or `zelma instances focus <id> --json`. Do not suggest direct `zellij`
 commands.
 
 ### Rationale
@@ -310,12 +310,12 @@ None.
 Update `SKILL.md` with a send-message intent that routes only through:
 
 ```bash
-zelma sessions send <id> [message] --json
-zelma sessions send <id> --stdin --json
+zelma instances send <id> [message] --json
+zelma instances send <id> --stdin --json
 ```
 
 The skill must not call `zellij` directly and must not parse
-`.zelma/sessions.json` directly. On not-ready diagnostics, the skill should
+`.zelma/instances.json` directly. On not-ready diagnostics, the skill should
 stop and present the recovery hint rather than attempting manual terminal input.
 
 ### Rationale

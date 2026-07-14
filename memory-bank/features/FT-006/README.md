@@ -2,7 +2,7 @@
 title: "FT-006: Sessions Schema V1"
 doc_kind: feature
 doc_function: index
-purpose: "Навигация по package фичи для versioned schema `.zelma/sessions.json`."
+purpose: "Навигация по package фичи для versioned schema `.zelma/instances.json`."
 derived_from:
   - ../../dna/governance.md
   - brief.md

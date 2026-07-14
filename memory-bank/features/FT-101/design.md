@@ -2,7 +2,7 @@
 title: "FT-101: Design"
 doc_kind: feature
 doc_function: canonical
-purpose: "Solution-space документ для безопасной отправки сообщения в существующую Codex session через `zelma sessions send`."
+purpose: "Solution-space документ для безопасной отправки сообщения в существующую Codex session через `zelma instances send`."
 derived_from:
   - brief.md
   - decision-log.md
@@ -37,7 +37,7 @@ must_not_define:
 ## Context
 
 FT-101 adds a controlled write path into a live terminal pane. This is riskier
-than `sessions focus`: writing a prompt into an ordinary shell or wrong pane can
+than `instances focus`: writing a prompt into an ordinary shell or wrong pane can
 execute unintended shell input. The selected design therefore separates target
 selection, message source parsing, runtime readiness and delivery.
 
@@ -61,18 +61,18 @@ Current code already has pieces that can be reused:
 
 | Element ID | Component | Responsibility | Collaborates with | Boundary |
 | --- | --- | --- | --- | --- |
-| `C4-E01` | CLI `sessions send` command | Parse `<id>`, message source flags, `--json`, stdout/stderr and diagnostics | `C4-E02`, `C4-E05` | Public user/agent command surface |
+| `C4-E01` | CLI `instances send` command | Parse `<id>`, message source flags, `--json`, stdout/stderr and diagnostics | `C4-E02`, `C4-E05` | Public user/agent command surface |
 | `C4-E02` | Send readiness service | Resolve registry record and revalidate live target before any write | `registry`, `zellij-adapter`, Codex evidence helpers | Must not perform delivery |
-| `C4-E03` | Registry module | Read repo-local session records and validate state/id facts | `C4-E02` | Owns `.zelma/sessions.json`, not live zellij probing |
-| `C4-E04` | Zellij adapter | List live sessions/panes and deliver text to explicit pane | `C4-E02`, `C4-E05` | Owns zellij CLI details |
+| `C4-E03` | Registry module | Read repo-local session records and validate state/id facts | `C4-E02` | Owns `.zelma/instances.json`, not live zellij probing |
+| `C4-E04` | Zellij adapter | List live instances/panes and deliver text to explicit pane | `C4-E02`, `C4-E05` | Owns zellij CLI details |
 | `C4-E05` | Delivery adapter method | Send payload and submit action to explicit pane | `C4-E04` | Does not decide target readiness |
 | `C4-E06` | Skill contract / `SKILL.md` | Route agent send intent to public CLI | `C4-E01` | Must not call zellij or parse registry directly |
 
 ## Selected Solution
 
-- `SOL-01` Add `zelma sessions send <id> [message] --json` and
-  `zelma sessions send <id> --stdin --json` as the only public send surface.
-  The command uses repo-local numeric `ZelmaSessionID`, matching `FT-045` and
+- `SOL-01` Add `zelma instances send <id> [message] --json` and
+  `zelma instances send <id> --stdin --json` as the only public send surface.
+  The command uses repo-local numeric `ZelmaInstanceID`, matching `FT-045` and
   avoiding fuzzy target selection.
 - `SOL-02` Implement exclusive message-source parsing in the CLI command:
   positional message XOR `--stdin`; no source, both sources or empty message
@@ -95,7 +95,7 @@ Current code already has pieces that can be reused:
   such as source, byte count and line count. Do not echo the message body.
 - `SOL-07` Extend `../../engineering/skill-contract.md`, root `SKILL.md` and
   `internal/skills` wrapper/tests so agents route send-message intents through
-  `zelma sessions send` and stop on not-ready diagnostics.
+  `zelma instances send` and stop on not-ready diagnostics.
 
 ## Alternatives Considered
 
@@ -103,7 +103,7 @@ Current code already has pieces that can be reused:
 | --- | --- | --- |
 | `ALT-01` | Let skills or callers send direct `zellij action write-chars` | Rejected by issue #101 and `CON-03`; it bypasses readiness, JSON diagnostics and prompt privacy controls. |
 | `ALT-02` | Target by `opened_path`, pane title, zellij pane id or Codex session id | Rejected by `DL-001`; fuzzy or external identifiers create ambiguity and weaken repo-local session ownership. |
-| `ALT-03` | Reuse `sessions focus <id>` then type into focused pane | Rejected because focus is UI state, can race with humans/agents and is explicitly not a prerequisite in issue #101. |
+| `ALT-03` | Reuse `instances focus <id>` then type into focused pane | Rejected because focus is UI state, can race with humans/agents and is explicitly not a prerequisite in issue #101. |
 | `ALT-04` | Treat `live.Reconcile` live status as enough readiness | Rejected because it checks only zellij session/pane reachability and can pass for a shell left in the same pane. |
 | `ALT-05` | Auto-detect/repair ambiguous target and send in one command | Rejected by issue non-goal and `DL-003`; automatic repair before a write can guess wrong. |
 | `ALT-06` | Allow empty messages by default | Rejected by `DL-002`; empty message needs a later explicit design if ever required. |
@@ -122,7 +122,7 @@ Current code already has pieces that can be reused:
 
 ## Accepted Local Decisions
 
-- `SD-01` Target selector is exactly repo-local numeric `ZelmaSessionID`.
+- `SD-01` Target selector is exactly repo-local numeric `ZelmaInstanceID`.
 - `SD-02` Message source is exclusive: argument XOR `--stdin`; missing,
   conflicting or empty message fails before readiness checks.
 - `SD-03` Readiness must prove active registry state, reachable zellij session,
@@ -132,8 +132,8 @@ Current code already has pieces that can be reused:
   the live launch command to repeat the UUID when the pane and opened path still
   match; an explicitly different live UUID remains a mismatch.
 - `SD-04` Send diagnostics use specific reason codes where possible:
-  `session_not_found`, `pane_not_found`, `pane_not_terminal`,
-  `session_state_not_active`, `runtime_unreachable`, `codex_runtime_missing`,
+  `instance_not_found`, `pane_not_found`, `pane_not_terminal`,
+  `instance_state_not_active`, `runtime_unreachable`, `codex_runtime_missing`,
   `codex_identity_mismatch`, `runtime_ambiguous`, `target_not_ready`.
 - `SD-05` Public CLI and skill contract must not expose zellij-specific delivery
   mechanics; zellij commands remain adapter internals.
@@ -149,15 +149,15 @@ Current code already has pieces that can be reused:
 
 | Contract ID | Input / Output | Producer / Consumer | Semantics / Constraints |
 | --- | --- | --- | --- |
-| `CTR-01` | CLI input `<id>` | Caller / `sessions send` | Positive numeric repo-local id; no fuzzy fallback |
-| `CTR-02` | CLI message argument | Caller / `sessions send` | Single positional message source; may contain spaces as shell-provided one arg; empty is rejected |
-| `CTR-03` | STDIN message | Caller / `sessions send --stdin` | Reads full stdin, allows multiline content, rejects empty input |
-| `CTR-04` | Message source diagnostic | `sessions send` / caller | `conflicting_message_sources`, `missing_message`, `empty_message` before adapter write |
+| `CTR-01` | CLI input `<id>` | Caller / `instances send` | Positive numeric repo-local id; no fuzzy fallback |
+| `CTR-02` | CLI message argument | Caller / `instances send` | Single positional message source; may contain spaces as shell-provided one arg; empty is rejected |
+| `CTR-03` | STDIN message | Caller / `instances send --stdin` | Reads full stdin, allows multiline content, rejects empty input |
+| `CTR-04` | Message source diagnostic | `instances send` / caller | `conflicting_message_sources`, `missing_message`, `empty_message` before adapter write |
 | `CTR-05` | Ready target | Send readiness service / delivery | Contains registry session plus validated live terminal pane identity |
 | `CTR-06` | Not-ready diagnostic | Send readiness service / CLI | Stable reason code, no adapter write, public `zelma` recovery hint |
 | `CTR-07` | Delivery request | CLI / zellij adapter | Explicit zellij session and pane id from ready target, message text and submit flag |
 | `CTR-08` | Success JSON | CLI / caller | Includes id, zellij session/tab/pane, codex session, opened path, source, byte count, line count, submitted flag; excludes message body |
-| `CTR-09` | Skill wrapper method | `internal/skills` / agents | Invokes `zelma sessions send <id> ... --json` or stdin equivalent and parses JSON/diagnostics only |
+| `CTR-09` | Skill wrapper method | `internal/skills` / agents | Invokes `zelma instances send <id> ... --json` or stdin equivalent and parses JSON/diagnostics only |
 | `CTR-10` | Zellij binding | Zellij adapter / zellij CLI | For `submit=true`, call `write-chars` once with `message + "\n"` against explicit recorded pane; do not expose this binding in CLI or skill output |
 
 ## Invariants
@@ -174,14 +174,14 @@ Current code already has pieces that can be reused:
 - `INV-06` Recovery hints and `next_command` values stay within public `zelma`
   commands.
 - `INV-07` `SKILL.md` and `internal/skills` do not call `zellij` directly and
-  do not parse `.zelma/sessions.json` directly.
+  do not parse `.zelma/instances.json` directly.
 
 ## Failure Modes
 
 - `FM-01` Registry id is missing or inactive; send must stop with
-  `session_not_found` or `session_state_not_active`.
+  `instance_not_found` or `instance_state_not_active`.
 - `FM-02` Zellij session or pane is missing; send must stop with
-  `runtime_unreachable`, `session_not_found` or `pane_not_found`.
+  `runtime_unreachable`, `instance_not_found` or `pane_not_found`.
 - `FM-03` Pane exists but is plugin/non-terminal; send must stop with
   `pane_not_terminal`.
 - `FM-04` Pane exists but Codex exited or command evidence no longer indicates
@@ -198,7 +198,7 @@ Current code already has pieces that can be reused:
 
 | Stage ID | Stage | Entry condition | Backout |
 | --- | --- | --- | --- |
-| `RB-01` | Add CLI/readiness/delivery behind explicit `sessions send` command | `brief.md` and `design.md` active | Remove command registration and helper code before merge if readiness tests fail |
+| `RB-01` | Add CLI/readiness/delivery behind explicit `instances send` command | `brief.md` and `design.md` active | Remove command registration and helper code before merge if readiness tests fail |
 | `RB-02` | Update skill contract and root skill instructions | CLI contract tests pass locally | Revert skill updates if CLI surface is not shipped |
 | `RB-03` | Verify and ship | All `CHK-*` pass | Keep feature branch unmerged; no runtime migration is required |
 

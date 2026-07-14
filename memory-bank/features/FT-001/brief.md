@@ -52,8 +52,8 @@ entrypoint и проверяемого binary skeleton. Без scaffold нель
 
 - `NS-01` Нет Cobra command tree сверх строго необходимого для компиляции, если
   это вообще понадобится.
-- `NS-02` Нет behavior для `sessions list/create/detect`.
-- `NS-03` Нет schema, read или write behavior для `.zelma/sessions.json`.
+- `NS-02` Нет behavior для `instances list/create/detect`.
+- `NS-03` Нет schema, read или write behavior для `.zelma/instances.json`.
 - `NS-04` Нет live-выполнения `zellij`.
 - `NS-05` Нет Codex session identification.
 - `NS-06` Нет GitHub Actions или release packaging.
@@ -80,7 +80,7 @@ entrypoint и проверяемого binary skeleton. Без scaffold нель
 - `EC-01` `go.mod` существует и объявляет project module.
 - `EC-02` `cmd/zelma/main.go` существует и собирается.
 - `EC-03` `go test ./...` завершается успешно.
-- `EC-04` implementation не вызывает `zellij` и не пишет `.zelma/sessions.json`.
+- `EC-04` implementation не вызывает `zellij` и не пишет `.zelma/instances.json`.
 
 ### Матрица Трассировки
 
@@ -97,7 +97,7 @@ entrypoint и проверяемого binary skeleton. Без scaffold нель
 - `SC-01` Разработчик или агент с установленным Go может запустить
   `go test ./...` и `go build ./cmd/zelma` из repo root.
 - `SC-02` Scaffold задает package boundaries без попытки обращаться к live
-  `zellij`, Codex или `.zelma/sessions.json`.
+  `zellij`, Codex или `.zelma/instances.json`.
 
 ### Проверки
 
@@ -105,7 +105,7 @@ entrypoint и проверяемого binary skeleton. Без scaffold нель
 | --- | --- | --- | --- | --- |
 | `CHK-01` | `EC-01`, `EC-03`, `SC-01` | `go test ./...` | command exits 0 | `artifacts/ft-001/verify/chk-01/` |
 | `CHK-02` | `EC-02`, `SC-01` | `go build ./cmd/zelma` | command exits 0 | `artifacts/ft-001/verify/chk-02/` |
-| `CHK-03` | `EC-04`, `SC-02` | code review / `rg -n "zellij|sessions.json|\\.zelma" cmd internal` | нет runtime invocation/write behavior в scaffold | `artifacts/ft-001/verify/chk-03/` |
+| `CHK-03` | `EC-04`, `SC-02` | code review / `rg -n "zellij|instances.json|\\.zelma" cmd internal` | нет runtime invocation/write behavior в scaffold | `artifacts/ft-001/verify/chk-03/` |
 
 ### Матрица Тестов
 

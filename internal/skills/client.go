@@ -15,7 +15,7 @@ import (
 
 const (
 	DefaultZelmaBinary    = "zelma"
-	SessionsSchemaVersion = 1
+	InstanceSchemaVersion = 1
 )
 
 type Client struct {
@@ -48,12 +48,12 @@ type ListOptions struct {
 	Live bool
 }
 
-type SessionsList struct {
-	Version  int       `json:"version"`
-	Sessions []Session `json:"sessions"`
+type InstanceList struct {
+	Version   int        `json:"version"`
+	Instances []Instance `json:"instances"`
 }
 
-type Session struct {
+type Instance struct {
 	ID            int    `json:"id"`
 	ZellijSession string `json:"zellij_session"`
 	ZellijTab     string `json:"zellij_tab,omitempty"`
@@ -73,10 +73,10 @@ type CreateLaunchContract struct {
 }
 
 type CreateSummary struct {
-	Created    int     `json:"created"`
-	Registered int     `json:"registered"`
-	Skipped    int     `json:"skipped"`
-	Session    Session `json:"session,omitempty"`
+	Created    int      `json:"created"`
+	Registered int      `json:"registered"`
+	Skipped    int      `json:"skipped"`
+	Instance   Instance `json:"instance,omitempty"`
 }
 
 type DetectSummary struct {
@@ -100,7 +100,7 @@ type StaleCandidate struct {
 }
 
 type SendMessageResult struct {
-	Session
+	Instance
 	Message SendMessageMetadata `json:"message"`
 }
 
@@ -113,7 +113,7 @@ type SendMessageMetadata struct {
 
 type BufferObservation struct {
 	Version    int          `json:"version"`
-	SessionID  int          `json:"session_id"`
+	InstanceID int          `json:"instance_id"`
 	Source     string       `json:"source"`
 	CapturedAt string       `json:"captured_at"`
 	Truncated  bool         `json:"truncated"`
@@ -128,7 +128,7 @@ type BufferLine struct {
 
 type TranscriptObservation struct {
 	Version      int               `json:"version"`
-	SessionID    int               `json:"session_id"`
+	InstanceID   int               `json:"instance_id"`
 	Source       string            `json:"source"`
 	CapturedAt   string            `json:"captured_at"`
 	Truncated    bool              `json:"truncated"`
@@ -223,17 +223,17 @@ func (err *ContractError) Unwrap() error {
 	return err.Err
 }
 
-func (client Client) ListSessions(ctx context.Context, options ListOptions) (SessionsList, error) {
-	args := []string{"sessions", "list"}
+func (client Client) ListInstances(ctx context.Context, options ListOptions) (InstanceList, error) {
+	args := []string{"instances", "list"}
 	if options.Live {
 		args = append(args, "--live")
 	}
 	args = append(args, "--json")
-	return runJSON[SessionsList](ctx, client, args)
+	return runJSON[InstanceList](ctx, client, args)
 }
 
-func (client Client) PreviewCreateSession(ctx context.Context, path string) (CreateLaunchContract, error) {
-	args := []string{"sessions", "create"}
+func (client Client) PreviewCreateInstance(ctx context.Context, path string) (CreateLaunchContract, error) {
+	args := []string{"instances", "create"}
 	if strings.TrimSpace(path) != "" {
 		args = append(args, path)
 	}
@@ -241,8 +241,8 @@ func (client Client) PreviewCreateSession(ctx context.Context, path string) (Cre
 	return runJSON[CreateLaunchContract](ctx, client, args)
 }
 
-func (client Client) CreateSession(ctx context.Context, path string) (CreateSummary, error) {
-	args := []string{"sessions", "create"}
+func (client Client) CreateInstance(ctx context.Context, path string) (CreateSummary, error) {
+	args := []string{"instances", "create"}
 	if strings.TrimSpace(path) != "" {
 		args = append(args, path)
 	}
@@ -250,32 +250,32 @@ func (client Client) CreateSession(ctx context.Context, path string) (CreateSumm
 	return runJSON[CreateSummary](ctx, client, args)
 }
 
-func (client Client) DetectSessions(ctx context.Context) (DetectSummary, error) {
-	return runJSON[DetectSummary](ctx, client, []string{"sessions", "detect", "--json"})
+func (client Client) DetectInstances(ctx context.Context) (DetectSummary, error) {
+	return runJSON[DetectSummary](ctx, client, []string{"instances", "detect", "--json"})
 }
 
-func (client Client) FocusSession(ctx context.Context, id int) (Session, error) {
-	return runJSON[Session](ctx, client, []string{"sessions", "focus", strconv.Itoa(id), "--json"})
+func (client Client) FocusInstance(ctx context.Context, id int) (Instance, error) {
+	return runJSON[Instance](ctx, client, []string{"instances", "focus", strconv.Itoa(id), "--json"})
 }
 
 func (client Client) SendMessage(ctx context.Context, id int, message string) (SendMessageResult, error) {
-	return runJSON[SendMessageResult](ctx, client, []string{"sessions", "send", strconv.Itoa(id), "--json", "--", message})
+	return runJSON[SendMessageResult](ctx, client, []string{"instances", "send", strconv.Itoa(id), "--json", "--", message})
 }
 
 func (client Client) SendMessageFromStdin(ctx context.Context, id int, message []byte) (SendMessageResult, error) {
-	return runJSONWithStdin[SendMessageResult](ctx, client, []string{"sessions", "send", strconv.Itoa(id), "--stdin", "--json"}, message)
+	return runJSONWithStdin[SendMessageResult](ctx, client, []string{"instances", "send", strconv.Itoa(id), "--stdin", "--json"}, message)
 }
 
-func (client Client) ObserveSessionBuffer(ctx context.Context, id int, tailLines int) (BufferObservation, error) {
-	args := []string{"sessions", "buffer", strconv.Itoa(id), "--json"}
+func (client Client) ObserveInstanceBuffer(ctx context.Context, id int, tailLines int) (BufferObservation, error) {
+	args := []string{"instances", "buffer", strconv.Itoa(id), "--json"}
 	if tailLines > 0 {
 		args = append(args, "--tail", strconv.Itoa(tailLines))
 	}
 	return runJSON[BufferObservation](ctx, client, args)
 }
 
-func (client Client) ObserveSessionTranscript(ctx context.Context, id int, tailEvents int) (TranscriptObservation, error) {
-	args := []string{"sessions", "transcript", strconv.Itoa(id), "--json"}
+func (client Client) ObserveInstanceTranscript(ctx context.Context, id int, tailEvents int) (TranscriptObservation, error) {
+	args := []string{"instances", "transcript", strconv.Itoa(id), "--json"}
 	if tailEvents > 0 {
 		args = append(args, "--tail", strconv.Itoa(tailEvents))
 	}
@@ -330,7 +330,7 @@ func safeCommandForError(command []string) []string {
 	if len(safe) < 6 {
 		return safe
 	}
-	if safe[1] != "sessions" || safe[2] != "send" {
+	if safe[1] != "instances" || safe[2] != "send" {
 		return safe
 	}
 	if safe[4] == "--stdin" {
@@ -354,9 +354,9 @@ type contractValidator interface {
 	validateContract() error
 }
 
-func (output SessionsList) validateContract() error {
-	if output.Version != SessionsSchemaVersion {
-		return fmt.Errorf("unsupported sessions list schema version %d", output.Version)
+func (output InstanceList) validateContract() error {
+	if output.Version != InstanceSchemaVersion {
+		return fmt.Errorf("unsupported instances list schema version %d", output.Version)
 	}
 	return nil
 }

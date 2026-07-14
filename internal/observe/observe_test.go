@@ -23,7 +23,7 @@ func TestBufferReturnsBoundedLines(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Buffer() error = %v, want nil", err)
 	}
-	if got.Version != 1 || got.SessionID != 2 || got.Source != "zellij_buffer" {
+	if got.Version != 1 || got.InstanceID != 2 || got.Source != "zellij_buffer" {
 		t.Fatalf("identity = %#v, want version/session/source", got)
 	}
 	if !got.Truncated {
@@ -46,9 +46,9 @@ func TestBufferReturnsBoundedLines(t *testing.T) {
 func TestBufferMissingIDReturnsStructuredDiagnostic(t *testing.T) {
 	_, err := Buffer(context.Background(), registry.Registry{Version: 1}, 99, 2, time.Now(), &fakeDumper{})
 
-	diagnostic := requireObserveDiagnostic(t, err, ErrorCodeSessionNotFound)
-	if strings.Join(diagnostic.NextCommand, " ") != "zelma sessions list --json" {
-		t.Fatalf("NextCommand = %#v, want sessions list", diagnostic.NextCommand)
+	diagnostic := requireObserveDiagnostic(t, err, ErrorCodeInstanceNotFound)
+	if strings.Join(diagnostic.NextCommand, " ") != "zelma instances list --json" {
+		t.Fatalf("NextCommand = %#v, want instances list", diagnostic.NextCommand)
 	}
 }
 
@@ -58,7 +58,7 @@ func TestBufferUnreachablePaneReturnsStructuredDiagnostic(t *testing.T) {
 	_, err := Buffer(context.Background(), reg, 1, 2, time.Now(), &fakeDumper{err: errors.New("pane not found")})
 
 	diagnostic := requireObserveDiagnostic(t, err, ErrorCodePaneUnreachable)
-	if !strings.Contains(diagnostic.RecoveryHint, "sessions list --live --json") {
+	if !strings.Contains(diagnostic.RecoveryHint, "instances list --live --json") {
 		t.Fatalf("RecoveryHint = %q, want live list hint", diagnostic.RecoveryHint)
 	}
 }

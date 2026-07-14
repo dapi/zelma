@@ -42,9 +42,9 @@ Reasoning:
 - Zellij `0.44.0` added/expanded CLI automation for pane listing, sending keys,
   dumping screens, subscribing to pane output and returning created pane IDs.
 - `zellij action list-panes --json --all` gives the core facts needed for
-  `sessions detect`.
+  `instances detect`.
 - `zellij run` and `zellij action new-pane` return created pane IDs, which is
-  enough for `sessions create`.
+  enough for `instances create`.
 - A Go CLI can keep the integration explicit, testable and fixture-driven by
   wrapping external commands and parsing JSON.
 
@@ -53,9 +53,9 @@ Reasoning:
 | Surface | Link | Use in zelma | Notes |
 | --- | --- | --- | --- |
 | Zellij CLI control overview | https://zellij.dev/documentation/controlling-zellij-through-cli.html | Entry point for supported automation surfaces | Links to run/edit, action, plugin/pipe and subscribe docs |
-| `zellij run` | https://zellij.dev/documentation/zellij-run-and-edit.html | Candidate for `zelma sessions create` | Launches command panes, supports `--cwd`, `--name`, layout options and returns `terminal_<id>` |
-| `zellij action new-pane` | https://zellij.dev/documentation/cli-actions | Alternative for `sessions create` | Returns `terminal_<id>` or `plugin_<id>`; supports `--cwd`, `--name`, `--direction`, `--floating`, `--stacked` |
-| `zellij action list-panes --json --all` | https://zellij.dev/documentation/cli-actions | Primary source for `sessions detect` and reconciliation | Include `--session <name>` globally when targeting a specific session |
+| `zellij run` | https://zellij.dev/documentation/zellij-run-and-edit.html | Candidate for `zelma instances create` | Launches command panes, supports `--cwd`, `--name`, layout options and returns `terminal_<id>` |
+| `zellij action new-pane` | https://zellij.dev/documentation/cli-actions | Alternative for `instances create` | Returns `terminal_<id>` or `plugin_<id>`; supports `--cwd`, `--name`, `--direction`, `--floating`, `--stacked` |
+| `zellij action list-panes --json --all` | https://zellij.dev/documentation/cli-actions | Primary source for `instances detect` and reconciliation | Include `--session <name>` globally when targeting a specific session |
 | `zellij list-sessions --short --no-formatting` | https://zellij.dev/documentation/commands.html | Enumerate candidate zellij sessions | Default output is human-formatted; use parse-friendly flags |
 | `zellij attach --create-background` | https://zellij.dev/documentation/cli-recipes.html | Future background/session bootstrap | Useful if zelma later creates named background zellij sessions |
 | `zellij subscribe --format json` | https://zellij.dev/documentation/zellij-subscribe.html | Future live observation | Emits NDJSON pane update/closed events |
@@ -191,7 +191,7 @@ Plugin API notes:
 
 ### Implications For Zelma
 
-- Use live `list-panes --json --all` for `sessions detect`, not resurrect files.
+- Use live `list-panes --json --all` for `instances detect`, not resurrect files.
 - Treat resurrect files as a recovery/inspection surface for exited sessions and
   as fixture material.
 - Never assume resurrected command panes already started; account for suspended
@@ -227,7 +227,7 @@ Relevant fields seen in local `0.44.0` output:
 - `pane_cwd`
 
 Adapter rule: treat these as zellij adapter facts, not domain field names. Store
-normalized domain values in `.zelma/sessions.json` after mapping and validation.
+normalized domain values in `.zelma/instances.json` after mapping and validation.
 
 ## MVP Adapter Rules
 
@@ -253,7 +253,7 @@ normalized domain values in `.zelma/sessions.json` after mapping and validation.
 
 ## Detection Strategy Notes
 
-For `sessions detect`, first candidate signal is the pane command/cwd metadata
+For `instances detect`, first candidate signal is the pane command/cwd metadata
 from `list-panes --json --all`:
 
 - candidate pane: `is_plugin == false`;
@@ -270,9 +270,9 @@ mark a record `active` until those rules produce a resolved UUID.
 | Library | Link | Candidate use | Adoption status |
 | --- | --- | --- | --- |
 | `os/exec` | https://pkg.go.dev/os/exec | Run `zellij` with context, stdout/stderr capture and stdin pipes | Primary, standard library |
-| `encoding/json` | https://pkg.go.dev/encoding/json | Parse zellij JSON output and `.zelma/sessions.json` | Primary, standard library |
-| `github.com/spf13/cobra` | https://pkg.go.dev/github.com/spf13/cobra | Command tree for `zelma sessions create/detect/list` | Selected CLI framework |
-| `os.CreateTemp` + `os.Rename` | https://pkg.go.dev/os | Atomic replacement of `.zelma/sessions.json` on Unix and best-effort replace on Windows | Primary persistence helper |
+| `encoding/json` | https://pkg.go.dev/encoding/json | Parse zellij JSON output and `.zelma/instances.json` | Primary, standard library |
+| `github.com/spf13/cobra` | https://pkg.go.dev/github.com/spf13/cobra | Command tree for `zelma instances create/detect/list` | Selected CLI framework |
+| `os.CreateTemp` + `os.Rename` | https://pkg.go.dev/os | Atomic replacement of `.zelma/instances.json` on Unix and best-effort replace on Windows | Primary persistence helper |
 | `github.com/gofrs/flock` | https://pkg.go.dev/github.com/gofrs/flock | Cross-process lock around registry writes | Candidate locking helper |
 | `github.com/calico32/kdl-go` | https://pkg.go.dev/github.com/calico32/kdl-go | Parse/emit KDL layouts if zelma starts generating zellij layouts | Optional, not MVP |
 | `github.com/njreid/gokdl2` | https://pkg.go.dev/github.com/njreid/gokdl2 | Alternative KDL parser with v1/v2 support and compliance focus | Optional, compare before adopting KDL |

@@ -20,7 +20,7 @@ must_not_define:
 ## Цель текущего плана
 
 Реализовать Cobra command tree для `zelma setup` и
-`zelma sessions list/create/detect` как routed stubs, сохранив отсутствие
+`zelma instances list/create/detect` как routed stubs, сохранив отсутствие
 registry и live `zellij` side effects.
 
 ## Grounding / Support References
@@ -45,9 +45,9 @@ registry и live `zellij` side effects.
 
 | Test surface | Canonical refs | Existing coverage | Planned automated coverage | Required local suites / commands | Required CI suites / jobs | Manual-only gap / justification | Manual-only approval ref |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Cobra route availability | `REQ-01`, `REQ-02`, `SC-01`, `CHK-01`, `SOL-01`, `SOL-02`, `SOL-03`, `CTR-01` | none in current scaffold | Add Go tests for `setup --help` and `sessions list/create/detect --help` route execution | `go test ./...` | none configured | none | `none` |
+| Cobra route availability | `REQ-01`, `REQ-02`, `SC-01`, `CHK-01`, `SOL-01`, `SOL-02`, `SOL-03`, `CTR-01` | none in current scaffold | Add Go tests for `setup --help` and `instances list/create/detect --help` route execution | `go test ./...` | none configured | none | `none` |
 | Stub diagnostics | `REQ-03`, `SC-02`, `CHK-02`, `SOL-04`, `SD-01`, `CTR-02` | none in current scaffold | Add Go tests for deterministic non-implemented stub behavior | `go test ./...` | none configured | Exact final output contract beyond stub diagnostics belongs to FT-004 | `none` |
-| Side-effect boundary | `REQ-03`, `NEG-01`, `CHK-02`, `INV-01`, `INV-02`, `FM-01` | FT-001 static check only | Keep FT-002 code free of registry/zellij adapters; verify by tests and static search | `go test ./...`; `rg -n "zellij|sessions.json|\\.zelma" cmd internal` | none configured | Static review remains acceptable because no adapter exists in this slice | `none` |
+| Side-effect boundary | `REQ-03`, `NEG-01`, `CHK-02`, `INV-01`, `INV-02`, `FM-01` | FT-001 static check only | Keep FT-002 code free of registry/zellij adapters; verify by tests and static search | `go test ./...`; `rg -n "zellij|instances.json|\\.zelma" cmd internal` | none configured | Static review remains acceptable because no adapter exists in this slice | `none` |
 | Binary build | `ASM-01`, `CTR-03` | FT-001 scaffold builds | Ensure Cobra dependency and command tree compile | `go build ./cmd/zelma` | none configured | none | `none` |
 
 ## Open Questions / Ambiguities
@@ -80,7 +80,7 @@ registry и live `zellij` side effects.
 | Workstream | Implements | Result | Owner | Dependencies |
 | --- | --- | --- | --- | --- |
 | `WS-1` | `REQ-01`, `SOL-01`, `SOL-02`, `CTR-01`, `CTR-03` | Root command and `setup` route exist | agent | `PRE-01`, `PRE-02` |
-| `WS-2` | `REQ-02`, `SOL-03`, `CTR-01` | `sessions` command group and subcommand routes exist | agent | `WS-1` |
+| `WS-2` | `REQ-02`, `SOL-03`, `CTR-01` | `instances` command group and subcommand routes exist | agent | `WS-1` |
 | `WS-3` | `REQ-03`, `SOL-04`, `SD-01`, `CTR-02`, `INV-01`, `INV-02` | Stubs return deterministic diagnostics without side effects | agent | `WS-1`, `WS-2` |
 | `WS-4` | `CHK-01`, `CHK-02` | Tests and verification evidence cover routing and side-effect boundary | agent | `WS-1`, `WS-2`, `WS-3` |
 
@@ -96,9 +96,9 @@ registry и live `zellij` side effects.
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `STEP-01` | agent | `PRE-01` | Confirm scaffold and environment | repo root | discovery note / command output | `CHK-01` | `EVID-01` | `go test ./...` | none | none | Go toolchain unavailable |
 | `STEP-02` | agent | `REQ-01`, `SOL-01`, `SOL-02`, `CTR-01`, `CTR-03` | Add Cobra root command and `setup` route | `internal/cli/*`, `go.mod`, `go.sum` | command construction code | `CHK-01` | `EVID-01` | Go command tests | `PRE-01`, `PRE-02` | `AG-01` if behavior expands | Cobra architecture is no longer accepted |
-| `STEP-03` | agent | `REQ-02`, `SOL-03`, `CTR-01` | Add `sessions` group and `list/create/detect` routes | `internal/cli/*` | routed subcommands | `CHK-01` | `EVID-01` | Go command tests | `STEP-02` | `AG-01` if behavior expands | command names conflict with upstream docs |
+| `STEP-03` | agent | `REQ-02`, `SOL-03`, `CTR-01` | Add `instances` group and `list/create/detect` routes | `internal/cli/*` | routed subcommands | `CHK-01` | `EVID-01` | Go command tests | `STEP-02` | `AG-01` if behavior expands | command names conflict with upstream docs |
 | `STEP-04` | agent | `REQ-03`, `SOL-04`, `SD-01`, `CTR-02`, `INV-01`, `INV-02` | Add deterministic non-implemented stub behavior | `internal/cli/*` | stub handlers | `CHK-02` | `EVID-02` | Go tests plus side-effect search | `STEP-03` | `AG-01` if real behavior is needed | tests require registry or zellij |
-| `STEP-05` | agent | `CHK-01`, `CHK-02` | Run final verification | repo root | verification output | `CHK-01`, `CHK-02` | `EVID-01`, `EVID-02` | `go test ./...`; `go build ./cmd/zelma`; `rg -n "zellij|sessions.json|\\.zelma" cmd internal` | `STEP-04` | none | local checks cannot produce trustworthy evidence |
+| `STEP-05` | agent | `CHK-01`, `CHK-02` | Run final verification | repo root | verification output | `CHK-01`, `CHK-02` | `EVID-01`, `EVID-02` | `go test ./...`; `go build ./cmd/zelma`; `rg -n "zellij|instances.json|\\.zelma" cmd internal` | `STEP-04` | none | local checks cannot produce trustworthy evidence |
 
 ## Parallelizable Work
 
@@ -121,7 +121,7 @@ registry и live `zellij` side effects.
 | Risk ID | Risk | Impact | Mitigation | Trigger |
 | --- | --- | --- | --- | --- |
 | `ER-01` | Tests lock down default Cobra help wording too tightly | Collides with FT-003 help template ownership | Assert route availability and command identity only | Help snapshot assertions appear |
-| `ER-02` | Stub code starts real setup/session behavior | Violates `REQ-03`, `NS-01`, `NS-02`, `NS-04` | Stop via `AG-01`; move behavior to owning feature | `.zelma`, `sessions.json`, `.gitignore` or `zellij` logic appears |
+| `ER-02` | Stub code starts real setup/session behavior | Violates `REQ-03`, `NS-01`, `NS-02`, `NS-04` | Stop via `AG-01`; move behavior to owning feature | `.zelma`, `instances.json`, `.gitignore` or `zellij` logic appears |
 | `ER-03` | Cobra dependency cannot be fetched | Blocks implementation | Stop with environment evidence; do not hand-edit vendored dependency | `go get` / `go mod tidy` fails due to environment |
 
 ## Stop Conditions / Fallback

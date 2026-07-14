@@ -15,8 +15,8 @@ audience: humans_and_agents
 
 ## Selected Design
 
-`zelma sessions cleanup` is an explicit cleanup path for stale registry records.
-The command reads `.zelma/sessions.json` and builds a proposal from records whose
+`zelma instances cleanup` is an explicit cleanup path for stale registry records.
+The command reads `.zelma/instances.json` and builds a proposal from records whose
 registry `state` is exactly `stale`.
 
 By default, the command is read-only:
@@ -25,9 +25,9 @@ By default, the command is read-only:
 - it prints each proposed stale record with zellij, Codex and opened-path
   identity;
 - it does not contact zellij;
-- it does not write `.zelma/sessions.json`.
+- it does not write `.zelma/instances.json`.
 
-`zelma sessions cleanup --confirm` applies the same stale-only selection while
+`zelma instances cleanup --confirm` applies the same stale-only selection while
 holding the registry write lock. It removes only records still marked `stale` at
 write time. Records in `active`, `candidate`, `closed` or `archived` state are
 never removed by this command.
@@ -43,7 +43,7 @@ never removed by this command.
 
 ## Non-Goals
 
-- No automatic cleanup from `sessions detect` or `sessions list --live`.
+- No automatic cleanup from `instances detect` or `instances list --live`.
 - No deletion of live or unresolved candidate records.
 - No global registry cleanup across repositories.
 - No registry schema change for cleanup reasons or audit history.

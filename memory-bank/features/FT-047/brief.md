@@ -2,7 +2,7 @@
 title: "FT-047: Focus Zelma Session By ID"
 doc_kind: feature
 doc_function: canonical
-purpose: "Канонический brief для фокусировки zellij pane по numeric zelma session id."
+purpose: "Канонический brief для фокусировки zellij pane по numeric zelma instance id."
 derived_from:
   - ../../product/roadmap.md
   - ../../domain/model.md
@@ -24,20 +24,20 @@ must_not_define:
 
 ### Проблема
 
-После появления numeric `ZelmaSessionID` пользователь видит короткий ID в
-`sessions list`, но все еще не может использовать его для перехода к нужной
+После появления numeric `ZelmaInstanceID` пользователь видит короткий ID в
+`instances list`, но все еще не может использовать его для перехода к нужной
 работе в `zellij`.
 
 ### Результат
 
-`zelma sessions focus <id>` фокусирует zellij tab/pane, сохраненные в registry
-для указанной `zelma session`.
+`zelma instances focus <id>` фокусирует zellij tab/pane, сохраненные в registry
+для указанной `zelma instance`.
 
 ### Объем Работ
 
-- `REQ-01` Добавить CLI command `zelma sessions focus <id>`.
+- `REQ-01` Добавить CLI command `zelma instances focus <id>`.
 - `REQ-02` Lookup выполняется по repo-local positive numeric `id` из
-  `.zelma/sessions.json`.
+  `.zelma/instances.json`.
 - `REQ-03` Если registry record содержит `zellij_tab`, команда сначала
   переключает zellij на этот tab через stable tab id.
 - `REQ-04` Команда затем фокусирует `zellij_pane`.
@@ -55,7 +55,7 @@ must_not_define:
 
 ### Критерии Готовности
 
-- `EC-01` `sessions focus <id>` вызывает zellij tab focus перед pane focus, если
+- `EC-01` `instances focus <id>` вызывает zellij tab focus перед pane focus, если
   `zellij_tab` известен.
 - `EC-02` Registry file не меняется после focus command.
 - `EC-03` Invalid или missing ID возвращает agent-readable diagnostic.

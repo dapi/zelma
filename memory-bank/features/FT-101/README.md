@@ -21,7 +21,7 @@ audience: humans_and_agents
 
 - [`brief.md`](brief.md)
   Читать, когда нужно понять problem space, scope, non-scope и canonical
-  verify contract команды `zelma sessions send`.
+  verify contract команды `zelma instances send`.
   Отвечает на вопрос: что должно быть доставлено и как это принимается.
 
 - [`design.md`](design.md)

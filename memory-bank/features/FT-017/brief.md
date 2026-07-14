@@ -27,7 +27,7 @@ must_not_define:
 
 ### Результат
 
-`sessions create` подтверждает наличие pane и enough launch evidence перед
+`instances create` подтверждает наличие pane и enough launch evidence перед
 созданием active registry record.
 
 ### Объем Работ

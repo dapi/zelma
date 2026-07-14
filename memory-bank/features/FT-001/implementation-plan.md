@@ -44,7 +44,7 @@ integration.
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | Go module discovery | `REQ-01`, `CHK-01` | none | Go package tests compile | `go test ./...` | none yet | CI not configured in FT-001 | `none` |
 | Binary build | `REQ-02`, `CHK-02` | none | Build command succeeds | `go build ./cmd/zelma` | none yet | CI not configured in FT-001 | `none` |
-| Side-effect boundary | `REQ-03`, `REQ-05`, `CHK-03` | docs only | Static search/code review | `rg -n "zellij|sessions.json|\\.zelma" cmd internal` | none yet | Review remains manual until behavior exists | `none` |
+| Side-effect boundary | `REQ-03`, `REQ-05`, `CHK-03` | docs only | Static search/code review | `rg -n "zellij|instances.json|\\.zelma" cmd internal` | none yet | Review remains manual until behavior exists | `none` |
 
 ## Open Questions / Ambiguities
 
@@ -88,7 +88,7 @@ integration.
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `STEP-01` | agent | `REQ-01` | Initialize Go module | `go.mod` | module file | `CHK-01` | `EVID-01` | `go test ./...` | `PRE-01` | none | module path conflicts with repo |
 | `STEP-02` | agent | `REQ-02`, `REQ-03` | Add minimal binary entrypoint | `cmd/zelma/main.go`, optional `internal/*` | buildable package | `CHK-02` | `EVID-02` | `go build ./cmd/zelma` | `STEP-01` | none | command tree scope appears necessary |
-| `STEP-03` | agent | `REQ-05` | Confirm no side-effect scope | `cmd`, `internal` | review note | `CHK-03` | `EVID-03` | `rg -n "zellij|sessions.json|\\.zelma" cmd internal` | `STEP-02` | `AG-01` if behavior needed | side effects are required |
+| `STEP-03` | agent | `REQ-05` | Confirm no side-effect scope | `cmd`, `internal` | review note | `CHK-03` | `EVID-03` | `rg -n "zellij|instances.json|\\.zelma" cmd internal` | `STEP-02` | `AG-01` if behavior needed | side effects are required |
 | `STEP-04` | agent | `REQ-04` | Run final checks | repo root | command outputs | `CHK-01`, `CHK-02`, `CHK-03` | `EVID-01`, `EVID-02`, `EVID-03` | all checks from brief | `STEP-03` | none | Go toolchain unavailable |
 
 ## Parallelizable Work
@@ -131,5 +131,5 @@ integration.
 - All workstreams complete or stopped through `STOP-*`.
 - `go test ./...` passes.
 - `go build ./cmd/zelma` passes.
-- Side-effect check confirms no `zellij` or `.zelma/sessions.json` behavior.
+- Side-effect check confirms no `zellij` or `.zelma/instances.json` behavior.
 - Final acceptance follows `brief.md` `Verify`.

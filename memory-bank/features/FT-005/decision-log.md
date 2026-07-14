@@ -35,13 +35,13 @@ must_not_define:
 - GitHub issue 5 задает цель: одинаково определять repo root для команд,
   работающих с `.zelma/` и `.gitignore`.
 - `brief.md` ограничивает scope правилами поиска root, нормализацией path и
-  agent-friendly ошибкой вне repo; чтение/запись `.zelma/sessions.json` не
+  agent-friendly ошибкой вне repo; чтение/запись `.zelma/instances.json` не
   входит в scope.
 - `../../adr/ADR-001-mvp-cli-architecture.md` назначает `internal/repo`
   centralized owner-ом repo root и `.zelma/` paths.
 - `../../engineering/architecture.md` требует централизованного repo root
-  detection и default registry location `.zelma/sessions.json` under repo root.
-- `../../ops/config.md` фиксирует default layout `<repo-root>/.zelma/sessions.json`
+  detection и default registry location `.zelma/instances.json` under repo root.
+- `../../ops/config.md` фиксирует default layout `<repo-root>/.zelma/instances.json`
   и запрещает недокументированные environment overrides.
 - `../../features/FT-031/brief.md` использует тот же resolver для `.gitignore`
   setup, а `.zelma/` может еще не существовать до setup.

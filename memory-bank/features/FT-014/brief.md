@@ -2,7 +2,7 @@
 title: "FT-014: Detect Upsert Idempotency"
 doc_kind: feature
 doc_function: canonical
-purpose: "Канонический brief для idempotent registry upsert в `zelma sessions detect`."
+purpose: "Канонический brief для idempotent registry upsert в `zelma instances detect`."
 derived_from:
   - ../../product/roadmap.md
   - ../../epics/EP-003/brief.md
@@ -21,7 +21,7 @@ must_not_define:
 
 ### Проблема
 
-`zelma sessions detect` может запускаться многократно. Повторный запуск не
+`zelma instances detect` может запускаться многократно. Повторный запуск не
 должен создавать duplicates или перетирать более точную информацию.
 
 ### Результат

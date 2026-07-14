@@ -74,13 +74,13 @@ None.
 ### Available Facts
 
 - Issue 103 proposes `zelma monitor` and allows naming to be decided during
-  design among examples like `zelma tui`, `zelma sessions monitor` or
+  design among examples like `zelma tui`, `zelma instances monitor` or
   `zelma monitor`.
 - The first screen's question is operational and broad: which sessions are live
   and worth attention right now?
 - Existing root help already has top-level user workflow commands such as
   `zelma status` and nested session management commands under
-  `zelma sessions`.
+  `zelma instances`.
 
 ### Alternatives
 
@@ -88,7 +88,7 @@ None.
 | --- | --- | --- |
 | `zelma monitor` | selected | Short, issue-aligned, and names the operational surface rather than an implementation technology. |
 | `zelma tui` | rejected | Names the UI technology, not the live-session monitoring outcome. |
-| `zelma sessions monitor` | rejected for first slice | Accurate but longer; can be added later only if product wants nested aliases. |
+| `zelma instances monitor` | rejected for first slice | Accurate but longer; can be added later only if product wants nested aliases. |
 
 ### Decision
 
@@ -154,7 +154,7 @@ None.
 ### Available Facts
 
 - Issue 103 allows the TUI to consume `zelma status --json`,
-  `zelma sessions list --live --json`, or an internal service behind those same
+  `zelma instances list --live --json`, or an internal service behind those same
   contracts.
 - FT-042 status backend returns a versioned snapshot with dashboard status,
   live status and recovery hints.

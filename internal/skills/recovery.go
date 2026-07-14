@@ -23,12 +23,12 @@ type ListRecoveryOptions struct {
 	LivePanesLikely bool
 }
 
-func RecoveryForListResult(result SessionsList, options ListRecoveryOptions) Recovery {
-	if len(result.Sessions) == 0 && options.LivePanesLikely {
+func RecoveryForListResult(result InstanceList, options ListRecoveryOptions) Recovery {
+	if len(result.Instances) == 0 && options.LivePanesLikely {
 		return Recovery{
 			Action:      RecoveryActionDetect,
 			ReasonCode:  ReasonEmptyRegistryPanesLikely,
-			Message:     "Registry is empty, but live Codex panes are likely; force detection through zelma sessions detect.",
+			Message:     "Registry is empty, but live Codex panes are likely; force detection through zelma instances detect.",
 			NextCommand: detectCommand(),
 		}
 	}
@@ -42,7 +42,7 @@ func RecoveryForDetectResult(result DetectSummary) Recovery {
 	return Recovery{
 		Action:      RecoveryActionInspect,
 		ReasonCode:  ReasonStaleSessionsDetected,
-		Message:     "Review stale session records; preview cleanup through zelma sessions cleanup --json and confirm cleanup only after explicit user intent.",
+		Message:     "Review stale instance records; preview cleanup through zelma instances cleanup --json and confirm cleanup only after explicit user intent.",
 		NextCommand: cleanupPreviewCommand(),
 	}
 }
@@ -170,13 +170,13 @@ var recoveryRules = append([]recoveryRule{
 	{
 		reasonCode:  "send_target_not_ready",
 		action:      RecoveryActionInspect,
-		message:     "Inspect live zelma session status before retrying send; do not use direct terminal or zellij fallback.",
+		message:     "Inspect live zelma instance status before retrying send; do not use direct terminal or zellij fallback.",
 		nextCommand: liveListCommand(),
 		needles: []string{
-			"session_not_found",
+			"instance_not_found",
 			"pane_not_found",
 			"pane_not_terminal",
-			"session_state_not_active",
+			"instance_state_not_active",
 			"runtime_unreachable",
 			"codex_runtime_missing",
 			"codex_identity_mismatch",
@@ -194,26 +194,26 @@ var recoveryRules = append([]recoveryRule{
 		reasonCode: "registry_locked",
 		action:     RecoveryActionRetry,
 		message:    "Retry after the other registry writer finishes; do not bypass the zelma CLI or edit the registry directly.",
-		needles:    []string{"registry_locked", "sessions registry is locked"},
+		needles:    []string{"registry_locked", "instances registry is locked"},
 	},
 	{
 		reasonCode:  "repo_not_ready",
 		action:      RecoveryActionSetup,
-		message:     "Move into the target Git repository worktree, then prepare it with zelma setup before managing sessions.",
+		message:     "Move into the target Git repository worktree, then prepare it with zelma setup before managing instances.",
 		nextCommand: setupCommand(),
 		needles:     []string{"repo_not_ready"},
 	},
 	{
 		reasonCode:  "repo_not_prepared",
 		action:      RecoveryActionSetup,
-		message:     "Move into the target Git repository worktree, then prepare it with zelma setup before managing sessions.",
+		message:     "Move into the target Git repository worktree, then prepare it with zelma setup before managing instances.",
 		nextCommand: setupCommand(),
 		needles:     []string{"repo_not_prepared"},
 	},
 	{
 		reasonCode:  ReasonUnsupportedRepo,
 		action:      RecoveryActionSetup,
-		message:     "Move into the target Git repository worktree, then prepare it with zelma setup before managing sessions.",
+		message:     "Move into the target Git repository worktree, then prepare it with zelma setup before managing instances.",
 		nextCommand: setupCommand(),
 		needles:     []string{"unsupported repo", "no git worktree found"},
 	},
@@ -259,15 +259,15 @@ func registrySchemaRules() []recoveryRule {
 		"registry_missing_required_field",
 		"registry_unsupported_version",
 		"registry_invalid_field",
-		"registry_duplicate_session",
-		"registry_conflicting_session",
+		"registry_duplicate_instance",
+		"registry_conflicting_instance",
 	}
 	rules := make([]recoveryRule, 0, len(codes))
 	for _, code := range codes {
 		rules = append(rules, recoveryRule{
 			reasonCode: code,
 			action:     RecoveryActionStop,
-			message:    "Stop and restore valid schema v1 registry JSON before running mutating session commands.",
+			message:    "Stop and restore valid schema v1 registry JSON before running mutating instance commands.",
 			needles:    []string{code},
 		})
 	}
@@ -279,13 +279,13 @@ func setupCommand() []string {
 }
 
 func detectCommand() []string {
-	return []string{DefaultZelmaBinary, "sessions", "detect", "--json"}
+	return []string{DefaultZelmaBinary, "instances", "detect", "--json"}
 }
 
 func liveListCommand() []string {
-	return []string{DefaultZelmaBinary, "sessions", "list", "--live", "--json"}
+	return []string{DefaultZelmaBinary, "instances", "list", "--live", "--json"}
 }
 
 func cleanupPreviewCommand() []string {
-	return []string{DefaultZelmaBinary, "sessions", "cleanup", "--json"}
+	return []string{DefaultZelmaBinary, "instances", "cleanup", "--json"}
 }

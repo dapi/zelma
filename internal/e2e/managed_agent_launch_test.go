@@ -25,7 +25,7 @@ func TestManagedAgentLaunchCreateToListE2E(t *testing.T) {
 	env := isolatedZelmaEnv(t, fakeZellij)
 	env = append(env, "ZELMA_CODEX_BIN="+fakeCodex)
 
-	created := runZelma(t, bin, repoRoot, env, "sessions", "create", "--json")
+	created := runZelma(t, bin, repoRoot, env, "instances", "create", "--json")
 	if created.code != 0 {
 		t.Fatalf("create code = %d, want 0; stderr = %q", created.code, created.stderr)
 	}
@@ -34,36 +34,36 @@ func TestManagedAgentLaunchCreateToListE2E(t *testing.T) {
 	if createResult.Created != 1 || createResult.Registered != 1 || createResult.Skipped != 0 {
 		t.Fatalf("create summary = %+v, want created=1 registered=1 skipped=0", createResult)
 	}
-	if createResult.Session.ID != 1 ||
-		createResult.Session.ZellijSession != "zelma-main" ||
-		createResult.Session.ZellijPane != "terminal_7" ||
-		createResult.Session.CodexSession != managedLaunchSessionID ||
-		createResult.Session.OpenedPath != repoRoot ||
-		createResult.Session.State != "active" {
-		t.Fatalf("created session = %+v, want active registered terminal_7", createResult.Session)
+	if createResult.Instance.ID != 1 ||
+		createResult.Instance.ZellijSession != "zelma-main" ||
+		createResult.Instance.ZellijPane != "terminal_7" ||
+		createResult.Instance.CodexSession != managedLaunchSessionID ||
+		createResult.Instance.OpenedPath != repoRoot ||
+		createResult.Instance.State != "active" {
+		t.Fatalf("created instance = %+v, want active registered terminal_7", createResult.Instance)
 	}
 
-	registryPath := filepath.Join(repoRoot, ".zelma", "sessions.json")
+	registryPath := filepath.Join(repoRoot, ".zelma", "instances.json")
 	registry := decodeLiveInventory(t, readTextFile(t, registryPath))
-	if len(registry.Sessions) != 1 || registry.Sessions[0] != createResult.Session {
-		t.Fatalf("registry sessions = %+v, want created session %+v", registry.Sessions, createResult.Session)
+	if len(registry.Sessions) != 1 || registry.Sessions[0] != createResult.Instance {
+		t.Fatalf("registry instances = %+v, want created instance %+v", registry.Sessions, createResult.Instance)
 	}
 
-	listed := runZelma(t, bin, repoRoot, env, "sessions", "list", "--live", "--json")
+	listed := runZelma(t, bin, repoRoot, env, "instances", "list", "--live", "--json")
 	if listed.code != 0 {
 		t.Fatalf("list code = %d, want 0; stderr = %q", listed.code, listed.stderr)
 	}
 	assertEmptyStderr(t, listed)
 	live := decodeLiveInventory(t, listed.stdout)
 	if len(live.Sessions) != 1 {
-		t.Fatalf("live sessions = %+v, want one session", live.Sessions)
+		t.Fatalf("live instances = %+v, want one session", live.Sessions)
 	}
-	if live.Sessions[0].ID != createResult.Session.ID ||
-		live.Sessions[0].ZellijPane != createResult.Session.ZellijPane ||
-		live.Sessions[0].CodexSession != createResult.Session.CodexSession ||
+	if live.Sessions[0].ID != createResult.Instance.ID ||
+		live.Sessions[0].ZellijPane != createResult.Instance.ZellijPane ||
+		live.Sessions[0].CodexSession != createResult.Instance.CodexSession ||
 		live.Sessions[0].State != "active" ||
 		live.Sessions[0].LiveStatus != "live" {
-		t.Fatalf("live session = %+v, want created active/live session", live.Sessions[0])
+		t.Fatalf("live instance = %+v, want created active/live instance", live.Sessions[0])
 	}
 	assertFakeZellijCallsContain(t, callsPath,
 		"--session zelma-main run --cwd "+repoRoot+" --name codex -- "+fakeCodex+" --cd "+repoRoot,
@@ -87,7 +87,7 @@ func TestManagedAgentLaunchFailureLeavesNoActiveRegistryE2E(t *testing.T) {
 	env := isolatedZelmaEnv(t, fakeZellij)
 	env = append(env, "ZELMA_CODEX_BIN="+fakeCodex)
 
-	created := runZelma(t, bin, repoRoot, env, "sessions", "create", "--json")
+	created := runZelma(t, bin, repoRoot, env, "instances", "create", "--json")
 	if created.code != 1 {
 		t.Fatalf("create code = %d, want 1", created.code)
 	}
@@ -95,7 +95,7 @@ func TestManagedAgentLaunchFailureLeavesNoActiveRegistryE2E(t *testing.T) {
 		t.Fatalf("stdout = %q, want empty on create failure", created.stdout)
 	}
 	for _, want := range []string{
-		"zelma sessions create:",
+		"zelma instances create:",
 		"create_pane_launch_failed",
 		"zelma did not write registry state",
 		"recovery:",
@@ -105,7 +105,7 @@ func TestManagedAgentLaunchFailureLeavesNoActiveRegistryE2E(t *testing.T) {
 		}
 	}
 
-	registryPath := filepath.Join(repoRoot, ".zelma", "sessions.json")
+	registryPath := filepath.Join(repoRoot, ".zelma", "instances.json")
 	if _, err := os.Stat(registryPath); !os.IsNotExist(err) {
 		t.Fatalf("registry path stat err = %v, want no registry file after failed launch", err)
 	}
@@ -117,7 +117,7 @@ type managedCreateResult struct {
 	Created    int         `json:"created"`
 	Registered int         `json:"registered"`
 	Skipped    int         `json:"skipped"`
-	Session    liveSession `json:"session"`
+	Instance   liveSession `json:"instance"`
 }
 
 func decodeManagedCreateResult(t *testing.T, data string) managedCreateResult {

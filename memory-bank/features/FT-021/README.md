@@ -2,7 +2,7 @@
 title: "FT-021: Candidate Vs Active State Rules"
 doc_kind: feature
 doc_function: index
-purpose: "Навигация по package фичи для state rules candidate/active sessions."
+purpose: "Навигация по package фичи для state rules candidate/active instances."
 derived_from:
   - ../../dna/governance.md
   - brief.md

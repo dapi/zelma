@@ -35,7 +35,7 @@ audience: humans_and_agents
 - [FT-001: Go Module Scaffold](FT-001/README.md) — первый delivery slice
   `EP-001`: Go module scaffold and empty `zelma` binary without registry or
   zellij side effects.
-- [FT-002: Cobra Command Tree](FT-002/README.md) — `zelma sessions` command
+- [FT-002: Cobra Command Tree](FT-002/README.md) — `zelma instances` command
   group and routed command stubs.
 - [FT-003: Agent-First Help Templates](FT-003/README.md) — help output optimized
   for agents first and humans second.
@@ -44,13 +44,13 @@ audience: humans_and_agents
 - [FT-005: Repo Root Resolver](FT-005/README.md) — consistent repository root
   detection for registry commands.
 - [FT-006: Sessions Schema V1](FT-006/README.md) — versioned
-  `.zelma/sessions.json` schema.
+  `.zelma/instances.json` schema.
 - [FT-007: Atomic Registry Writes And Lock](FT-007/README.md) — safe writes and
   concurrency guard for registry persistence.
 - [FT-008: Registry Validation And Recovery](FT-008/README.md) — validation,
   diagnostics and recovery behavior for invalid registry state.
 - [FT-009: Sessions List Output](FT-009/README.md) — human and JSON output for
-  known sessions.
+  known instances.
 - [FT-010: Zellij Adapter ListSessions](FT-010/README.md) — read zellij sessions
   through the Go adapter.
 - [FT-011: Zellij Adapter ListPanes](FT-011/README.md) — read zellij panes and
@@ -95,11 +95,11 @@ audience: humans_and_agents
 - [FT-032: Supervisor Command And Zellij Launch](FT-032/README.md) — запуск
   `start-issue` в zellij pane по умолчанию или tab по явному env/config override.
 - [FT-033: Agent Session Inventory E2E](FT-033/README.md) — e2e-покрытие
-  сценария инвентаризации active/stale zelma-сессий через `sessions list --live --json`.
+  сценария инвентаризации active/stale zelma-сессий через `instances list --live --json`.
 - [FT-034: Manual Pane Adoption E2E](FT-034/README.md) — e2e-покрытие
-  обнаружения вручную созданных Codex pane через `sessions detect --json`.
+  обнаружения вручную созданных Codex pane через `instances detect --json`.
 - [FT-035: Managed Agent Launch E2E](FT-035/README.md) — e2e-покрытие
-  `sessions create --json` от запуска pane до записи registry.
+  `instances create --json` от запуска pane до записи registry.
 - [FT-036: Issue Supervisor Orchestration E2E](FT-036/README.md) — e2e-покрытие
   `start-issue` supervisor flow для GitHub issue.
 - [FT-037: Agent Recovery E2E](FT-037/README.md) — e2e-покрытие
@@ -117,20 +117,20 @@ audience: humans_and_agents
 - [FT-043: Command Arg Codex Session Evidence](FT-043/README.md) — извлечение
   `CodexSessionRef` из `codex resume <uuid>` и wrapper-provided external UUID.
 - [FT-044: Detect Evidence Explain And Indexed Lookup](FT-044/README.md) —
-  one-pass Codex evidence lookup и `sessions detect --explain`.
+  one-pass Codex evidence lookup и `instances detect --explain`.
 - [FT-045: Numeric Zelma Session IDs](FT-045/README.md) — короткий repo-local
-  numeric `id` для каждой `zelma session`, начиная с `1`.
+  numeric `id` для каждой `zelma instance`, начиная с `1`.
 - [FT-046: Pane PID Codex Session Evidence](FT-046/README.md) — fallback
-  evidence для `sessions detect`: если command/session-file evidence
+  evidence для `instances detect`: если command/session-file evidence
   недостаточно, связать zellij pane с live Codex PID и извлечь безопасный
   `CodexSessionRef`.
 - [FT-047: Focus Zelma Session By ID](FT-047/README.md) — команда
-  `sessions focus <id>` для перехода к сохраненному zellij tab/pane.
+  `instances focus <id>` для перехода к сохраненному zellij tab/pane.
 - [FT-048: Distributable Codex Skill](FT-048/README.md) — repo-local Codex
   skill package rooted at `SKILL.md` for managing `zelma` sessions through the
   public CLI contract.
 - [FT-049: TUI Monitor For Live Sessions](FT-049/README.md) — read-only
-  terminal monitor for live zelma sessions.
+  terminal monitor for live zelma instances.
 - [FT-101: Safe Message Sending To Codex Sessions](FT-101/README.md) —
-  guarded `zelma sessions send <id>` flow for delivering follow-up messages to
+  guarded `zelma instances send <id>` flow for delivering follow-up messages to
   live-revalidated Codex sessions through the public CLI and skill contract.

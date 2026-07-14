@@ -10,11 +10,11 @@ import (
 	"testing"
 )
 
-func TestListSessionsInvokesZelmaCLI(t *testing.T) {
+func TestListInstancesInvokesZelmaCLI(t *testing.T) {
 	root := t.TempDir()
 	stdout := writeFile(t, root, "stdout.json", `{
   "version": 1,
-  "sessions": [
+  "instances": [
     {
       "zellij_session": "zelma-main",
       "zellij_pane": "terminal_1",
@@ -28,25 +28,25 @@ func TestListSessionsInvokesZelmaCLI(t *testing.T) {
 	calls := filepath.Join(root, "calls.txt")
 	client := fakeCLIClient(t, root, stdout, "", "0", calls)
 
-	got, err := client.ListSessions(context.Background(), ListOptions{})
+	got, err := client.ListInstances(context.Background(), ListOptions{})
 
 	if err != nil {
-		t.Fatalf("ListSessions() error = %v", err)
+		t.Fatalf("ListInstances() error = %v", err)
 	}
-	assertCall(t, calls, root, "sessions", "list", "--json")
-	if got.Version != 1 || len(got.Sessions) != 1 {
-		t.Fatalf("ListSessions() = %+v, want schema v1 with one session", got)
+	assertCall(t, calls, root, "instances", "list", "--json")
+	if got.Version != 1 || len(got.Instances) != 1 {
+		t.Fatalf("ListInstances() = %+v, want schema v1 with one instance", got)
 	}
-	if got.Sessions[0].ZellijSession != "zelma-main" || got.Sessions[0].State != "active" {
-		t.Fatalf("session = %+v, want parsed CLI session", got.Sessions[0])
+	if got.Instances[0].ZellijSession != "zelma-main" || got.Instances[0].State != "active" {
+		t.Fatalf("session = %+v, want parsed CLI instance", got.Instances[0])
 	}
 }
 
-func TestListSessionsLiveInvokesZelmaCLI(t *testing.T) {
+func TestListInstancesLiveInvokesZelmaCLI(t *testing.T) {
 	root := t.TempDir()
 	stdout := writeFile(t, root, "stdout.json", `{
   "version": 1,
-  "sessions": [
+  "instances": [
     {
       "zellij_session": "zelma-main",
       "zellij_pane": "terminal_1",
@@ -61,18 +61,18 @@ func TestListSessionsLiveInvokesZelmaCLI(t *testing.T) {
 	calls := filepath.Join(root, "calls.txt")
 	client := fakeCLIClient(t, root, stdout, "", "0", calls)
 
-	got, err := client.ListSessions(context.Background(), ListOptions{Live: true})
+	got, err := client.ListInstances(context.Background(), ListOptions{Live: true})
 
 	if err != nil {
-		t.Fatalf("ListSessions() error = %v", err)
+		t.Fatalf("ListInstances() error = %v", err)
 	}
-	assertCall(t, calls, root, "sessions", "list", "--live", "--json")
-	if got.Sessions[0].LiveStatus != "live" {
-		t.Fatalf("live_status = %q, want live", got.Sessions[0].LiveStatus)
+	assertCall(t, calls, root, "instances", "list", "--live", "--json")
+	if got.Instances[0].LiveStatus != "live" {
+		t.Fatalf("live_status = %q, want live", got.Instances[0].LiveStatus)
 	}
 }
 
-func TestCreateSessionInvokesZelmaCLI(t *testing.T) {
+func TestCreateInstanceInvokesZelmaCLI(t *testing.T) {
 	root := t.TempDir()
 	stdout := writeFile(t, root, "stdout.json", `{
   "created": 1,
@@ -83,24 +83,24 @@ func TestCreateSessionInvokesZelmaCLI(t *testing.T) {
 	calls := filepath.Join(root, "calls.txt")
 	client := fakeCLIClient(t, root, stdout, "", "0", calls)
 
-	got, err := client.CreateSession(context.Background(), "nested/path")
+	got, err := client.CreateInstance(context.Background(), "nested/path")
 
 	if err != nil {
-		t.Fatalf("CreateSession() error = %v", err)
+		t.Fatalf("CreateInstance() error = %v", err)
 	}
-	assertCall(t, calls, root, "sessions", "create", "nested/path", "--json")
+	assertCall(t, calls, root, "instances", "create", "nested/path", "--json")
 	if got.Created != 1 || got.Registered != 1 || got.Skipped != 0 {
-		t.Fatalf("CreateSession() = %+v, want created=1 registered=1 skipped=0", got)
+		t.Fatalf("CreateInstance() = %+v, want created=1 registered=1 skipped=0", got)
 	}
 }
 
-func TestCreateSessionParsesDuplicateGuardSkip(t *testing.T) {
+func TestCreateInstanceParsesDuplicateGuardSkip(t *testing.T) {
 	root := t.TempDir()
 	stdout := writeFile(t, root, "stdout.json", `{
   "created": 0,
   "registered": 0,
   "skipped": 1,
-  "session": {
+  "instance": {
     "id": 3,
     "zellij_session": "zelma-main",
     "zellij_pane": "terminal_1",
@@ -113,21 +113,21 @@ func TestCreateSessionParsesDuplicateGuardSkip(t *testing.T) {
 	calls := filepath.Join(root, "calls.txt")
 	client := fakeCLIClient(t, root, stdout, "", "0", calls)
 
-	got, err := client.CreateSession(context.Background(), "")
+	got, err := client.CreateInstance(context.Background(), "")
 
 	if err != nil {
-		t.Fatalf("CreateSession() error = %v", err)
+		t.Fatalf("CreateInstance() error = %v", err)
 	}
-	assertCall(t, calls, root, "sessions", "create", "--json")
+	assertCall(t, calls, root, "instances", "create", "--json")
 	if got.Created != 0 || got.Registered != 0 || got.Skipped != 1 {
-		t.Fatalf("CreateSession() = %+v, want duplicate guard skipped result", got)
+		t.Fatalf("CreateInstance() = %+v, want duplicate guard skipped result", got)
 	}
-	if got.Session.ID != 3 || got.Session.State != "active" || got.Session.OpenedPath != "/workspace/zelma" {
-		t.Fatalf("Session = %+v, want existing active session", got.Session)
+	if got.Instance.ID != 3 || got.Instance.State != "active" || got.Instance.OpenedPath != "/workspace/zelma" {
+		t.Fatalf("Instance = %+v, want existing active instance", got.Instance)
 	}
 }
 
-func TestPreviewCreateSessionInvokesZelmaCLI(t *testing.T) {
+func TestPreviewCreateInstanceInvokesZelmaCLI(t *testing.T) {
 	root := t.TempDir()
 	stdout := writeFile(t, root, "stdout.json", `{
   "opened_path": "/workspace/zelma",
@@ -142,18 +142,18 @@ func TestPreviewCreateSessionInvokesZelmaCLI(t *testing.T) {
 	calls := filepath.Join(root, "calls.txt")
 	client := fakeCLIClient(t, root, stdout, "", "0", calls)
 
-	got, err := client.PreviewCreateSession(context.Background(), "")
+	got, err := client.PreviewCreateInstance(context.Background(), "")
 
 	if err != nil {
-		t.Fatalf("PreviewCreateSession() error = %v", err)
+		t.Fatalf("PreviewCreateInstance() error = %v", err)
 	}
-	assertCall(t, calls, root, "sessions", "create", "--dry-run", "--json")
+	assertCall(t, calls, root, "instances", "create", "--dry-run", "--json")
 	if got.OpenedPath != "/workspace/zelma" || got.Binary == "" || len(got.Args) != 2 {
-		t.Fatalf("PreviewCreateSession() = %+v, want launch contract", got)
+		t.Fatalf("PreviewCreateInstance() = %+v, want launch contract", got)
 	}
 }
 
-func TestDetectSessionsInvokesZelmaCLI(t *testing.T) {
+func TestDetectInstancesInvokesZelmaCLI(t *testing.T) {
 	root := t.TempDir()
 	stdout := writeFile(t, root, "stdout.json", `{
   "added": 0,
@@ -177,18 +177,18 @@ func TestDetectSessionsInvokesZelmaCLI(t *testing.T) {
 	calls := filepath.Join(root, "calls.txt")
 	client := fakeCLIClient(t, root, stdout, "", "0", calls)
 
-	got, err := client.DetectSessions(context.Background())
+	got, err := client.DetectInstances(context.Background())
 
 	if err != nil {
-		t.Fatalf("DetectSessions() error = %v", err)
+		t.Fatalf("DetectInstances() error = %v", err)
 	}
-	assertCall(t, calls, root, "sessions", "detect", "--json")
+	assertCall(t, calls, root, "instances", "detect", "--json")
 	if got.Stale != 1 || len(got.StaleCandidates) != 1 || got.StaleCandidates[0].Reason != "missing_pane" {
-		t.Fatalf("DetectSessions() = %+v, want one stale candidate", got)
+		t.Fatalf("DetectInstances() = %+v, want one stale candidate", got)
 	}
 }
 
-func TestFocusSessionInvokesZelmaCLI(t *testing.T) {
+func TestFocusInstanceInvokesZelmaCLI(t *testing.T) {
 	root := t.TempDir()
 	stdout := writeFile(t, root, "stdout.json", `{
   "id": 2,
@@ -203,14 +203,14 @@ func TestFocusSessionInvokesZelmaCLI(t *testing.T) {
 	calls := filepath.Join(root, "calls.txt")
 	client := fakeCLIClient(t, root, stdout, "", "0", calls)
 
-	got, err := client.FocusSession(context.Background(), 2)
+	got, err := client.FocusInstance(context.Background(), 2)
 
 	if err != nil {
-		t.Fatalf("FocusSession() error = %v", err)
+		t.Fatalf("FocusInstance() error = %v", err)
 	}
-	assertCall(t, calls, root, "sessions", "focus", "2", "--json")
+	assertCall(t, calls, root, "instances", "focus", "2", "--json")
 	if got.ID != 2 || got.ZellijPane != "terminal_75" || got.State != "active" {
-		t.Fatalf("FocusSession() = %+v, want focused active session 2", got)
+		t.Fatalf("FocusInstance() = %+v, want focused active instance 2", got)
 	}
 }
 
@@ -240,9 +240,9 @@ func TestSendMessageInvokesZelmaCLI(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SendMessage() error = %v", err)
 	}
-	assertCall(t, calls, root, "sessions", "send", "2", "--json", "--", "continue carefully")
+	assertCall(t, calls, root, "instances", "send", "2", "--json", "--", "continue carefully")
 	if got.ID != 2 || got.ZellijPane != "terminal_75" || got.Message.Source != "argument" || !got.Message.Submitted {
-		t.Fatalf("SendMessage() = %+v, want sent active session metadata", got)
+		t.Fatalf("SendMessage() = %+v, want sent active instance metadata", got)
 	}
 }
 
@@ -277,7 +277,7 @@ func TestSendMessageFromStdinInvokesZelmaCLIWithStdin(t *testing.T) {
 	if runner.calls != 1 {
 		t.Fatalf("runner calls = %d, want 1", runner.calls)
 	}
-	wantArgs := []string{"sessions", "send", "2", "--stdin", "--json"}
+	wantArgs := []string{"instances", "send", "2", "--stdin", "--json"}
 	if strings.Join(runner.request.Args, "\x00") != strings.Join(wantArgs, "\x00") {
 		t.Fatalf("args = %#v, want %#v", runner.request.Args, wantArgs)
 	}
@@ -292,11 +292,11 @@ func TestSendMessageFromStdinInvokesZelmaCLIWithStdin(t *testing.T) {
 	}
 }
 
-func TestObserveSessionBufferInvokesZelmaCLI(t *testing.T) {
+func TestObserveInstanceBufferInvokesZelmaCLI(t *testing.T) {
 	root := t.TempDir()
 	stdout := writeFile(t, root, "stdout.json", `{
   "version": 1,
-  "session_id": 2,
+  "instance_id": 2,
   "source": "zellij_buffer",
   "captured_at": "2026-07-10T00:00:00Z",
   "truncated": true,
@@ -312,25 +312,25 @@ func TestObserveSessionBufferInvokesZelmaCLI(t *testing.T) {
 	calls := filepath.Join(root, "calls.txt")
 	client := fakeCLIClient(t, root, stdout, "", "0", calls)
 
-	got, err := client.ObserveSessionBuffer(context.Background(), 2, 2)
+	got, err := client.ObserveInstanceBuffer(context.Background(), 2, 2)
 
 	if err != nil {
-		t.Fatalf("ObserveSessionBuffer() error = %v", err)
+		t.Fatalf("ObserveInstanceBuffer() error = %v", err)
 	}
-	assertCall(t, calls, root, "sessions", "buffer", "2", "--json", "--tail", "2")
-	if got.Version != 1 || got.Source != "zellij_buffer" || got.SessionID != 2 || len(got.Items) != 1 {
-		t.Fatalf("ObserveSessionBuffer() = %+v, want parsed buffer observation", got)
+	assertCall(t, calls, root, "instances", "buffer", "2", "--json", "--tail", "2")
+	if got.Version != 1 || got.Source != "zellij_buffer" || got.InstanceID != 2 || len(got.Items) != 1 {
+		t.Fatalf("ObserveInstanceBuffer() = %+v, want parsed buffer observation", got)
 	}
 	if got.Items[0].Line != 3 || got.Items[0].Text != "synthetic pane line" {
 		t.Fatalf("Buffer item = %+v, want parsed line", got.Items[0])
 	}
 }
 
-func TestObserveSessionTranscriptInvokesZelmaCLI(t *testing.T) {
+func TestObserveInstanceTranscriptInvokesZelmaCLI(t *testing.T) {
 	root := t.TempDir()
 	stdout := writeFile(t, root, "stdout.json", `{
   "version": 1,
-  "session_id": 2,
+  "instance_id": 2,
   "source": "codex_transcript",
   "captured_at": "2026-07-10T00:00:00Z",
   "truncated": false,
@@ -350,14 +350,14 @@ func TestObserveSessionTranscriptInvokesZelmaCLI(t *testing.T) {
 	calls := filepath.Join(root, "calls.txt")
 	client := fakeCLIClient(t, root, stdout, "", "0", calls)
 
-	got, err := client.ObserveSessionTranscript(context.Background(), 2, 1)
+	got, err := client.ObserveInstanceTranscript(context.Background(), 2, 1)
 
 	if err != nil {
-		t.Fatalf("ObserveSessionTranscript() error = %v", err)
+		t.Fatalf("ObserveInstanceTranscript() error = %v", err)
 	}
-	assertCall(t, calls, root, "sessions", "transcript", "2", "--json", "--tail", "1")
+	assertCall(t, calls, root, "instances", "transcript", "2", "--json", "--tail", "1")
 	if got.Version != 1 || got.Source != "codex_transcript" || got.CodexSession == "" || len(got.Items) != 1 {
-		t.Fatalf("ObserveSessionTranscript() = %+v, want parsed transcript observation", got)
+		t.Fatalf("ObserveInstanceTranscript() = %+v, want parsed transcript observation", got)
 	}
 	if got.Items[0].Index != 4 || got.Items[0].Type != "assistant_message" || !strings.Contains(string(got.Items[0].Payload), "synthetic answer") {
 		t.Fatalf("Transcript item = %+v, want parsed event", got.Items[0])
@@ -366,15 +366,15 @@ func TestObserveSessionTranscriptInvokesZelmaCLI(t *testing.T) {
 
 func TestCommandErrorPreservesDiagnosticsAndRecovery(t *testing.T) {
 	root := t.TempDir()
-	stderr := writeFile(t, root, "stderr.txt", "zelma sessions list: registry_unsupported_version: unsupported schema version 2\n")
+	stderr := writeFile(t, root, "stderr.txt", "zelma instances list: registry_unsupported_version: unsupported schema version 2\n")
 	calls := filepath.Join(root, "calls.txt")
 	client := fakeCLIClient(t, root, "", stderr, "1", calls)
 
-	_, err := client.ListSessions(context.Background(), ListOptions{})
+	_, err := client.ListInstances(context.Background(), ListOptions{})
 
 	var commandErr *CommandError
 	if !errors.As(err, &commandErr) {
-		t.Fatalf("ListSessions() error = %T, want CommandError", err)
+		t.Fatalf("ListInstances() error = %T, want CommandError", err)
 	}
 	if commandErr.ExitCode != 1 {
 		t.Fatalf("ExitCode = %d, want 1", commandErr.ExitCode)
@@ -388,47 +388,47 @@ func TestCommandErrorPreservesDiagnosticsAndRecovery(t *testing.T) {
 	if commandErr.Recovery.Action != RecoveryActionStop || commandErr.Recovery.ReasonCode != "registry_unsupported_version" {
 		t.Fatalf("Recovery = %+v, want stop for registry_unsupported_version", commandErr.Recovery)
 	}
-	assertCall(t, calls, root, "sessions", "list", "--json")
+	assertCall(t, calls, root, "instances", "list", "--json")
 }
 
-func TestListSessionsRejectsUnsupportedSchemaVersion(t *testing.T) {
+func TestListInstancesRejectsUnsupportedSchemaVersion(t *testing.T) {
 	root := t.TempDir()
 	stdout := writeFile(t, root, "stdout.json", `{
   "version": 2,
-  "sessions": []
+  "instances": []
 }
 `)
 	calls := filepath.Join(root, "calls.txt")
 	client := fakeCLIClient(t, root, stdout, "", "0", calls)
 
-	_, err := client.ListSessions(context.Background(), ListOptions{})
+	_, err := client.ListInstances(context.Background(), ListOptions{})
 
 	var contractErr *ContractError
 	if !errors.As(err, &contractErr) {
-		t.Fatalf("ListSessions() error = %T, want ContractError", err)
+		t.Fatalf("ListInstances() error = %T, want ContractError", err)
 	}
 	if !strings.Contains(contractErr.Error(), "schema version 2") {
 		t.Fatalf("ContractError = %v, want schema version diagnostic", contractErr)
 	}
-	assertCall(t, calls, root, "sessions", "list", "--json")
+	assertCall(t, calls, root, "instances", "list", "--json")
 }
 
 func TestCreatePartialFailureSuggestsDetectRecovery(t *testing.T) {
 	root := t.TempDir()
-	stderr := writeFile(t, root, "stderr.txt", "zelma sessions create: create session: create_pane_unconfirmed: created pane could not be confirmed; recovery: run zelma sessions detect --json\n")
+	stderr := writeFile(t, root, "stderr.txt", "zelma instances create: create instance: create_pane_unconfirmed: created pane could not be confirmed; recovery: run zelma instances detect --json\n")
 	calls := filepath.Join(root, "calls.txt")
 	client := fakeCLIClient(t, root, "", stderr, "1", calls)
 
-	_, err := client.CreateSession(context.Background(), "")
+	_, err := client.CreateInstance(context.Background(), "")
 
 	var commandErr *CommandError
 	if !errors.As(err, &commandErr) {
-		t.Fatalf("CreateSession() error = %T, want CommandError", err)
+		t.Fatalf("CreateInstance() error = %T, want CommandError", err)
 	}
 	if commandErr.Recovery.Action != RecoveryActionDetect || commandErr.Recovery.ReasonCode != "create_pane_unconfirmed" {
 		t.Fatalf("Recovery = %+v, want detect for create_pane_unconfirmed", commandErr.Recovery)
 	}
-	assertRecoveryCommand(t, commandErr.Recovery, DefaultZelmaBinary, "sessions", "detect", "--json")
+	assertRecoveryCommand(t, commandErr.Recovery, DefaultZelmaBinary, "instances", "detect", "--json")
 }
 
 func TestRecoveryJSONUsesAgentContractFields(t *testing.T) {
@@ -436,7 +436,7 @@ func TestRecoveryJSONUsesAgentContractFields(t *testing.T) {
 		Action:      RecoveryActionDetect,
 		ReasonCode:  "create_pane_unconfirmed",
 		Message:     "reconcile through detect",
-		NextCommand: []string{DefaultZelmaBinary, "sessions", "detect", "--json"},
+		NextCommand: []string{DefaultZelmaBinary, "instances", "detect", "--json"},
 	})
 	if err != nil {
 		t.Fatalf("Marshal(Recovery) error = %v", err)
@@ -457,15 +457,15 @@ func TestRecoveryJSONUsesAgentContractFields(t *testing.T) {
 
 func TestRepoNotReadyErrorSuggestsSetup(t *testing.T) {
 	root := t.TempDir()
-	stderr := writeFile(t, root, "stderr.txt", "zelma sessions list: unsupported repo: no Git worktree found from /tmp/outside\nhint: run zelma sessions list from inside a Git repository\n")
+	stderr := writeFile(t, root, "stderr.txt", "zelma instances list: unsupported repo: no Git worktree found from /tmp/outside\nhint: run zelma instances list from inside a Git repository\n")
 	calls := filepath.Join(root, "calls.txt")
 	client := fakeCLIClient(t, root, "", stderr, "1", calls)
 
-	_, err := client.ListSessions(context.Background(), ListOptions{})
+	_, err := client.ListInstances(context.Background(), ListOptions{})
 
 	var commandErr *CommandError
 	if !errors.As(err, &commandErr) {
-		t.Fatalf("ListSessions() error = %T, want CommandError", err)
+		t.Fatalf("ListInstances() error = %T, want CommandError", err)
 	}
 	if commandErr.Recovery.Action != RecoveryActionSetup || commandErr.Recovery.ReasonCode != ReasonUnsupportedRepo {
 		t.Fatalf("Recovery = %+v, want setup for unsupported repo", commandErr.Recovery)
@@ -475,15 +475,15 @@ func TestRepoNotReadyErrorSuggestsSetup(t *testing.T) {
 
 func TestZellijUnavailableErrorStopsForEnvironmentFix(t *testing.T) {
 	root := t.TempDir()
-	stderr := writeFile(t, root, "stderr.txt", "zelma sessions detect: zellij adapter: zellij_missing_binary: zellij binary was not found; recovery: install zellij or configure the adapter binary path\n")
+	stderr := writeFile(t, root, "stderr.txt", "zelma instances detect: zellij adapter: zellij_missing_binary: zellij binary was not found; recovery: install zellij or configure the adapter binary path\n")
 	calls := filepath.Join(root, "calls.txt")
 	client := fakeCLIClient(t, root, "", stderr, "1", calls)
 
-	_, err := client.DetectSessions(context.Background())
+	_, err := client.DetectInstances(context.Background())
 
 	var commandErr *CommandError
 	if !errors.As(err, &commandErr) {
-		t.Fatalf("DetectSessions() error = %T, want CommandError", err)
+		t.Fatalf("DetectInstances() error = %T, want CommandError", err)
 	}
 	if commandErr.Recovery.Action != RecoveryActionStop || commandErr.Recovery.ReasonCode != "zellij_missing_binary" {
 		t.Fatalf("Recovery = %+v, want stop for zellij_missing_binary", commandErr.Recovery)
@@ -495,7 +495,7 @@ func TestZellijUnavailableErrorStopsForEnvironmentFix(t *testing.T) {
 
 func TestSendNotReadySuggestsLiveListOnly(t *testing.T) {
 	root := t.TempDir()
-	stderr := writeFile(t, root, "stderr.txt", "zelma sessions send: send message: codex_runtime_missing: pane command evidence does not indicate Codex; recovery: run zelma sessions list --live --json\n")
+	stderr := writeFile(t, root, "stderr.txt", "zelma instances send: send message: codex_runtime_missing: pane command evidence does not indicate Codex; recovery: run zelma instances list --live --json\n")
 	calls := filepath.Join(root, "calls.txt")
 	client := fakeCLIClient(t, root, "", stderr, "1", calls)
 
@@ -508,7 +508,7 @@ func TestSendNotReadySuggestsLiveListOnly(t *testing.T) {
 	if commandErr.Recovery.Action != RecoveryActionInspect || commandErr.Recovery.ReasonCode != "send_target_not_ready" {
 		t.Fatalf("Recovery = %+v, want inspect for send_target_not_ready", commandErr.Recovery)
 	}
-	assertRecoveryCommand(t, commandErr.Recovery, DefaultZelmaBinary, "sessions", "list", "--live", "--json")
+	assertRecoveryCommand(t, commandErr.Recovery, DefaultZelmaBinary, "instances", "list", "--live", "--json")
 	if strings.Contains(commandErr.Error(), "SECRET_PROMPT_BODY") || strings.Contains(strings.Join(commandErr.Command, " "), "SECRET_PROMPT_BODY") {
 		t.Fatalf("CommandError leaked message body: command=%#v error=%q", commandErr.Command, commandErr.Error())
 	}
@@ -516,7 +516,7 @@ func TestSendNotReadySuggestsLiveListOnly(t *testing.T) {
 
 func TestSendMessageWithDashPrefixedPromptUsesSeparatorAndRedactsDiagnostics(t *testing.T) {
 	root := t.TempDir()
-	stderr := writeFile(t, root, "stderr.txt", "zelma sessions send: send message: codex_runtime_missing: pane command evidence does not indicate Codex\n")
+	stderr := writeFile(t, root, "stderr.txt", "zelma instances send: send message: codex_runtime_missing: pane command evidence does not indicate Codex\n")
 	calls := filepath.Join(root, "calls.txt")
 	client := fakeCLIClient(t, root, "", stderr, "1", calls)
 
@@ -526,7 +526,7 @@ func TestSendMessageWithDashPrefixedPromptUsesSeparatorAndRedactsDiagnostics(t *
 	if !errors.As(err, &commandErr) {
 		t.Fatalf("SendMessage() error = %T, want CommandError", err)
 	}
-	assertCall(t, calls, root, "sessions", "send", "2", "--json", "--", "-SECRET_PROMPT_BODY")
+	assertCall(t, calls, root, "instances", "send", "2", "--json", "--", "-SECRET_PROMPT_BODY")
 	if strings.Contains(commandErr.Error(), "-SECRET_PROMPT_BODY") || strings.Contains(strings.Join(commandErr.Command, " "), "-SECRET_PROMPT_BODY") {
 		t.Fatalf("CommandError leaked dash-prefixed message body: command=%#v error=%q", commandErr.Command, commandErr.Error())
 	}
@@ -536,18 +536,18 @@ func TestSendMessageWithDashPrefixedPromptUsesSeparatorAndRedactsDiagnostics(t *
 }
 
 func TestEmptyRegistryWithLikelyLivePanesSuggestsDetect(t *testing.T) {
-	recovery := RecoveryForListResult(SessionsList{Version: SessionsSchemaVersion}, ListRecoveryOptions{
+	recovery := RecoveryForListResult(InstanceList{Version: InstanceSchemaVersion}, ListRecoveryOptions{
 		LivePanesLikely: true,
 	})
 
 	if recovery.Action != RecoveryActionDetect || recovery.ReasonCode != ReasonEmptyRegistryPanesLikely {
 		t.Fatalf("Recovery = %+v, want detect for likely live panes", recovery)
 	}
-	assertRecoveryCommand(t, recovery, DefaultZelmaBinary, "sessions", "detect", "--json")
+	assertRecoveryCommand(t, recovery, DefaultZelmaBinary, "instances", "detect", "--json")
 }
 
 func TestEmptyRegistryWithoutLikelyLivePanesHasNoRecovery(t *testing.T) {
-	recovery := RecoveryForListResult(SessionsList{Version: SessionsSchemaVersion}, ListRecoveryOptions{})
+	recovery := RecoveryForListResult(InstanceList{Version: InstanceSchemaVersion}, ListRecoveryOptions{})
 
 	if !isZeroRecovery(recovery) {
 		t.Fatalf("Recovery = %+v, want zero recovery", recovery)
@@ -568,18 +568,18 @@ func TestDetectStaleResultSuggestsCleanupPreviewOnly(t *testing.T) {
 	})
 
 	if recovery.Action != RecoveryActionInspect || recovery.ReasonCode != ReasonStaleSessionsDetected {
-		t.Fatalf("Recovery = %+v, want inspect for stale sessions", recovery)
+		t.Fatalf("Recovery = %+v, want inspect for stale instances", recovery)
 	}
-	assertRecoveryCommand(t, recovery, DefaultZelmaBinary, "sessions", "cleanup", "--json")
+	assertRecoveryCommand(t, recovery, DefaultZelmaBinary, "instances", "cleanup", "--json")
 }
 
 func TestRecoveryCommandsStayInsideSafeZelmaSurface(t *testing.T) {
 	recoveries := []Recovery{
-		recoveryFor("zelma sessions list: unsupported repo: no Git worktree found"),
-		recoveryFor("zelma sessions create: create session: create_pane_unconfirmed: created pane could not be confirmed"),
-		recoveryFor("zelma sessions create: create session: create_registry_write_failed: write sessions registry failed"),
-		recoveryFor("zelma sessions send: send message: codex_runtime_missing: pane command evidence does not indicate Codex"),
-		RecoveryForListResult(SessionsList{Version: SessionsSchemaVersion}, ListRecoveryOptions{LivePanesLikely: true}),
+		recoveryFor("zelma instances list: unsupported repo: no Git worktree found"),
+		recoveryFor("zelma instances create: create instance: create_pane_unconfirmed: created pane could not be confirmed"),
+		recoveryFor("zelma instances create: create instance: create_registry_write_failed: write instances registry failed"),
+		recoveryFor("zelma instances send: send message: codex_runtime_missing: pane command evidence does not indicate Codex"),
+		RecoveryForListResult(InstanceList{Version: InstanceSchemaVersion}, ListRecoveryOptions{LivePanesLikely: true}),
 		RecoveryForDetectResult(DetectSummary{Stale: 1}),
 	}
 
@@ -592,7 +592,7 @@ func TestRecoveryCommandsStayInsideSafeZelmaSurface(t *testing.T) {
 			t.Fatalf("Recovery = %+v, want next command to use zelma CLI", recovery)
 		}
 		joined := strings.Join(command, " ")
-		for _, forbidden := range []string{"zellij", ".zelma", "sessions.json", "--confirm"} {
+		for _, forbidden := range []string{"zellij", ".zelma", "instances.json", "--confirm"} {
 			if strings.Contains(joined, forbidden) {
 				t.Fatalf("Recovery = %+v, command must not contain %q", recovery, forbidden)
 			}
@@ -612,11 +612,11 @@ func TestDecodeRejectsTrailingData(t *testing.T) {
 	calls := filepath.Join(root, "calls.txt")
 	client := fakeCLIClient(t, root, stdout, "", "0", calls)
 
-	_, err := client.CreateSession(context.Background(), "")
+	_, err := client.CreateInstance(context.Background(), "")
 
 	var decodeErr *DecodeError
 	if !errors.As(err, &decodeErr) {
-		t.Fatalf("CreateSession() error = %T, want DecodeError", err)
+		t.Fatalf("CreateInstance() error = %T, want DecodeError", err)
 	}
 	if !strings.Contains(decodeErr.Stdout, `"created": 1`) {
 		t.Fatalf("DecodeError stdout = %q, want preserved stdout", decodeErr.Stdout)

@@ -14,12 +14,12 @@ audience: humans_and_agents
 
 Каталог `memory-bank/` содержит durable knowledge layer проекта `zelma`.
 Главный фокус текущей версии документации: удерживать согласованными
-продуктовую цель, предметную модель `zelma sessions`, roadmap, instantiated
+продуктовую цель, предметную модель `zelma instances`, roadmap, instantiated
 epics и feature packages.
 
 `zelma` управляет Codex-сессиями внутри `zellij panes`: создает управляемые
 сессии, обнаруживает вручную запущенные Codex panes и хранит локальный реестр в
-`.zelma/sessions.json`.
+`.zelma/instances.json`.
 
 ## Аннотированный индекс
 
@@ -28,8 +28,8 @@ epics и feature packages.
   какие workflows важны и каким roadmap движется проект.
 
 - [`domain/README.md`](domain/README.md)
-  Читать, когда нужно: зафиксировать язык `zelma sessions`, свойства записи,
-  правила `.zelma/sessions.json`, lifecycle, события и bounded contexts.
+  Читать, когда нужно: зафиксировать язык `zelma instances`, свойства записи,
+  правила `.zelma/instances.json`, lifecycle, события и bounded contexts.
 
 - [`prd/README.md`](prd/README.md)
   Читать, когда нужно: описать продуктовую инициативу между общим product context и downstream feature packages.

@@ -27,7 +27,7 @@ must_not_define:
   a human gate?
 - Available facts:
   - Issue 2 names `FT-002: Дерево команд Cobra` and lists `zelma setup`,
-    `zelma sessions list/create/detect`, no registry writes, no `.gitignore`
+    `zelma instances list/create/detect`, no registry writes, no `.gitignore`
     changes and no `zellij` calls.
   - `brief.md` has matching `REQ-*`, `NS-*`, `SC-*`, `CHK-*` and
     `Design required: yes`.
@@ -52,9 +52,9 @@ must_not_define:
 - Available facts:
   - Issue 2 requires stubs to return predictable diagnostics without side
     effects.
-  - EP-001 charter allows `sessions list/create/detect` stubs with predictable
+  - EP-001 charter allows `instances list/create/detect` stubs with predictable
     errors or placeholder behavior.
-  - `brief.md` excludes `.zelma/sessions.json`, `.gitignore` and live `zellij`
+  - `brief.md` excludes `.zelma/instances.json`, `.gitignore` and live `zellij`
     behavior.
   - FT-003 owns agent-first help templates; FT-004 owns broader output/error
     contract tests.
@@ -97,8 +97,8 @@ must_not_define:
 - Available facts:
   - Current code has only `cmd/zelma/main.go`, `internal/cli/cli.go` and
     `go.mod`.
-  - FT-002 excludes `.zelma/sessions.json` and live `zellij`.
-  - FT-001 used `rg -n "zellij|sessions.json|\\.zelma" cmd internal` as a
+  - FT-002 excludes `.zelma/instances.json` and live `zellij`.
+  - FT-001 used `rg -n "zellij|instances.json|\\.zelma" cmd internal` as a
     side-effect boundary check.
 - Decision: Use Go tests for routing/stub behavior and static search/code
   review for forbidden side-effect paths.

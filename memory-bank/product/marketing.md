@@ -25,7 +25,7 @@ canonical_for:
 | --- | --- | --- | --- |
 | `SEG-01` | Ручной `zellij` layout, pane names, shell history, личная память | `zelma` создает repo-local registry и дает CLI-инвентарь Codex panes | MVP target; evidence pending |
 | `SEG-02` | Custom scripts вокруг `zellij`/Codex | `zelma` задает общий domain contract и skill-friendly CLI | MVP target; evidence pending |
-| `SEG-03` | Неформальные team conventions | `.zelma/sessions.json` и команды `sessions *` делают workflow повторяемым | Assumption; evidence pending |
+| `SEG-03` | Неформальные team conventions | `.zelma/instances.json` и команды `sessions *` делают workflow повторяемым | Assumption; evidence pending |
 
 ## Messaging
 
@@ -51,8 +51,8 @@ canonical_for:
 
 ## Launch Constraints
 
-- `LC-01` До MVP launch должны работать `sessions create`, `sessions detect` и
-  `sessions list` на поддерживаемой версии `zellij`.
+- `LC-01` До MVP launch должны работать `instances create`, `instances detect` и
+  `instances list` на поддерживаемой версии `zellij`.
 - `LC-02` Нельзя обещать надежный detect без явного списка поддерживаемых Codex и
   `zellij` versions.
 - `LC-03` Нельзя заявлять multi-machine или GUI support до отдельного roadmap

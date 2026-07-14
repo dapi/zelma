@@ -52,7 +52,7 @@ otherwise.
 | `docs-memory-bank` | Проверить governed docs, links, indexing и typo guard | Any PR touching `memory-bank/` |
 | `go-unit-contract` | Unit, fixture, schema, CLI help/output and adapter contract tests | Any runtime PR |
 | `go-race` | Race check for shared state, locks and concurrent registry writes | PRs touching registry/concurrency |
-| `docker-zellij-e2e` | End-to-end checks against real `zellij` in a container | PRs that claim `sessions create/detect/list` live integration is done |
+| `docker-zellij-e2e` | End-to-end checks against real `zellij` in a container | PRs that claim `instances create/detect/list` live integration is done |
 
 `docker-zellij-e2e` is required for feature closure once a feature depends on
 real `zellij` pane creation, live pane discovery or command execution. The local
@@ -82,8 +82,8 @@ Implemented design:
   account, network access, user prompts or conversation transcripts.
 - Synthetic Codex fixtures may contain UUID, cwd, timestamp and CLI version
   metadata only. Do not include real prompts, responses or user session logs.
-- The runner exercises the smallest real integration path: `sessions create`,
-  `sessions detect`, `sessions list --live` and JSON output contracts.
+- The runner exercises the smallest real integration path: `instances create`,
+  `instances detect`, `instances list --live` and JSON output contracts.
 - The e2e job must have an explicit timeout and must surface `zellij` start logs
   on failure.
 
@@ -158,10 +158,10 @@ Canonical lifecycle gates живут в [../flows/feature-flow.md](../flows/feat
 ## Project-Specific Conventions
 
 - Registry schema changes require contract tests against sample
-  `.zelma/sessions.json` files.
-- `sessions detect` requires fixtures for `zellij` inspection output and Codex
+  `.zelma/instances.json` files.
+- `instances detect` requires fixtures for `zellij` inspection output and Codex
   identification evidence before it can be considered regression-covered.
-- `sessions create` requires integration coverage or a documented manual-only
+- `instances create` requires integration coverage or a documented manual-only
   gap until reliable local automation around `zellij` pane creation exists.
 - Reliable local automation around `zellij` means the Docker e2e target above,
   not an ad hoc manual run inside a developer's current terminal session.

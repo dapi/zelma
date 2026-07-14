@@ -2,7 +2,7 @@
 title: "FT-018: Create Failure Recovery Hints"
 doc_kind: feature
 doc_function: canonical
-purpose: "Канонический brief для agent-friendly recovery hints при частичных сбоях `zelma sessions create`."
+purpose: "Канонический brief для agent-friendly recovery hints при частичных сбоях `zelma instances create`."
 derived_from:
   - ../../product/roadmap.md
   - ../../epics/EP-004/brief.md

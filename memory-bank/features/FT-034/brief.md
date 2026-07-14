@@ -24,12 +24,12 @@ must_not_define:
 
 ### Результат
 
-`zelma sessions detect --json` покрыт e2e-тестом с несколькими pane: уверенная Codex pane добавляется, не-Codex pane пропускается, повторный запуск идемпотентен.
+`zelma instances detect --json` покрыт e2e-тестом с несколькими pane: уверенная Codex pane добавляется, не-Codex pane пропускается, повторный запуск идемпотентен.
 
 ### Объем Работ
 
 - `REQ-01` Смоделировать zellij panes с Codex и non-Codex командами.
-- `REQ-02` Проверить upsert в `.zelma/sessions.json`.
+- `REQ-02` Проверить upsert в `.zelma/instances.json`.
 - `REQ-03` Проверить повторный detect без дублей.
 - `REQ-04` Проверить JSON summary added/known/skipped.
 
@@ -47,4 +47,4 @@ must_not_define:
 
 ### Обязательное E2E-Покрытие
 
-Feature считается готовой только после e2e-теста, который исполняет `zelma sessions detect --json` через CLI entrypoint.
+Feature считается готовой только после e2e-теста, который исполняет `zelma instances detect --json` через CLI entrypoint.

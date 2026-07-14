@@ -63,7 +63,7 @@ surface и setup behavior существуют как merged baseline для dow
 - `#25` / `FT-013`: Codex Pane Candidate Classifier
 - `#26` / `FT-014`: Detect Upsert Idempotency
 
-Результат волны: `zelma sessions detect` может консервативно находить Codex
+Результат волны: `zelma instances detect` может консервативно находить Codex
 pane candidates и идемпотентно обновлять registry.
 
 ## Волна 3: Create MVP
@@ -78,7 +78,7 @@ pane candidates и идемпотентно обновлять registry.
 - `#29` / `FT-017`: Create Confirmation And Reconciliation
 - `#30` / `FT-018`: Create Failure Recovery Hints
 
-Результат волны: `zelma sessions create` создает managed Codex pane,
+Результат волны: `zelma instances create` создает managed Codex pane,
 подтверждает ее и дает понятные recovery hints при частичных сбоях.
 
 ## Волна 4: Codex Session Identity

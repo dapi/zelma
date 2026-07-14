@@ -24,7 +24,7 @@ must_not_define:
 
 ### Результат
 
-E2E-тест fresh repo проверяет `zelma setup --json`, идемпотентность `.gitignore`, `sessions list --json` и `sessions detect --json`.
+E2E-тест fresh repo проверяет `zelma setup --json`, идемпотентность `.gitignore`, `instances list --json` и `instances detect --json`.
 
 ### Объем Работ
 

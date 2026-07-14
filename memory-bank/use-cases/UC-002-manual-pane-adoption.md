@@ -17,7 +17,7 @@ must_not_define:
 
 ## Goal
 
-Zelma находит zellij pane, где уже запущен Codex, и добавляет ее в `.zelma/sessions.json`, чтобы дальнейший supervisor мог управлять этой работой как обычной zelma-сессией.
+Zelma находит zellij pane, где уже запущен Codex, и добавляет ее в `.zelma/instances.json`, чтобы дальнейший supervisor мог управлять этой работой как обычной zelma-сессией.
 
 ## Primary Actor
 
@@ -25,7 +25,7 @@ Supervising agent.
 
 ## Trigger
 
-Пользователь вручную создал pane и запустил Codex, после чего агент вызывает `zelma sessions list --json`.
+Пользователь вручную создал pane и запустил Codex, после чего агент вызывает `zelma instances list --json`.
 
 ## Preconditions
 
@@ -35,7 +35,7 @@ Supervising agent.
 
 ## Main Flow
 
-1. Агент вызывает `zelma sessions list --json`.
+1. Агент вызывает `zelma instances list --json`.
 2. Zelma получает список pane и классифицирует Codex candidates.
 3. Zelma idempotent upsert записывает уверенные совпадения в registry.
 4. Zelma возвращает JSON с добавленными, уже известными и пропущенными pane.
@@ -48,8 +48,8 @@ Supervising agent.
 
 ## Postconditions
 
-- Обнаруженные Codex pane доступны в `sessions list`; standalone `sessions detect` остается diagnostic/manual вариантом.
-- Не-Codex pane не записываются как active sessions.
+- Обнаруженные Codex pane доступны в `instances list`; standalone `instances detect` остается diagnostic/manual вариантом.
+- Не-Codex pane не записываются как active instances.
 
 ## Business Rules
 

@@ -2,7 +2,7 @@
 title: "FT-049: TUI Monitor For Live Sessions"
 doc_kind: feature
 doc_function: index
-purpose: "Навигация по feature package для read-only TUI monitor поверх live zelma session status."
+purpose: "Навигация по feature package для read-only TUI monitor поверх live zelma instance status."
 derived_from:
   - ../../dna/governance.md
   - brief.md

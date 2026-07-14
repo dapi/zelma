@@ -31,7 +31,7 @@ identity fields are absent or invalid.
 
 ## Invariants
 
-- `INV-01` The parser does not write `.zelma/sessions.json`.
+- `INV-01` The parser does not write `.zelma/instances.json`.
 - `INV-02` The parser does not promote candidate sessions to `active`.
 - `INV-03` Relative or empty `cwd` values are not emitted as safe metadata.
 

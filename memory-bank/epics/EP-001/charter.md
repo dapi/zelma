@@ -27,9 +27,9 @@ command tree, output/error contract и базовую developer workflow.
 Есть installable/testable Go CLI skeleton:
 
 - binary называется `zelma`;
-- top-level command и `sessions` command group существуют;
-- `zelma`, `zelma help`, `zelma sessions help` выводят agent-first help;
-- пустые `sessions list/create/detect` существуют как command stubs с
+- top-level command и `instances` command group существуют;
+- `zelma`, `zelma help`, `zelma instances help` выводят agent-first help;
+- пустые `instances list/create/detect` существуют как command stubs с
   predictable errors или placeholder behavior;
 - local Go test command проходит.
 
@@ -48,14 +48,14 @@ command tree, output/error contract и базовую developer workflow.
   with ADR-001.
 - `REQ-03` Use Cobra for command tree.
 - `REQ-04` Implement top-level and `sessions` help as agent-first output.
-- `REQ-05` Add command stubs for `sessions list`, `sessions create`,
-  `sessions detect`.
+- `REQ-05` Add command stubs for `instances list`, `instances create`,
+  `instances detect`.
 - `REQ-06` Add tests that lock help/output contract enough to prevent accidental
   fallback to generic Cobra help.
 
 ## Non-Scope
 
-- `NS-01` No `.zelma/sessions.json` schema or persistence implementation.
+- `NS-01` No `.zelma/instances.json` schema or persistence implementation.
 - `NS-02` No live `zellij` command execution.
 - `NS-03` No Codex session identification.
 - `NS-04` No GitHub Actions release pipeline.
@@ -76,7 +76,7 @@ command tree, output/error contract и базовую developer workflow.
 | --- | --- |
 | Go scaffold exists | `go test ./...` can run once Go toolchain is available |
 | Agent-first help exists | Help tests assert command map appears before prose |
-| Command tree exists | `zelma sessions list/create/detect --help` are routed by Cobra |
+| Command tree exists | `zelma instances list/create/detect --help` are routed by Cobra |
 | No external side effects | Feature packages under this epic do not call live `zellij` unless explicitly moved to later epic |
 
 ## Handoff

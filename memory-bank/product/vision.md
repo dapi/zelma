@@ -25,7 +25,7 @@ canonical_for:
 репозитория.
 
 Долгосрочно `zelma` должна стать тонким, предсказуемым coordination layer для
-agentic development: CLI остается источником команд, `.zelma/sessions.json`
+agentic development: CLI остается источником команд, `.zelma/instances.json`
 остается локальным реестром, а Codex skills используют эти контракты для
 управления параллельными рабочими сессиями.
 
@@ -33,15 +33,15 @@ agentic development: CLI остается источником команд, `.z
 
 | Bet ID | Bet | Why now | Evidence | Review cadence |
 | --- | --- | --- | --- | --- |
-| `BET-01` | Локальный registry-first подход лучше скрытой глобальной автоматики | Пользователю нужна прозрачность и versionable reasoning вокруг repo-local Codex работы | Product prompt `2026-07-07` | После MVP `sessions create/list/detect` |
+| `BET-01` | Локальный registry-first подход лучше скрытой глобальной автоматики | Пользователю нужна прозрачность и versionable reasoning вокруг repo-local Codex работы | Product prompt `2026-07-07` | После MVP `instances create/list/detect` |
 | `BET-02` | CLI должен быть canonical interface для skills | Skills проще поддерживать, если они вызывают те же команды, что и человек | Архитектурное предположение | При проектировании первого skill |
 | `BET-03` | Авто-detect важен не меньше controlled create | Пользователи уже создают panes вручную и не будут всегда начинать через `zelma` | Product prompt `2026-07-07` | После реализации detection fixtures |
 
 ## Experience Principles
 
 - `XP-01` Explicit over magical: каждая управляемая сессия должна быть видна в
-  `.zelma/sessions.json` и объяснима через `sessions list`.
-- `XP-02` Idempotent by default: повторный `sessions detect` не должен плодить
+  `.zelma/instances.json` и объяснима через `instances list`.
+- `XP-02` Idempotent by default: повторный `instances detect` не должен плодить
   дубликаты или менять unrelated panes.
 - `XP-03` Human and agent parity: команда, которой пользуется skill, должна быть
   пригодна для ручного запуска человеком.
@@ -66,7 +66,7 @@ agentic development: CLI остается источником команд, `.z
 
 - Если две инициативы дают сопоставимый impact, приоритет получает та, которая
   улучшает `WF-01`, `WF-02` или `WF-03` из [`context.md`](context.md).
-- Если изменение затрагивает свойства `zelma session`, сначала обнови
+- Если изменение затрагивает свойства `zelma instance`, сначала обнови
   [`../domain/model.md`](../domain/model.md) и [`../domain/rules.md`](../domain/rules.md).
 - Если skill требует возможности, которой нет в CLI, сначала спроектируй CLI
   contract, затем добавляй skill wrapper.

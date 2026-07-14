@@ -130,13 +130,13 @@ func TestMachineReadableOutputCompatibilityExamples(t *testing.T) {
 			parse: parseSkillSupervisorStartIssue,
 		},
 		{
-			name: "sessions list json",
-			args: []string{"sessions", "list", "--no-detect", "--json"},
+			name: "instances list json",
+			args: []string{"instances", "list", "--no-detect", "--json"},
 			arrange: func(t *testing.T) string {
 				root := newTestGitRepo(t)
 				writeRegistryFile(t, root, `{
   "version": 1,
-  "sessions": [
+  "instances": [
     {
       "id": 1,
       "zellij_session": "zelma-main",
@@ -154,7 +154,7 @@ func TestMachineReadableOutputCompatibilityExamples(t *testing.T) {
 			want: func(string) string {
 				return `{
   "version": 1,
-  "sessions": [
+  "instances": [
     {
       "id": 1,
       "zellij_session": "zelma-main",
@@ -167,17 +167,17 @@ func TestMachineReadableOutputCompatibilityExamples(t *testing.T) {
 }
 `
 			},
-			parse: parseSkillSessionsList,
+			parse: parseSkillInstancesList,
 		},
 		{
-			name: "sessions list live json",
-			args: []string{"sessions", "list", "--no-detect", "--live", "--json"},
+			name: "instances list live json",
+			args: []string{"instances", "list", "--no-detect", "--live", "--json"},
 			arrange: func(t *testing.T) string {
 				root := newTestGitRepo(t)
 				openedPath := resolvedPath(t, root)
 				writeRegistryFile(t, root, fmt.Sprintf(`{
   "version": 1,
-  "sessions": [
+  "instances": [
     {
       "zellij_session": "zelma-main",
       "zellij_pane": "terminal_1",
@@ -202,7 +202,7 @@ func TestMachineReadableOutputCompatibilityExamples(t *testing.T) {
 			want: func(openedPath string) string {
 				return fmt.Sprintf(`{
   "version": 1,
-  "sessions": [
+  "instances": [
     {
       "id": 1,
       "zellij_session": "zelma-main",
@@ -225,11 +225,11 @@ func TestMachineReadableOutputCompatibilityExamples(t *testing.T) {
 }
 `, openedPath, openedPath)
 			},
-			parse: parseSkillSessionsListLive,
+			parse: parseSkillInstancesListLive,
 		},
 		{
-			name: "sessions create dry run json",
-			args: []string{"sessions", "create", "--dry-run", "--json"},
+			name: "instances create dry run json",
+			args: []string{"instances", "create", "--dry-run", "--json"},
 			arrange: func(t *testing.T) string {
 				root := newTestGitRepo(t)
 				fakeCodex := writeFakeCodex(t)
@@ -254,8 +254,8 @@ func TestMachineReadableOutputCompatibilityExamples(t *testing.T) {
 			parse: parseSkillCreateLaunchContract,
 		},
 		{
-			name: "sessions create summary json",
-			args: []string{"sessions", "create", "--json"},
+			name: "instances create summary json",
+			args: []string{"instances", "create", "--json"},
 			arrange: func(t *testing.T) string {
 				root := newTestGitRepo(t)
 				openedPath := resolvedPath(t, root)
@@ -271,7 +271,7 @@ func TestMachineReadableOutputCompatibilityExamples(t *testing.T) {
   "created": 1,
   "registered": 1,
   "skipped": 0,
-  "session": {
+  "instance": {
     "id": 1,
     "zellij_session": "zelma-main",
     "zellij_tab": "tab_1",
@@ -287,8 +287,8 @@ func TestMachineReadableOutputCompatibilityExamples(t *testing.T) {
 			parse: parseSkillCreateSummary,
 		},
 		{
-			name: "sessions detect summary json",
-			args: []string{"sessions", "detect", "--json"},
+			name: "instances detect summary json",
+			args: []string{"instances", "detect", "--json"},
 			arrange: func(t *testing.T) string {
 				root := newTestGitRepo(t)
 				t.Setenv("ZELMA_ZELLIJ_BIN", writeFakeZellij(t, panesJSON(resolvedPath(t, root), true)))
@@ -309,14 +309,14 @@ func TestMachineReadableOutputCompatibilityExamples(t *testing.T) {
 			parse: parseSkillDetectSummary,
 		},
 		{
-			name: "sessions detect stale json",
-			args: []string{"sessions", "detect", "--json"},
+			name: "instances detect stale json",
+			args: []string{"instances", "detect", "--json"},
 			arrange: func(t *testing.T) string {
 				root := newTestGitRepo(t)
 				openedPath := resolvedPath(t, root)
 				writeRegistryFile(t, root, fmt.Sprintf(`{
   "version": 1,
-  "sessions": [
+  "instances": [
     {
       "zellij_session": "zelma-main",
       "zellij_pane": "terminal_9",
@@ -356,14 +356,14 @@ func TestMachineReadableOutputCompatibilityExamples(t *testing.T) {
 			parse: parseSkillDetectSummary,
 		},
 		{
-			name: "sessions cleanup json",
-			args: []string{"sessions", "cleanup", "--json"},
+			name: "instances cleanup json",
+			args: []string{"instances", "cleanup", "--json"},
 			arrange: func(t *testing.T) string {
 				root := newTestGitRepo(t)
 				openedPath := resolvedPath(t, root)
 				writeRegistryFile(t, root, fmt.Sprintf(`{
   "version": 1,
-  "sessions": [
+  "instances": [
     {
       "zellij_session": "zelma-main",
       "zellij_pane": "terminal_1",
@@ -400,15 +400,15 @@ func TestMachineReadableOutputCompatibilityExamples(t *testing.T) {
 			parse: parseSkillCleanupProposal,
 		},
 		{
-			name: "sessions send json",
-			args: []string{"sessions", "send", "2", "continue carefully", "--json"},
+			name: "instances send json",
+			args: []string{"instances", "send", "2", "continue carefully", "--json"},
 			arrange: func(t *testing.T) string {
 				root := newTestGitRepo(t)
 				openedPath := resolvedPath(t, root)
 				const codexSession = "11111111-1111-4111-8111-111111111111"
 				writeRegistryFile(t, root, fmt.Sprintf(`{
   "version": 1,
-  "sessions": [
+  "instances": [
     {
       "id": 2,
       "zellij_session": "zelma-main",
@@ -447,14 +447,14 @@ func TestMachineReadableOutputCompatibilityExamples(t *testing.T) {
 			parse: parseSkillSendResult,
 		},
 		{
-			name: "sessions cleanup confirm json",
-			args: []string{"sessions", "cleanup", "--confirm", "--json"},
+			name: "instances cleanup confirm json",
+			args: []string{"instances", "cleanup", "--confirm", "--json"},
 			arrange: func(t *testing.T) string {
 				root := newTestGitRepo(t)
 				openedPath := resolvedPath(t, root)
 				writeRegistryFile(t, root, fmt.Sprintf(`{
   "version": 1,
-  "sessions": [
+  "instances": [
     {
       "zellij_session": "zelma-main",
       "zellij_pane": "terminal_1",
@@ -523,12 +523,12 @@ func TestMachineReadableOutputCompatibilityExamples(t *testing.T) {
 
 func TestMachineReadableDiagnosticCompatibility(t *testing.T) {
 	root := newTestGitRepo(t)
-	writeRegistryFile(t, root, `{"version":2,"sessions":[]}`)
+	writeRegistryFile(t, root, `{"version":2,"instances":[]}`)
 	t.Chdir(root)
 
 	var stdout, stderr bytes.Buffer
 
-	code := Run(context.Background(), []string{"sessions", "list", "--no-detect", "--json"}, &stdout, &stderr)
+	code := Run(context.Background(), []string{"instances", "list", "--no-detect", "--json"}, &stdout, &stderr)
 
 	if code != 1 {
 		t.Fatalf("Run() code = %d, want 1", code)
@@ -541,7 +541,7 @@ func TestMachineReadableDiagnosticCompatibility(t *testing.T) {
 		t.Fatalf("diagnostic = %+v, want unsupported version without registry_path", diagnostic)
 	}
 	for _, want := range []string{
-		"zelma sessions list:",
+		"zelma instances list:",
 		"registry_unsupported_version",
 		"unsupported schema version 2",
 		"use schema version 1 or run a future migration command when one exists",
@@ -560,7 +560,7 @@ func TestMachineReadableInvalidRegistryJSONReportsRegistryFilePath(t *testing.T)
 
 	var stdout, stderr bytes.Buffer
 
-	code := Run(context.Background(), []string{"sessions", "list", "--no-detect", "--json"}, &stdout, &stderr)
+	code := Run(context.Background(), []string{"instances", "list", "--no-detect", "--json"}, &stdout, &stderr)
 
 	if code != 1 {
 		t.Fatalf("Run() code = %d, want 1", code)
@@ -579,7 +579,7 @@ func TestMachineReadableRegistryLockDiagnosticCompatibility(t *testing.T) {
 	openedPath := resolvedPath(t, root)
 	writeRegistryFile(t, root, fmt.Sprintf(`{
   "version": 1,
-  "sessions": [
+  "instances": [
     {
       "id": 1,
       "zellij_session": "zelma-main",
@@ -605,7 +605,7 @@ func TestMachineReadableRegistryLockDiagnosticCompatibility(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 
-	code := Run(context.Background(), []string{"sessions", "cleanup", "--confirm", "--json"}, &stdout, &stderr)
+	code := Run(context.Background(), []string{"instances", "cleanup", "--confirm", "--json"}, &stdout, &stderr)
 
 	if code != 1 {
 		t.Fatalf("Run() code = %d, want 1", code)
@@ -617,7 +617,7 @@ func TestMachineReadableRegistryLockDiagnosticCompatibility(t *testing.T) {
 	if diagnostic.Code != "registry_locked" ||
 		!diagnostic.Retryable ||
 		diagnostic.ManualActionRequired ||
-		diagnostic.CommandPath != "zelma sessions cleanup" {
+		diagnostic.CommandPath != "zelma instances cleanup" {
 		t.Fatalf("diagnostic = %+v, want retryable registry_locked cleanup diagnostic", diagnostic)
 	}
 	if len(diagnostic.NextCommand) != 0 {
@@ -659,20 +659,20 @@ func TestMachineReadableArgumentValidationDiagnostics(t *testing.T) {
 	}{
 		{
 			name:        "focus missing id",
-			args:        []string{"sessions", "focus", "--json"},
-			commandPath: "zelma sessions focus",
+			args:        []string{"instances", "focus", "--json"},
+			commandPath: "zelma instances focus",
 			wantMessage: "accepts 1 arg(s), received 0",
 		},
 		{
 			name:        "create too many args",
-			args:        []string{"sessions", "create", "a", "b", "--json"},
-			commandPath: "zelma sessions create",
+			args:        []string{"instances", "create", "a", "b", "--json"},
+			commandPath: "zelma instances create",
 			wantMessage: "accepts at most 1 arg(s), received 2",
 		},
 		{
 			name:        "list unknown flag before json",
-			args:        []string{"sessions", "list", "--bad", "--json"},
-			commandPath: "zelma sessions list",
+			args:        []string{"instances", "list", "--bad", "--json"},
+			commandPath: "zelma instances list",
 			wantMessage: "unknown flag: --bad",
 		},
 	}
@@ -713,7 +713,7 @@ func TestExplicitJSONFalseKeepsHumanArgumentValidationDiagnostic(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 
-	code := Run(context.Background(), []string{"sessions", "focus", "--json=false"}, &stdout, &stderr)
+	code := Run(context.Background(), []string{"instances", "focus", "--json=false"}, &stdout, &stderr)
 
 	if code != 1 {
 		t.Fatalf("Run() code = %d, want 1", code)
@@ -735,18 +735,36 @@ func TestMachineReadableExecutionFailureUsesGenericDiagnostic(t *testing.T) {
 
 	var stderr bytes.Buffer
 
-	code := Run(context.Background(), []string{"sessions", "list", "--no-detect", "--json"}, failingWriter{}, &stderr)
+	code := Run(context.Background(), []string{"instances", "list", "--no-detect", "--json"}, failingWriter{}, &stderr)
 
 	if code != 1 {
 		t.Fatalf("Run() code = %d, want 1", code)
 	}
 	diagnostic := decodeSkillRecoveryDiagnostic(t, stderr.Bytes())
 	if diagnostic.Code != "unknown_cli_error" ||
-		diagnostic.CommandPath != "zelma sessions list" ||
+		diagnostic.CommandPath != "zelma instances list" ||
 		diagnostic.Retryable ||
 		!diagnostic.ManualActionRequired ||
 		!strings.Contains(diagnostic.Message, "synthetic stdout failure") {
 		t.Fatalf("diagnostic = %+v, want generic execution failure diagnostic", diagnostic)
+	}
+}
+
+func TestSessionsCommandIsRemoved(t *testing.T) {
+	root := newTestGitRepo(t)
+	t.Chdir(root)
+
+	var stdout, stderr bytes.Buffer
+	code := Run(context.Background(), []string{"sessions", "list", "--json"}, &stdout, &stderr)
+
+	if code == 0 {
+		t.Fatalf("Run() code = %d, want non-zero for removed sessions command", code)
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("stdout = %q, want empty", stdout.String())
+	}
+	if !strings.Contains(stderr.String(), `unknown command "sessions"`) {
+		t.Fatalf("stderr = %q, want removed sessions command diagnostic", stderr.String())
 	}
 }
 
@@ -835,32 +853,32 @@ type skillStaleCandidate struct {
 	Reason        string `json:"reason"`
 }
 
-func parseSkillSessionsList(t *testing.T, data []byte) {
+func parseSkillInstancesList(t *testing.T, data []byte) {
 	t.Helper()
 
 	var output struct {
-		Version  int            `json:"version"`
-		Sessions []skillSession `json:"sessions"`
+		Version   int            `json:"version"`
+		Instances []skillSession `json:"instances"`
 	}
 	decodeStrict(t, data, &output)
-	if output.Version != 1 || len(output.Sessions) != 1 {
-		t.Fatalf("output = %+v, want schema v1 with one session", output)
+	if output.Version != 1 || len(output.Instances) != 1 {
+		t.Fatalf("output = %+v, want schema v1 with one instance", output)
 	}
-	assertSkillSession(t, output.Sessions[0])
+	assertSkillSession(t, output.Instances[0])
 }
 
-func parseSkillSessionsListLive(t *testing.T, data []byte) {
+func parseSkillInstancesListLive(t *testing.T, data []byte) {
 	t.Helper()
 
 	var output struct {
-		Version  int                `json:"version"`
-		Sessions []skillLiveSession `json:"sessions"`
+		Version   int                `json:"version"`
+		Instances []skillLiveSession `json:"instances"`
 	}
 	decodeStrict(t, data, &output)
-	if output.Version != 1 || len(output.Sessions) != 2 {
-		t.Fatalf("output = %+v, want schema v1 with two live sessions", output)
+	if output.Version != 1 || len(output.Instances) != 2 {
+		t.Fatalf("output = %+v, want schema v1 with two live instances", output)
 	}
-	for _, session := range output.Sessions {
+	for _, session := range output.Instances {
 		assertSkillSession(t, session.skillSession)
 		if session.LiveStatus != "live" && session.LiveStatus != "unreachable" {
 			t.Fatalf("live_status = %q, want live or unreachable", session.LiveStatus)
@@ -951,15 +969,15 @@ func parseSkillCreateSummary(t *testing.T, data []byte) {
 		Created    int          `json:"created"`
 		Registered int          `json:"registered"`
 		Skipped    int          `json:"skipped"`
-		Session    skillSession `json:"session"`
+		Instance   skillSession `json:"instance"`
 	}
 	decodeStrict(t, data, &output)
 	if output.Created != 1 || output.Registered != 1 || output.Skipped != 0 {
 		t.Fatalf("create summary = %+v, want created=1 registered=1 skipped=0", output)
 	}
-	assertSkillSession(t, output.Session)
-	if output.Session.State != "candidate" || output.Session.ZellijPane == "" {
-		t.Fatalf("create session = %+v, want registered candidate session", output.Session)
+	assertSkillSession(t, output.Instance)
+	if output.Instance.State != "candidate" || output.Instance.ZellijPane == "" {
+		t.Fatalf("create instance = %+v, want registered candidate instance", output.Instance)
 	}
 }
 

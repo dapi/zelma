@@ -15,7 +15,7 @@ audience: humans_and_agents
 
 - [Brief](brief.md)
   Читать, когда нужно понять scope и acceptance criteria для PID-correlated
-  fallback evidence в `sessions detect`.
+  fallback evidence в `instances detect`.
 - [Design](design.md)
   Читать, когда нужно понять selected PID fallback adapter boundary, evidence
   order and privacy constraints.

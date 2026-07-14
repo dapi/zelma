@@ -38,7 +38,7 @@ Codex runtime identification and `CodexSessionRef` extraction rules live in
 | Module / Layer | Owns | Must not depend on directly |
 | --- | --- | --- |
 | `cli` | Command routing, arguments, user-facing output and exit codes | Private JSON write details except through registry API |
-| `registry` | `.zelma/sessions.json` schema, validation, atomic reads/writes, migrations | `zellij` command execution or Codex process probing |
+| `registry` | `.zelma/instances.json` schema, validation, atomic reads/writes, migrations | `zellij` command execution or Codex process probing |
 | `zellij-adapter` | Creating panes and reading `zellij` session/pane facts | Registry persistence details |
 | `codex-adapter` | Identifying Codex runtime/session refs from pane/process/log evidence | Registry persistence details or `zellij` UI assumptions |
 | `detection` | Combining zellij facts and Codex evidence into candidates/session verdicts | Direct JSON mutation outside `registry` |
@@ -50,7 +50,7 @@ Codex runtime identification and `CodexSessionRef` extraction rules live in
 - модуль владеет своим state и публичными контрактами;
 - межмодульные зависимости проходят через явно названный API, event или adapter;
 - UI, jobs и интеграции не должны читать чужие внутренние детали в обход owner-модуля.
-- `skills` must call CLI/public API rather than hand-writing `.zelma/sessions.json`.
+- `skills` must call CLI/public API rather than hand-writing `.zelma/instances.json`.
 - `registry` must not shell out to `zellij` or inspect processes; it validates and persists facts passed by adapters.
 - `zellij-adapter` must expose typed methods such as `ListSessions`,
   `ListPanes`, `RunCodexPane` and keep raw command execution details private.
@@ -78,17 +78,17 @@ Requirements:
 - Any command intended for skills must provide a stable `--json` output mode
   before a skill depends on it.
 - Error messages should include the next safe command when possible, normally
-  `zelma sessions list --json` for inventory/reconciliation or
-  `zelma sessions detect --json` for explicit diagnostic detect.
+  `zelma instances list --json` for inventory/reconciliation or
+  `zelma instances detect --json` for explicit diagnostic detect.
 
 ## Concurrency And Critical Sections
 
-- Writes to `.zelma/sessions.json` must be atomic: validate next state, write to
+- Writes to `.zelma/instances.json` must be atomic: validate next state, write to
   a temporary file, then replace the registry file.
 - Concurrent writes need an explicit lock strategy before multiple mutating
   commands are supported in parallel. Until then, mutating commands should fail
   clearly or serialize access if a lock exists.
-- `sessions detect` must be idempotent. Re-processing the same live pane should
+- `instances detect` must be idempotent. Re-processing the same live pane should
   update an existing record or no-op, never append a duplicate active record.
 - External side effects happen before registry commit only when rollback is
   either unnecessary or represented by a clear stale/candidate state. For
@@ -104,7 +104,7 @@ Requirements:
 - Missing `zellij` is a dependency error, not an empty session list.
 - A pane that cannot be proven to contain Codex is a detection verdict, not an
   internal exception.
-- Corrupt `sessions.json` is a registry integrity error; mutating commands must
+- Corrupt `instances.json` is a registry integrity error; mutating commands must
   stop before writing until recovery/migration behavior is defined.
 - Machine-readable output must remain parseable on success. Diagnostics belong
   on stderr or in structured error fields once the CLI contract is defined.
@@ -113,7 +113,7 @@ Requirements:
 
 Документируй не все переменные окружения подряд, а ownership-модель конфигурации:
 
-- Registry location defaults to `.zelma/sessions.json` under repo root.
+- Registry location defaults to `.zelma/instances.json` under repo root.
 - Repo root detection must be centralized; commands should not each invent their
   own root discovery behavior.
 - Supported `zellij` and Codex versions belong in [`../ops/config.md`](../ops/config.md)

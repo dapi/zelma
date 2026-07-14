@@ -45,9 +45,9 @@ default registry path below the detected root.
 
 | C3 element | Responsibility | Collaborates with | Boundary |
 | --- | --- | --- | --- |
-| `internal/repo` | Detect and normalize repo root; derive repo-local paths when later features need them | `internal/cli`, future `internal/registry`, future setup command | Does not read/write `.zelma/sessions.json`, does not call `zellij`, does not mutate `.gitignore` |
+| `internal/repo` | Detect and normalize repo root; derive repo-local paths when later features need them | `internal/cli`, future `internal/registry`, future setup command | Does not read/write `.zelma/instances.json`, does not call `zellij`, does not mutate `.gitignore` |
 | `internal/cli` | Calls resolver for commands that require repo context and renders diagnostics | `internal/repo` | Does not implement independent root discovery |
-| future `internal/registry` | Uses resolved root to locate `.zelma/sessions.json` | `internal/repo` | Owns registry schema/read/write, not root discovery |
+| future `internal/registry` | Uses resolved root to locate `.zelma/instances.json` | `internal/repo` | Owns registry schema/read/write, not root discovery |
 
 ## Selected Solution
 
@@ -91,7 +91,7 @@ default registry path below the detected root.
 
 - `INV-01` Commands must not implement a second root discovery algorithm outside
   `internal/repo`.
-- `INV-02` Resolver must not create, read, write or validate `.zelma/sessions.json`.
+- `INV-02` Resolver must not create, read, write or validate `.zelma/instances.json`.
 - `INV-03` Resolver must not mutate `.gitignore`; setup behavior belongs to FT-031.
 
 ## Failure Modes

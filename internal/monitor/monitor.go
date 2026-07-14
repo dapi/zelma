@@ -143,7 +143,7 @@ func (app *App) View() string {
 		if app.snapshot.Degraded {
 			builder.WriteString("  Live state unavailable.\n")
 		} else {
-			builder.WriteString("  No live zelma sessions.\n")
+			builder.WriteString("  No live zelma instances.\n")
 		}
 	} else {
 		for _, row := range liveRows {

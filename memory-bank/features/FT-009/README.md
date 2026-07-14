@@ -2,7 +2,7 @@
 title: "FT-009: Sessions List Output"
 doc_kind: feature
 doc_function: index
-purpose: "Навигация по package фичи для `zelma sessions list` поверх registry."
+purpose: "Навигация по package фичи для `zelma instances list` поверх registry."
 derived_from:
   - ../../dna/governance.md
   - brief.md

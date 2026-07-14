@@ -78,9 +78,9 @@ setup_json="$(run_zelma setup --json)"
 printf '%s\n' "${setup_json}" \
   | assert_json '.changed == true and .gitignore_changed == true and .zelma_dir_created == true'
 
-log "running zelma sessions create"
+log "running zelma instances create"
 create_stderr="${ROOT}/create.stderr"
-if ! create_json="$(run_zelma sessions create --json 2>"${create_stderr}")"; then
+if ! create_json="$(run_zelma instances create --json 2>"${create_stderr}")"; then
   cat "${create_stderr}" >&2
   zellij --session "${SESSION}" action list-panes --json --all >&2 || true
   exit 1
@@ -90,14 +90,14 @@ printf '%s\n' "${create_json}" \
 wait_for_pane_cwd "${REPO_ROOT}"
 
 log "checking live list after create"
-list_json="$(run_zelma sessions list --live --json)"
+list_json="$(run_zelma instances list --live --json)"
 printf '%s\n' "${list_json}" \
   | jq -e --arg repo "${REPO_ROOT}" '
       .version == 1
-      and (.sessions | length) == 1
-      and .sessions[0].opened_path == $repo
-      and .sessions[0].live_status == "live"
-      and (.sessions[0].state == "candidate" or .sessions[0].state == "active")
+      and (.instances | length) == 1
+      and .instances[0].opened_path == $repo
+      and .instances[0].live_status == "live"
+      and (.instances[0].state == "candidate" or .instances[0].state == "active")
     ' >/dev/null
 
 log "creating manually managed Codex pane"
@@ -115,16 +115,16 @@ case "${manual_pane}" in
 esac
 wait_for_pane_cwd "${manual_path}"
 
-log "running zelma sessions detect"
-detect_json="$(run_zelma sessions detect --json)"
+log "running zelma instances detect"
+detect_json="$(run_zelma instances detect --json)"
 printf '%s\n' "${detect_json}" \
   | jq -e '.added >= 1 and (.active + .candidate) >= 2' >/dev/null
 
 log "checking live list after detect"
-detected_list_json="$(run_zelma sessions list --live --json)"
+detected_list_json="$(run_zelma instances list --live --json)"
 printf '%s\n' "${detected_list_json}" \
   | jq -e --arg manual_path "${manual_path}" '
-      [.sessions[] | select(.opened_path == $manual_path and .live_status == "live")]
+      [.instances[] | select(.opened_path == $manual_path and .live_status == "live")]
       | length == 1
     ' >/dev/null
 

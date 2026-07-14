@@ -18,7 +18,7 @@ audience: humans_and_agents
 
 Candidate classification lives in `internal/detection`. The package exposes a
 pure classifier over `zellij.Pane` facts and a caller-supplied absolute repo
-root. It does not shell out, read Codex metadata, write `.zelma/sessions.json`
+root. It does not shell out, read Codex metadata, write `.zelma/instances.json`
 or produce a `CodexSessionRef`.
 
 The first implementation returns two verdicts:

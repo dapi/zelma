@@ -17,7 +17,7 @@ must_not_define:
 
 ## Goal
 
-Агент создает новую Codex-сессию через `zelma sessions create`, получает подтвержденную pane и registry-запись, пригодную для последующего мониторинга.
+Агент создает новую Codex-сессию через `zelma instances create`, получает подтвержденную pane и registry-запись, пригодную для последующего мониторинга.
 
 ## Primary Actor
 
@@ -35,10 +35,10 @@ Supervising agent.
 
 ## Main Flow
 
-1. Агент вызывает `zelma sessions create --json`.
+1. Агент вызывает `zelma instances create --json`.
 2. Zelma запускает Codex в новой zellij pane.
 3. Zelma подтверждает созданную pane через zellij adapter.
-4. Zelma записывает session metadata в `.zelma/sessions.json`.
+4. Zelma записывает session metadata в `.zelma/instances.json`.
 5. Агент получает JSON с идентификаторами pane/session и workspace path.
 
 ## Alternate Flows / Exceptions
@@ -49,7 +49,7 @@ Supervising agent.
 
 ## Postconditions
 
-- Успешный запуск виден в `sessions list --live --json`.
+- Успешный запуск виден в `instances list --live --json`.
 - Частичный сбой не оставляет ложную active-сессию без диагностики.
 
 ## Business Rules

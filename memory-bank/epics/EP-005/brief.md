@@ -19,7 +19,7 @@ must_not_define:
 
 ## Проблема
 
-`zelma session` должна знать не только zellij pane, но и Codex session. Этот
+`zelma instance` должна знать не только zellij pane, но и Codex session. Этот
 identity слой рискованный: источники metadata могут меняться, а session logs
 могут содержать приватные данные.
 
@@ -32,7 +32,7 @@ candidate state, если evidence недостаточно.
 
 - `EP-005-REQ-01` Найти доступные Codex metadata sources.
 - `EP-005-REQ-02` Добавить parser/process evidence extraction.
-- `EP-005-REQ-03` Зафиксировать rules для candidate vs active sessions.
+- `EP-005-REQ-03` Зафиксировать rules для candidate vs active instances.
 - `EP-005-REQ-04` Создать privacy-safe fixture corpus.
 
 ## Что Не Входит

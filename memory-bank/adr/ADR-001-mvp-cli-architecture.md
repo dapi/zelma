@@ -22,13 +22,13 @@ must_not_define:
 ## Контекст
 
 `zelma` должен управлять Codex-сессиями, запущенными в `zellij panes`, и хранить
-repo-local registry в `.zelma/sessions.json`.
+repo-local registry в `.zelma/instances.json`.
 
 MVP должен поддержать:
 
-- `zelma sessions create`;
-- `zelma sessions detect`;
-- `zelma sessions list`.
+- `zelma instances create`;
+- `zelma instances detect`;
+- `zelma instances list`.
 
 Для этого CLI должен координировать три разные зоны ответственности:
 
@@ -43,8 +43,8 @@ MVP должен поддержать:
   команды, safe defaults, JSON flags и recovery hints должны появляться раньше
   человеческого объяснения.
 - Интеграция с `zellij` должна быть явной, тестируемой и fixture-friendly.
-- `.zelma/sessions.json` должен оставаться единственным repo-local source of
-  truth для `zelma sessions`.
+- `.zelma/instances.json` должен оставаться единственным repo-local source of
+  truth для `zelma instances`.
 - Команды не должны напрямую смешивать parsing flags, вызовы `zellij` и запись
   JSON.
 - MVP не должен зависеть от Zellij plugin/WASM lifecycle.
@@ -54,7 +54,7 @@ MVP должен поддержать:
 | Вариант | Плюсы | Минусы | Почему выбран / не выбран |
 | --- | --- | --- | --- |
 | Go CLI + Cobra + internal zellij adapter over `os/exec` | Простой binary, понятная command tree, стандартная модель для nested commands, можно тестировать adapter через fixtures | Зависит от стабильности zellij CLI JSON output | Выбран для MVP как самый прямой путь к `create/list/detect` |
-| Go CLI без CLI framework, только standard `flag` | Меньше зависимостей | Неудобнее nested commands вида `sessions create/list/detect`, больше ручного boilerplate | Не выбран для MVP |
+| Go CLI без CLI framework, только standard `flag` | Меньше зависимостей | Неудобнее nested commands вида `instances create/list/detect`, больше ручного boilerplate | Не выбран для MVP |
 | Zellij plugin/WASM как primary integration | Глубже интегрируется с runtime zellij | Добавляет plugin permissions, WASM lifecycle, Rust-oriented API и отдельную доставку plugin artifact | Отложено до отдельного ADR |
 | Прямой Go zellij client library | Мог бы дать typed API | Официального Go zellij client library не найдено; риск поддержки выше, чем у CLI automation | Не выбран |
 
@@ -66,7 +66,7 @@ Command layer:
 
 - использовать `github.com/spf13/cobra` для command tree;
 - переопределить Cobra help/usage templates под agent-first output;
-- primary command group: `zelma sessions`;
+- primary command group: `zelma instances`;
 - начальные subcommands: `create`, `detect`, `list`.
 
 Application layer:
@@ -85,7 +85,7 @@ Adapters:
 
 Registry:
 
-- `internal/registry` владеет `.zelma/sessions.json`;
+- `internal/registry` владеет `.zelma/instances.json`;
 - запись делается под lock и через atomic replace;
 - registry не вызывает `zellij`, а `zellij-adapter` не пишет registry.
 

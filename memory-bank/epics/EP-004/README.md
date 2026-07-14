@@ -2,7 +2,7 @@
 title: "EP-004: Managed Create Workflow"
 doc_kind: epic
 doc_function: index
-purpose: "Навигация по draft package epic для `zelma sessions create`."
+purpose: "Навигация по draft package epic для `zelma instances create`."
 derived_from:
   - ../../dna/governance.md
   - brief.md
@@ -15,7 +15,7 @@ audience: humans_and_agents
 ## О разделе
 
 Draft package для managed create path: открыть zellij pane, запустить Codex и
-зарегистрировать active zelma session.
+зарегистрировать active zelma instance.
 
 ## Аннотированный индекс
 

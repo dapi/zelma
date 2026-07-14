@@ -26,7 +26,7 @@ must_not_define:
 
 ## Context
 
-`brief.md` requires `zelma setup` and `zelma sessions list/create/detect` to be
+`brief.md` requires `zelma setup` and `zelma instances list/create/detect` to be
 routed through Cobra while preserving the no-side-effects boundary. ADR-001
 already chooses Go + Cobra and states that CLI handlers must not call `zellij`
 or write the registry directly. FT-003 owns agent-first help templates, so this
@@ -79,7 +79,7 @@ design stabilizes route existence and stub behavior without finalizing help copy
 
 | Contract ID | Input / Output | Producer / Consumer | Semantics / Constraints |
 | --- | --- | --- | --- |
-| `CTR-01` | CLI args `setup`, `sessions list`, `sessions create`, `sessions detect` | `internal/cli` / user or agent | Args route to existing Cobra commands; `--help` produces routed command output. |
+| `CTR-01` | CLI args `setup`, `instances list`, `instances create`, `instances detect` | `internal/cli` / user or agent | Args route to existing Cobra commands; `--help` produces routed command output. |
 | `CTR-02` | Stub execution output and exit status | Stub handlers / user or agent | Output is deterministic non-implemented diagnostics; handlers do not perform registry writes or live `zellij` calls. |
 | `CTR-03` | Root binary wiring | `cmd/zelma/main.go` / `internal/cli` | Binary delegates args/stdout/stderr to CLI package and does not own command definitions. |
 
@@ -87,7 +87,7 @@ design stabilizes route existence and stub behavior without finalizing help copy
 
 - `INV-01` Command handlers in FT-002 do not call live `zellij`.
 - `INV-02` Command handlers in FT-002 do not create, read or write
-  `.zelma/sessions.json`.
+  `.zelma/instances.json`.
 - `INV-03` FT-002 does not finalize help templates beyond proving command
   route availability.
 

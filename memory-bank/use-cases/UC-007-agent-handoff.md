@@ -29,19 +29,19 @@ Incoming agent.
 
 ## Preconditions
 
-- `.zelma/sessions.json` содержит сохраненные session metadata.
+- `.zelma/instances.json` содержит сохраненные session metadata.
 - Часть pane может быть live, stale или неизвестной.
 
 ## Main Flow
 
-1. Incoming agent вызывает `zelma sessions list --live --json`.
+1. Incoming agent вызывает `zelma instances list --live --json`.
 2. Zelma возвращает active/stale/candidate status по каждой записи.
 3. Агент сопоставляет pane с issue/task metadata.
 4. Агент продолжает poll, cleanup или recovery без повторного запуска уже активных задач.
 
 ## Alternate Flows / Exceptions
 
-- `ALT-01` Registry отсутствует: агент продолжает через `zelma sessions list --json`, который auto-detects по умолчанию.
+- `ALT-01` Registry отсутствует: агент продолжает через `zelma instances list --json`, который auto-detects по умолчанию.
 - `ALT-02` Есть stale entries: агент применяет cleanup flow.
 - `EX-01` Live state недоступен: агент получает diagnostic и не делает destructive action.
 

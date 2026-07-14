@@ -635,8 +635,8 @@ func normalizeSendTextCommandError(command string, result commandResult) error {
 	return normalizeCommandErrorWithRecovery(
 		command,
 		result,
-		"install zellij or configure the adapter binary path, then verify with zelma sessions list --live --json",
-		"run zelma sessions list --live --json to inspect the target, then retry only after the active Codex pane is confirmed",
+		"install zellij or configure the adapter binary path, then verify with zelma instances list --live --json",
+		"run zelma instances list --live --json to inspect the target, then retry only after the active Codex pane is confirmed",
 	)
 }
 
@@ -661,7 +661,7 @@ func normalizeSendTextSessionNotFoundResult(command string, result commandResult
 			ExitCode:     0,
 			Stderr:       trimStderr(result.stderr),
 			Message:      "zellij command reported session failure",
-			RecoveryHint: "run zelma sessions list --live --json to inspect the target before retrying send",
+			RecoveryHint: "run zelma instances list --live --json to inspect the target before retrying send",
 		},
 	}
 }

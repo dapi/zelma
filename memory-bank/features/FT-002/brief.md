@@ -2,7 +2,7 @@
 title: "FT-002: Дерево Команд Cobra"
 doc_kind: feature
 doc_function: canonical
-purpose: "Канонический brief для delivery slice: завести Cobra command tree для `zelma setup` и `zelma sessions` без registry/zellij behavior."
+purpose: "Канонический brief для delivery slice: завести Cobra command tree для `zelma setup` и `zelma instances` без registry/zellij behavior."
 derived_from:
   - ../../flows/feature-flow.md
   - ../../product/roadmap.md
@@ -32,17 +32,17 @@ downstream features могли добавлять behavior без переиме
 
 | ID метрики | Метрика | База | Цель | Способ измерения |
 | --- | --- | --- | --- | --- |
-| `MET-01` | Маршрутизируемые команды | routed stubs отсутствуют | `setup` и `sessions list/create/detect` маршрутизируются через Cobra | CLI tests |
+| `MET-01` | Маршрутизируемые команды | routed stubs отсутствуют | `setup` и `instances list/create/detect` маршрутизируются через Cobra | CLI tests |
 
 ### Объем Работ
 
 - `REQ-01` Добавить root command `zelma`, command `setup` и command group `sessions`.
-- `REQ-02` Добавить routed stubs для `sessions list`, `sessions create` и `sessions detect`.
+- `REQ-02` Добавить routed stubs для `instances list`, `instances create` и `instances detect`.
 - `REQ-03` Сохранить поведение без side effects: без registry writes и live zellij calls.
 
 ### Что Не Входит
 
-- `NS-01` Нет `.zelma/sessions.json` behavior.
+- `NS-01` Нет `.zelma/instances.json` behavior.
 - `NS-02` Нет zellij integration.
 - `NS-03` Нет finalized help templates за пределами route availability.
 - `NS-04` Нет изменения `.gitignore`; это scope [FT-031](../FT-031/README.md).
@@ -62,7 +62,7 @@ downstream features могли добавлять behavior без переиме
 
 ### Критерии Готовности
 
-- `EC-01` `zelma setup --help` и `zelma sessions list/create/detect --help` маршрутизируются в существующие команды.
+- `EC-01` `zelma setup --help` и `zelma instances list/create/detect --help` маршрутизируются в существующие команды.
 - `EC-02` Запуск command stubs не трогает registry или zellij.
 
 ### Матрица Трассировки
@@ -80,7 +80,7 @@ downstream features могли добавлять behavior без переиме
 
 ### Негативные / Edge Сценарии
 
-- `NEG-01` Stub-команды не создают, не читают и не изменяют `.zelma/sessions.json`
+- `NEG-01` Stub-команды не создают, не читают и не изменяют `.zelma/instances.json`
   и не вызывают live `zellij`.
 
 ### Проверки

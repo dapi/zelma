@@ -29,19 +29,19 @@ E2E-тест моделирует новый процесс агента, regist
 ### Объем Работ
 
 - `REQ-01` Подготовить registry после предыдущего agent run.
-- `REQ-02` Запустить `sessions list --live --json` в fresh process.
+- `REQ-02` Запустить `instances list --live --json` в fresh process.
 - `REQ-03` Проверить active/stale classification.
 - `REQ-04` Проверить duplicate launch guard для уже активной issue/session.
 
 ### Что Не Входит
 
-- `NS-01` Нет persistence beyond `.zelma/sessions.json`.
+- `NS-01` Нет persistence beyond `.zelma/instances.json`.
 
 ## Проверка
 
 ### Критерии Готовности
 
-- `EC-01` Новый agent process видит active sessions.
+- `EC-01` Новый agent process видит active instances.
 - `EC-02` Stale sessions ведут к cleanup guidance.
 - `EC-03` Active issue не запускается повторно.
 

@@ -7,10 +7,10 @@ import (
 	"time"
 )
 
-func TestSessionsListAutoDetectTTLDefault(t *testing.T) {
+func TestInstancesListAutoDetectTTLDefault(t *testing.T) {
 	root := t.TempDir()
 
-	got, err := SessionsListAutoDetectTTL(root)
+	got, err := InstancesListAutoDetectTTL(root)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -19,11 +19,11 @@ func TestSessionsListAutoDetectTTLDefault(t *testing.T) {
 	}
 }
 
-func TestSessionsListAutoDetectTTLFromRepoConfig(t *testing.T) {
+func TestInstancesListAutoDetectTTLFromRepoConfig(t *testing.T) {
 	root := t.TempDir()
-	writeConfig(t, root, `{"sessions_list":{"auto_detect_ttl":"750ms"}}`)
+	writeConfig(t, root, `{"instances_list":{"auto_detect_ttl":"750ms"}}`)
 
-	got, err := SessionsListAutoDetectTTL(root)
+	got, err := InstancesListAutoDetectTTL(root)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -32,13 +32,13 @@ func TestSessionsListAutoDetectTTLFromRepoConfig(t *testing.T) {
 	}
 }
 
-func TestSessionsListAutoDetectTTLRejectsInvalidDuration(t *testing.T) {
+func TestInstancesListAutoDetectTTLRejectsInvalidDuration(t *testing.T) {
 	root := t.TempDir()
-	writeConfig(t, root, `{"sessions_list":{"auto_detect_ttl":"soon"}}`)
+	writeConfig(t, root, `{"instances_list":{"auto_detect_ttl":"soon"}}`)
 
-	_, err := SessionsListAutoDetectTTL(root)
+	_, err := InstancesListAutoDetectTTL(root)
 	if err == nil {
-		t.Fatal("SessionsListAutoDetectTTL() err = nil, want invalid duration")
+		t.Fatal("InstancesListAutoDetectTTL() err = nil, want invalid duration")
 	}
 }
 

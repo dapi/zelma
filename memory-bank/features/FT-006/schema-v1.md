@@ -2,7 +2,7 @@
 title: "FT-006: Sessions Registry Schema V1"
 doc_kind: feature-support
 doc_function: reference
-purpose: "Reference contract for `.zelma/sessions.json` schema v1 fields and fixtures."
+purpose: "Reference contract for `.zelma/instances.json` schema v1 fields and fixtures."
 derived_from:
   - brief.md
   - ../../domain/model.md
@@ -19,12 +19,12 @@ feature scope and acceptance criteria remain in [brief.md](brief.md).
 
 ## File Shape
 
-`.zelma/sessions.json` v1 is a JSON object:
+`.zelma/instances.json` v1 is a JSON object:
 
 ```json
 {
   "version": 1,
-  "sessions": []
+  "instances": []
 }
 ```
 
@@ -33,8 +33,8 @@ feature scope and acceptance criteria remain in [brief.md](brief.md).
 | Field | Type | Required | Meaning |
 | --- | --- | --- | --- |
 | `version` | integer | yes | Schema version. FT-006 supports only `1`. |
-| `sessions` | array | yes | Registry records for known `zelma sessions`. Empty is valid. |
-| `sessions[].id` | integer | yes | Positive repo-local `ZelmaSessionID`, unique within this registry. Old records without `id` are backfilled by the CLI. |
+| `sessions` | array | yes | Registry records for known `zelma instances`. Empty is valid. |
+| `sessions[].id` | integer | yes | Positive repo-local `ZelmaInstanceID`, unique within this registry. Old records without `id` are backfilled by the CLI. |
 | `sessions[].zellij_session` | string | yes | External `zellij session` reference. |
 | `sessions[].zellij_tab` | string | no | External `zellij tab` reference observed from `list-panes`, formatted as `tab_<id>`. |
 | `sessions[].zellij_tab_name` | string | no | Human-readable zellij tab name observed with the pane. |

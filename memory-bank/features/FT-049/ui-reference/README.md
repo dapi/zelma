@@ -27,7 +27,7 @@ acceptance остаются в `../brief.md`; selected solution и contracts о�
 | --- | --- | --- | --- |
 | `UI-01` | Live sessions present | `REQ-03`, `REQ-05`, `SOL-03` | Show live/active work first and keep selection on that group by default |
 | `UI-02` | Mixed active and non-active records | `REQ-03`, `REQ-04`, `SOL-03` | Keep stale/non-active records secondary |
-| `UI-03` | Empty live state | `REQ-04`, `REQ-09`, `SC-03` | State that no live sessions are running and expose recovery/non-active context |
+| `UI-03` | Empty live state | `REQ-04`, `REQ-09`, `SC-03` | State that no live instances are running and expose recovery/non-active context |
 | `UI-04` | Degraded status | `REQ-09`, `FM-01` | Surface status backend recovery hints |
 | `UI-05` | Focus result / failure | `REQ-08`, `FM-04` | Show transient outcome while keeping monitor running |
 
@@ -64,7 +64,7 @@ status: refreshed 12:30:14
 zelma monitor                         live 0  stale 2  degraded no
 
 LIVE
-  No live zelma sessions.
+  No live zelma instances.
 
 OTHER
 > 3  stale  unreachable  /repo/old   zelma-main tab_2 terminal_44  -

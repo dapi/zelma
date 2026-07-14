@@ -14,6 +14,6 @@ audience: humans_and_agents
 ## Аннотированный индекс
 
 - [Brief](brief.md)
-  Читать, когда нужно понять scope ускорения `sessions detect` и explain output.
+  Читать, когда нужно понять scope ускорения `instances detect` и explain output.
 - [Design](design.md)
-  Читать перед изменением Codex evidence lookup или `sessions detect --explain`.
+  Читать перед изменением Codex evidence lookup или `instances detect --explain`.

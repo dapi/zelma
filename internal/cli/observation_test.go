@@ -16,7 +16,7 @@ func TestSessionsBufferJSONReturnsBoundedPaneContent(t *testing.T) {
 	root := newTestGitRepo(t)
 	writeRegistryFile(t, root, fmt.Sprintf(`{
   "version": 1,
-  "sessions": [
+  "instances": [
     {
       "id": 2,
       "zellij_session": "zelma-main",
@@ -33,7 +33,7 @@ func TestSessionsBufferJSONReturnsBoundedPaneContent(t *testing.T) {
 	withFixedNow(t)
 
 	var stdout, stderr bytes.Buffer
-	code := Run(context.Background(), []string{"sessions", "buffer", "2", "--json", "--tail", "2"}, &stdout, &stderr)
+	code := Run(context.Background(), []string{"instances", "buffer", "2", "--json", "--tail", "2"}, &stdout, &stderr)
 
 	if code != 0 {
 		t.Fatalf("Run() code = %d, want 0; stderr = %s", code, stderr.String())
@@ -43,7 +43,7 @@ func TestSessionsBufferJSONReturnsBoundedPaneContent(t *testing.T) {
 	}
 	var got struct {
 		Version    int    `json:"version"`
-		SessionID  int    `json:"session_id"`
+		InstanceID int    `json:"instance_id"`
 		Source     string `json:"source"`
 		CapturedAt string `json:"captured_at"`
 		Truncated  bool   `json:"truncated"`
@@ -56,7 +56,7 @@ func TestSessionsBufferJSONReturnsBoundedPaneContent(t *testing.T) {
 	if err := json.Unmarshal(stdout.Bytes(), &got); err != nil {
 		t.Fatalf("json.Unmarshal() error = %v; stdout = %s", err, stdout.String())
 	}
-	if got.Version != 1 || got.SessionID != 2 || got.Source != "zellij_buffer" || got.CapturedAt != "2026-07-10T00:00:00Z" {
+	if got.Version != 1 || got.InstanceID != 2 || got.Source != "zellij_buffer" || got.CapturedAt != "2026-07-10T00:00:00Z" {
 		t.Fatalf("identity = %#v, want stable buffer identity", got)
 	}
 	if !got.Truncated || got.Limit != 2 || len(got.Items) != 2 {
@@ -73,7 +73,7 @@ func TestSessionsBufferJSONMissingIDReturnsStructuredError(t *testing.T) {
 	t.Chdir(root)
 
 	var stdout, stderr bytes.Buffer
-	code := Run(context.Background(), []string{"sessions", "buffer", "99", "--json"}, &stdout, &stderr)
+	code := Run(context.Background(), []string{"instances", "buffer", "99", "--json"}, &stdout, &stderr)
 
 	if code != 1 {
 		t.Fatalf("Run() code = %d, want 1", code)
@@ -81,7 +81,7 @@ func TestSessionsBufferJSONMissingIDReturnsStructuredError(t *testing.T) {
 	if stdout.Len() != 0 {
 		t.Fatalf("stdout = %q, want empty", stdout.String())
 	}
-	assertJSONDiagnostic(t, stderr.Bytes(), "observe_session_not_found", []string{"zelma", "sessions", "list", "--json"})
+	assertJSONDiagnostic(t, stderr.Bytes(), "observe_instance_not_found", []string{"zelma", "instances", "list", "--json"})
 }
 
 func TestSessionsBufferJSONUnreachablePaneReturnsStructuredError(t *testing.T) {
@@ -91,7 +91,7 @@ func TestSessionsBufferJSONUnreachablePaneReturnsStructuredError(t *testing.T) {
 	t.Chdir(root)
 
 	var stdout, stderr bytes.Buffer
-	code := Run(context.Background(), []string{"sessions", "buffer", "1", "--json"}, &stdout, &stderr)
+	code := Run(context.Background(), []string{"instances", "buffer", "1", "--json"}, &stdout, &stderr)
 
 	if code != 1 {
 		t.Fatalf("Run() code = %d, want 1", code)
@@ -99,15 +99,15 @@ func TestSessionsBufferJSONUnreachablePaneReturnsStructuredError(t *testing.T) {
 	if stdout.Len() != 0 {
 		t.Fatalf("stdout = %q, want empty", stdout.String())
 	}
-	assertJSONDiagnostic(t, stderr.Bytes(), "observe_pane_unreachable", []string{"zelma", "sessions", "list", "--live", "--json"})
+	assertJSONDiagnostic(t, stderr.Bytes(), "observe_pane_unreachable", []string{"zelma", "instances", "list", "--live", "--json"})
 }
 
 func TestSessionsTranscriptJSONReturnsBoundedEvents(t *testing.T) {
 	root := newTestGitRepo(t)
-	sessionID := "11111111-1111-4111-8111-111111111111"
-	writeObservationRegistry(t, root, resolvedPath(t, root), sessionID)
-	codexHome := writeCodexHomeWithTranscript(t, sessionID, resolvedPath(t, root), []string{
-		`{"type":"session_meta","payload":{"session_id":"` + sessionID + `","cwd":` + strconvQuote(resolvedPath(t, root)) + `,"timestamp":"2026-07-10T00:00:00Z"}}`,
+	instanceID := "11111111-1111-4111-8111-111111111111"
+	writeObservationRegistry(t, root, resolvedPath(t, root), instanceID)
+	codexHome := writeCodexHomeWithTranscript(t, instanceID, resolvedPath(t, root), []string{
+		`{"type":"session_meta","payload":{"session_id":"` + instanceID + `","cwd":` + strconvQuote(resolvedPath(t, root)) + `,"timestamp":"2026-07-10T00:00:00Z"}}`,
 		`{"type":"user_message","timestamp":"2026-07-10T00:00:01Z","payload":{"text":"synthetic prompt"}}`,
 		`{"type":"assistant_message","timestamp":"2026-07-10T00:00:02Z","payload":{"text":"synthetic answer"}}`,
 	})
@@ -116,14 +116,14 @@ func TestSessionsTranscriptJSONReturnsBoundedEvents(t *testing.T) {
 	withFixedNow(t)
 
 	var stdout, stderr bytes.Buffer
-	code := Run(context.Background(), []string{"sessions", "transcript", "1", "--json", "--tail", "1"}, &stdout, &stderr)
+	code := Run(context.Background(), []string{"instances", "transcript", "1", "--json", "--tail", "1"}, &stdout, &stderr)
 
 	if code != 0 {
 		t.Fatalf("Run() code = %d, want 0; stderr = %s", code, stderr.String())
 	}
 	var got struct {
 		Version      int    `json:"version"`
-		SessionID    int    `json:"session_id"`
+		InstanceID   int    `json:"instance_id"`
 		Source       string `json:"source"`
 		CapturedAt   string `json:"captured_at"`
 		Truncated    bool   `json:"truncated"`
@@ -138,7 +138,7 @@ func TestSessionsTranscriptJSONReturnsBoundedEvents(t *testing.T) {
 	if err := json.Unmarshal(stdout.Bytes(), &got); err != nil {
 		t.Fatalf("json.Unmarshal() error = %v; stdout = %s", err, stdout.String())
 	}
-	if got.Version != 1 || got.SessionID != 1 || got.Source != "codex_transcript" || got.CodexSession != sessionID {
+	if got.Version != 1 || got.InstanceID != 1 || got.Source != "codex_transcript" || got.CodexSession != instanceID {
 		t.Fatalf("identity = %#v, want transcript identity", got)
 	}
 	if !got.Truncated || got.Limit != 1 || len(got.Items) != 1 {
@@ -157,7 +157,7 @@ func TestSessionsTranscriptJSONMissingTranscriptReturnsStructuredError(t *testin
 	t.Chdir(root)
 
 	var stdout, stderr bytes.Buffer
-	code := Run(context.Background(), []string{"sessions", "transcript", "1", "--json"}, &stdout, &stderr)
+	code := Run(context.Background(), []string{"instances", "transcript", "1", "--json"}, &stdout, &stderr)
 
 	if code != 1 {
 		t.Fatalf("Run() code = %d, want 1", code)
@@ -165,7 +165,7 @@ func TestSessionsTranscriptJSONMissingTranscriptReturnsStructuredError(t *testin
 	if stdout.Len() != 0 {
 		t.Fatalf("stdout = %q, want empty", stdout.String())
 	}
-	assertJSONDiagnostic(t, stderr.Bytes(), "codex_transcript_missing", []string{"zelma", "sessions", "detect", "--json"})
+	assertJSONDiagnostic(t, stderr.Bytes(), "codex_transcript_missing", []string{"zelma", "instances", "detect", "--json"})
 }
 
 func withFixedNow(t *testing.T) {
@@ -185,7 +185,7 @@ func writeObservationRegistry(t *testing.T, root, openedPath, codexSession strin
 
 	writeRegistryFile(t, root, fmt.Sprintf(`{
   "version": 1,
-  "sessions": [
+  "instances": [
     {
       "id": 1,
       "zellij_session": "zelma-main",
@@ -236,7 +236,7 @@ exit 2
 	return path
 }
 
-func writeCodexHomeWithTranscript(t *testing.T, sessionID, _ string, lines []string) string {
+func writeCodexHomeWithTranscript(t *testing.T, instanceID, _ string, lines []string) string {
 	t.Helper()
 
 	codexHome := t.TempDir()
@@ -253,7 +253,7 @@ func writeCodexHomeWithTranscript(t *testing.T, sessionID, _ string, lines []str
 func assertRegistryDoesNotContain(t *testing.T, root string, forbidden ...string) {
 	t.Helper()
 
-	data, err := os.ReadFile(filepath.Join(root, ".zelma", "sessions.json"))
+	data, err := os.ReadFile(filepath.Join(root, ".zelma", "instances.json"))
 	if err != nil {
 		t.Fatal(err)
 	}

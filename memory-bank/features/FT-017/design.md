@@ -17,7 +17,7 @@ audience: humans_and_agents
 
 ## Selected Design
 
-`zelma sessions create` now performs the managed create workflow through three
+`zelma instances create` now performs the managed create workflow through three
 ordered steps:
 
 1. Resolve the Codex launch contract from FT-015.
@@ -51,7 +51,7 @@ The created pane is confirmed when all conditions are true:
 
 If the pane cannot be confirmed after a successful create call, the command
 returns `created=1 registered=0 skipped=1` and does not create
-`.zelma/sessions.json`. Recovery hints and reason-code detail are owned by
+`.zelma/instances.json`. Recovery hints and reason-code detail are owned by
 FT-018.
 
 ## Registry Reconciliation

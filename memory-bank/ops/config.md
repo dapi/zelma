@@ -26,13 +26,13 @@ contracts важны для CLI, registry и external binaries.
 <repo-root>/
 └── .zelma/
     ├── config.json
-    └── sessions.json
+    └── instances.json
 ```
 
 ### Ownership Rules
 
 1. Registry schema belongs to the future Go `registry` package.
-2. Registry default path is `.zelma/sessions.json` under detected repo root.
+2. Registry default path is `.zelma/instances.json` under detected repo root.
 3. External binary paths default to `PATH` lookup.
 4. Repo-local non-secret configuration lives in `.zelma/config.json` only after
    its schema keys are documented here.
@@ -49,7 +49,7 @@ Initial schema:
 
 ```json
 {
-  "sessions_list": {
+  "instances_list": {
     "auto_detect_ttl": "5s"
   },
   "start_issue": {
@@ -68,10 +68,10 @@ Resolution order for values that support both env and repo-local config:
 supervisor launches the task agent inside the current zellij session. Allowed
 values are `pane` and `tab`. The default is `pane`.
 
-`sessions_list.auto_detect_ttl` controls how long `zelma sessions list` may
+`instances_list.auto_detect_ttl` controls how long `zelma instances list` may
 reuse the timestamp from the last successful auto-detect pass before probing
 zellij/Codex again. The value uses Go duration syntax such as `5s`, `500ms` or
-`1m`. The default is `5s`. Use `zelma sessions list --no-detect` for a
+`1m`. The default is `5s`. Use `zelma instances list --no-detect` for a
 registry-only read that ignores this cache.
 
 ## Naming Convention For Env Vars
@@ -99,11 +99,11 @@ Rules:
 | Variable | Description | Default | Owner |
 | --- | --- | --- | --- |
 | `ZELMA_ZELLIJ_BIN` | Optional path/name for zellij executable | `zellij` via `PATH` | `zellij-adapter` |
-| `ZELMA_ZELLIJ_SESSION` | Optional target session for `sessions create` pane creation | `zelma-main` | `cli` + `zellij-adapter` |
+| `ZELMA_ZELLIJ_SESSION` | Optional target zellij session for `instances create` pane creation | `zelma-main` | `cli` + `zellij-adapter` |
 | `ZELMA_CODEX_BIN` | Optional path/name for Codex executable | `codex` via `PATH` | `codex-adapter` |
-| `ZELMA_REGISTRY_PATH` | Optional registry file path for tests/recovery | `.zelma/sessions.json` | `registry` |
+| `ZELMA_REGISTRY_PATH` | Optional registry file path for tests/recovery | `.zelma/instances.json` | `registry` |
 | `ZELMA_START_ISSUE_ZELLIJ_SURFACE` | Optional supervisor launch surface override; allowed values: `pane`, `tab` | `.zelma/config.json` `start_issue.zellij_surface`, then `pane` | supervisor CLI |
-| `sessions_list.auto_detect_ttl` | Repo-local TTL for `sessions list` auto-detect cache | `5s` | sessions CLI |
+| `instances_list.auto_detect_ttl` | Repo-local TTL for `instances list` auto-detect cache | `5s` | sessions CLI |
 
 ## Secrets
 

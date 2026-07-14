@@ -2,7 +2,7 @@
 title: "FT-009: Sessions List Output"
 doc_kind: feature
 doc_function: canonical
-purpose: "Канонический brief для `zelma sessions list` как первого read surface над registry."
+purpose: "Канонический brief для `zelma instances list` как первого read surface над registry."
 derived_from:
   - ../../product/roadmap.md
   - ../../epics/EP-002/brief.md
@@ -22,11 +22,11 @@ must_not_define:
 ### Проблема
 
 После появления registry пользователю и агенту нужен простой read command,
-чтобы увидеть known zelma sessions текущего repo.
+чтобы увидеть known zelma instances текущего repo.
 
 ### Результат
 
-`zelma sessions list` показывает зарегистрированные sessions в человекочитаемом
+`zelma instances list` показывает зарегистрированные sessions в человекочитаемом
 виде и в стабильном JSON mode для агентов.
 
 ### Объем Работ

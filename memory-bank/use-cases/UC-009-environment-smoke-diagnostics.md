@@ -36,8 +36,8 @@ Setup agent.
 
 1. Агент вызывает `zelma setup --json`.
 2. Zelma проверяет repo root и идемпотентно добавляет `.zelma` в `.gitignore`.
-3. Агент вызывает `zelma sessions list --json`.
-4. Auto-detect внутри `sessions list` проверяет доступность zellij/Codex probing.
+3. Агент вызывает `zelma instances list --json`.
+4. Auto-detect внутри `instances list` проверяет доступность zellij/Codex probing.
 5. Агент получает summary готовности и warnings.
 
 ## Alternate Flows / Exceptions
@@ -55,8 +55,8 @@ Setup agent.
 
 - `BR-01` Setup должен быть идемпотентным.
 - `BR-02` `.zelma` должен быть исключен из git.
-- `BR-03` `zelma setup` не должен создавать `.zelma/sessions.json`; готовность
-  registry проверяется отдельным `sessions list --json`.
+- `BR-03` `zelma setup` не должен создавать `.zelma/instances.json`; готовность
+  registry проверяется отдельным `instances list --json`.
 - `BR-04` Сценарий должен иметь e2e-тест fresh repo setup plus repeated setup.
 
 ## Traceability

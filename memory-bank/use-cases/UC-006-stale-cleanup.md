@@ -17,7 +17,7 @@ must_not_define:
 
 ## Goal
 
-Агент находит записи `.zelma/sessions.json`, которые больше не соответствуют live zellij pane, и удаляет их только через явное подтверждение.
+Агент находит записи `.zelma/instances.json`, которые больше не соответствуют live zellij pane, и удаляет их только через явное подтверждение.
 
 ## Primary Actor
 
@@ -34,10 +34,10 @@ Task agent завершил работу, pane закрыта или zellij sess
 
 ## Main Flow
 
-1. Агент вызывает `zelma sessions list --json` или `zelma sessions list --live --json`.
+1. Агент вызывает `zelma instances list --json` или `zelma instances list --live --json`.
 2. Zelma помечает отсутствующие pane как stale.
-3. Агент вызывает `zelma sessions cleanup --json` для proposal.
-4. Агент вызывает `zelma sessions cleanup --confirm --json`, если proposal ожидаем.
+3. Агент вызывает `zelma instances cleanup --json` для proposal.
+4. Агент вызывает `zelma instances cleanup --confirm --json`, если proposal ожидаем.
 5. Zelma удаляет stale entries и возвращает итоговый diff.
 
 ## Alternate Flows / Exceptions

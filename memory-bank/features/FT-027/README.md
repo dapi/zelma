@@ -2,7 +2,7 @@
 title: "FT-027: Sessions List Live"
 doc_kind: feature
 doc_function: index
-purpose: "Навигация по package фичи для live reconciliation view в `sessions list`."
+purpose: "Навигация по package фичи для live reconciliation view в `instances list`."
 derived_from:
   - ../../dna/governance.md
   - brief.md

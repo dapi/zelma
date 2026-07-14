@@ -2,7 +2,7 @@
 title: "FT-018: Create Failure Recovery Hints"
 doc_kind: feature
 doc_function: index
-purpose: "Навигация по package фичи для recovery hints при сбоях `sessions create`."
+purpose: "Навигация по package фичи для recovery hints при сбоях `instances create`."
 derived_from:
   - ../../dna/governance.md
   - brief.md

@@ -6,8 +6,8 @@
 Текущий стек реализации: Go CLI на Cobra. Первичная интеграция с `zellij`
 планируется через внешний `zellij` binary и его CLI automation surface.
 
-Основная единица продукта — `zelma session`: запись о Codex-сессии в
-конкретном `zellij pane`. Реестр таких сессий хранится в `.zelma/sessions.json`
+Основная единица продукта — `zelma instance`: управляемый экземпляр Codex runtime
+в конкретном `zellij pane`. Реестр таких instances хранится в `.zelma/instances.json`
 в корне репозитория и содержит как минимум:
 
 - `zellij session`;
@@ -15,39 +15,41 @@
 - `codex session`;
 - путь, открытый внутри pane.
 
-Цель проекта — сделать работу с несколькими Codex-сессиями в одном репозитории
+Цель проекта — сделать работу с несколькими Codex instances в одном репозитории
 наблюдаемой, воспроизводимой и управляемой из командной строки и из Codex skills.
 
 ## Ожидаемый CLI
 
 Первые команды продукта:
 
-- `zelma sessions create` — создает новый `zellij pane`, запускает в нем Codex и
-  сохраняет запись о сессии в `.zelma/sessions.json`.
-- `zelma sessions list` — primary inventory command: перед выводом запускает
+- `zelma instances create` — создает новый `zellij pane`, запускает в нем Codex и
+  сохраняет запись об instance в `.zelma/instances.json`.
+- `zelma instances list` — primary inventory command: перед выводом запускает
   auto-detect вручную созданных Codex panes, если successful detection cache
-  старше configured TTL, и показывает active `zelma sessions` для текущего
+  старше configured TTL, и показывает active `zelma instances` для текущего
   репозитория; `--all` добавляет stale и другие non-active записи.
-- `zelma sessions list --no-detect` — registry-only read старого типа без
+- `zelma instances list --no-detect` — registry-only read старого типа без
   probing `zellij`/Codex.
-- `zelma sessions detect` — diagnostic/manual command для явного detect pass;
-  в normal workflow его заменяет `sessions list`.
-- `zelma sessions focus <id>` — переключает `zellij` на tab/pane известной
-  `zelma session`.
-- `zelma sessions buffer <id> --json` — read-only bounded наблюдение текущего
-  screen/scrollback известной `zellij pane` по repo-local `zelma session id`.
-- `zelma sessions transcript <id> --json` — read-only bounded чтение Codex
-  transcript events по `codex_session`, привязанному к `zelma session`.
+- `zelma instances detect` — diagnostic/manual command для явного detect pass;
+  в normal workflow его заменяет `instances list`.
+- `zelma instances focus <id>` — переключает `zellij` на tab/pane известного
+  `zelma instance`.
+- `zelma instances send <id> [message] --json` — отправляет сообщение в
+  verified active Codex instance без echo message body.
+- `zelma instances buffer <id> --json` — read-only bounded наблюдение текущего
+  screen/scrollback известной `zellij pane` по repo-local `zelma instance id`.
+- `zelma instances transcript <id> --json` — read-only bounded чтение Codex
+  transcript events по `codex_session`, привязанному к `zelma instance`.
 - `zelma monitor` — открывает read-only terminal monitor, где live/active
-  `zelma sessions` идут первыми, а stale/non-active записи и recovery hints
+  `zelma instances` идут первыми, а stale/non-active записи и recovery hints
   остаются видимым вторичным контекстом.
 
-Observation-команды не меняют `.zelma/sessions.json` и не сохраняют pane buffer,
+Observation-команды не меняют `.zelma/instances.json` и не сохраняют pane buffer,
 prompts, assistant answers, tool payloads или transcript content в durable state.
 
-`sessions create` покрывает controlled workflow, где `zelma` создает pane сама.
-`sessions list` покрывает real-world workflow, где пользователь сначала вручную
-открыл pane в `zellij`, запустил Codex, а потом хочет увидеть эту сессию в
+`instances create` покрывает controlled workflow, где `zelma` создает pane сама.
+`instances list` покрывает real-world workflow, где пользователь сначала вручную
+открыл pane в `zellij`, запустил Codex, а потом хочет увидеть этот instance в
 инвентаре без отдельного detect step.
 
 Auto-detect cache хранит timestamp последнего successful detect pass в
@@ -55,7 +57,7 @@ Auto-detect cache хранит timestamp последнего successful detect 
 
 ```json
 {
-  "sessions_list": {
+  "instances_list": {
     "auto_detect_ttl": "5s"
   }
 }
@@ -79,7 +81,7 @@ tab: текущий `zellij action new-tab` переключает focus в со
 - [`memory-bank/product/`](memory-bank/product/README.md) — продуктовый контекст,
   аудитории, метрики и roadmap.
 - [`memory-bank/domain/`](memory-bank/domain/README.md) — предметная модель
-  `zelma sessions`, правила, состояния, события и bounded contexts.
+  `zelma instances`, правила, состояния, события и bounded contexts.
 - [`memory-bank/flows/`](memory-bank/flows/README.md) — шаблоны для будущих PRD,
   epics, features и ADR.
 
@@ -187,7 +189,7 @@ The repo-local distributable Codex skill lives at
 [`SKILL.md`](SKILL.md), with optional OpenAI UI metadata in
 [`agents/openai.yaml`](agents/openai.yaml).
 The skill is an agent-facing wrapper over the public `zelma` CLI only; it does
-not call `zellij` directly and does not parse `.zelma/sessions.json`.
+not call `zellij` directly and does not parse `.zelma/instances.json`.
 
 ### Install the skill
 

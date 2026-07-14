@@ -2,7 +2,7 @@
 title: "FT-002: Cobra Command Tree"
 doc_kind: feature
 doc_function: index
-purpose: "Навигация по package фичи для Cobra command tree `zelma setup` и `zelma sessions`."
+purpose: "Навигация по package фичи для Cobra command tree `zelma setup` и `zelma instances`."
 derived_from:
   - ../../dna/governance.md
   - brief.md

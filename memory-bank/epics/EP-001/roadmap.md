@@ -20,7 +20,7 @@ must_not_define:
 | Wave | Target | Depends on | Exit gate |
 | --- | --- | --- | --- |
 | `W1` | Go module scaffold and empty binary | Go toolchain | `go test ./...` runs; `zelma` binary can be built |
-| `W2` | Cobra command tree | `W1` | `zelma`, `zelma sessions`, and three subcommands route |
+| `W2` | Cobra command tree | `W1` | `zelma`, `zelma instances`, and three subcommands route |
 | `W3` | Agent-first help templates | `W2` | help/output contract tests pass |
 | `W4` | Output/error stubs | `W2`, `W3` | command stubs return predictable status and diagnostics |
 

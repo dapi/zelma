@@ -23,7 +23,7 @@ type Snapshot struct {
 	Version       int       `json:"version"`
 	Degraded      bool      `json:"degraded"`
 	Summary       Summary   `json:"summary"`
-	Sessions      []Session `json:"sessions"`
+	Sessions      []Session `json:"instances"`
 	RecoveryHints []string  `json:"recovery_hints,omitempty"`
 }
 
@@ -106,10 +106,10 @@ func sessionSnapshot(session registry.Session, liveStatus string) Session {
 		OpenedPath:      session.OpenedPath,
 	}
 	if liveStatus == string(live.StatusUnreachable) && dashboardStatus == DashboardStatusStale {
-		item.RecoveryHint = "inspect zellij session and pane reachability; run zelma sessions detect or cleanup to reconcile stale records"
+		item.RecoveryHint = "inspect zellij session and pane reachability; run zelma instances detect or cleanup to reconcile stale records"
 	}
 	if session.State == registry.StateCandidate {
-		item.RecoveryHint = "resolve Codex session evidence with zelma sessions detect --json before treating this candidate as active"
+		item.RecoveryHint = "resolve Codex session evidence with zelma instances detect --json before treating this candidate as active"
 	}
 	return item
 }

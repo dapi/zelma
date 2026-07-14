@@ -23,7 +23,7 @@ must_not_define:
 
 Все команды, которые работают с repo-local `.zelma/` или `.gitignore`, должны
 одинаково понимать, какой каталог является корнем проекта. Иначе
-`.zelma/sessions.json`, `.zelma/` и `.gitignore` могут относиться к разным
+`.zelma/instances.json`, `.zelma/` и `.gitignore` могут относиться к разным
 каталогам, чем ожидают агенты и пользователи.
 
 ### Результат
@@ -40,7 +40,7 @@ must_not_define:
 
 ### Что Не Входит
 
-- `NS-01` Нет чтения или записи `.zelma/sessions.json`.
+- `NS-01` Нет чтения или записи `.zelma/instances.json`.
 - `NS-02` Нет multi-repo/global registry.
 - `NS-03` Нет zellij integration.
 - `NS-04` Нет изменения `.gitignore`; это scope `zelma setup`.

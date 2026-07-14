@@ -20,7 +20,7 @@ must_not_define:
 
 ### Проблема
 
-Cleanup stale registry entries должен быть безопасным: сначала proposal, потом explicit confirm, без удаления live sessions.
+Cleanup stale registry entries должен быть безопасным: сначала proposal, потом explicit confirm, без удаления live instances.
 
 ### Результат
 
@@ -29,8 +29,8 @@ E2E-тест проверяет stale proposal, no-op без confirm, confirm de
 ### Объем Работ
 
 - `REQ-01` Подготовить registry с active и stale entries.
-- `REQ-02` Проверить `sessions cleanup --json` как read-only proposal.
-- `REQ-03` Проверить `sessions cleanup --confirm --json`.
+- `REQ-02` Проверить `instances cleanup --json` как read-only proposal.
+- `REQ-03` Проверить `instances cleanup --confirm --json`.
 - `REQ-04` Проверить повторный cleanup как empty proposal.
 
 ### Что Не Входит

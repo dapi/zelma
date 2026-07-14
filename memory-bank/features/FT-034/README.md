@@ -15,4 +15,4 @@ audience: humans_and_agents
 ## Аннотированный индекс
 
 - [Brief](brief.md)
-  Читать, когда нужно реализовать и проверить e2e-сценарий `sessions detect --json`.
+  Читать, когда нужно реализовать и проверить e2e-сценарий `instances detect --json`.

@@ -21,11 +21,11 @@ func TestAgentRecoveryDiagnosticsE2E(t *testing.T) {
 
 	t.Run("corrupted registry", func(t *testing.T) {
 		repoRoot := newE2EGitRepo(t)
-		registryPath := filepath.Join(repoRoot, ".zelma", "sessions.json")
+		registryPath := filepath.Join(repoRoot, ".zelma", "instances.json")
 		writeE2EFile(t, registryPath, `{"version":`)
 		before := readTextFile(t, registryPath)
 
-		result := runZelma(t, bin, repoRoot, nil, "sessions", "list", "--no-detect", "--json")
+		result := runZelma(t, bin, repoRoot, nil, "instances", "list", "--no-detect", "--json")
 
 		if result.code != 1 {
 			t.Fatalf("list code = %d, want 1", result.code)
@@ -36,7 +36,7 @@ func TestAgentRecoveryDiagnosticsE2E(t *testing.T) {
 		diagnostic := decodeRecoveryDiagnostic(t, result.stderr)
 		assertRecoveryDiagnostic(t, diagnostic, recoveryDiagnosticExpectation{
 			Code:                 "registry_invalid_json",
-			CommandPath:          "zelma sessions list",
+			CommandPath:          "zelma instances list",
 			Retryable:            false,
 			ManualActionRequired: true,
 			NextCommand:          nil,
@@ -51,7 +51,7 @@ func TestAgentRecoveryDiagnosticsE2E(t *testing.T) {
 		repoRoot := newE2EGitRepo(t)
 		missingZellij := filepath.Join(t.TempDir(), "missing-zellij")
 
-		result := runZelma(t, bin, repoRoot, []string{"ZELMA_ZELLIJ_BIN=" + missingZellij}, "sessions", "detect", "--json")
+		result := runZelma(t, bin, repoRoot, []string{"ZELMA_ZELLIJ_BIN=" + missingZellij}, "instances", "detect", "--json")
 
 		if result.code != 1 {
 			t.Fatalf("detect code = %d, want 1", result.code)
@@ -62,7 +62,7 @@ func TestAgentRecoveryDiagnosticsE2E(t *testing.T) {
 		diagnostic := decodeRecoveryDiagnostic(t, result.stderr)
 		assertRecoveryDiagnostic(t, diagnostic, recoveryDiagnosticExpectation{
 			Code:                 "zellij_missing_binary",
-			CommandPath:          "zelma sessions detect",
+			CommandPath:          "zelma instances detect",
 			Retryable:            false,
 			ManualActionRequired: true,
 			NextCommand:          nil,
@@ -70,7 +70,7 @@ func TestAgentRecoveryDiagnosticsE2E(t *testing.T) {
 		if !strings.Contains(diagnostic.AdapterCommand, missingZellij) {
 			t.Fatalf("adapter_command = %q, want missing zellij path", diagnostic.AdapterCommand)
 		}
-		if _, err := os.Stat(filepath.Join(repoRoot, ".zelma", "sessions.json")); !os.IsNotExist(err) {
+		if _, err := os.Stat(filepath.Join(repoRoot, ".zelma", "instances.json")); !os.IsNotExist(err) {
 			t.Fatalf("registry stat err = %v, want no registry write on zellij failure", err)
 		}
 	})
@@ -82,7 +82,7 @@ func TestAgentRecoveryDiagnosticsE2E(t *testing.T) {
 		env := isolatedZelmaEnv(t, fakeZellij)
 		env = append(env, "ZELMA_CODEX_BIN="+fakeCodex)
 
-		result := runZelma(t, bin, repoRoot, env, "sessions", "create", "--json")
+		result := runZelma(t, bin, repoRoot, env, "instances", "create", "--json")
 
 		if result.code != 1 {
 			t.Fatalf("create code = %d, want 1", result.code)
@@ -93,15 +93,15 @@ func TestAgentRecoveryDiagnosticsE2E(t *testing.T) {
 		diagnostic := decodeRecoveryDiagnostic(t, result.stderr)
 		assertRecoveryDiagnostic(t, diagnostic, recoveryDiagnosticExpectation{
 			Code:                 "create_pane_unconfirmed",
-			CommandPath:          "zelma sessions create",
+			CommandPath:          "zelma instances create",
 			Retryable:            false,
 			ManualActionRequired: true,
-			NextCommand:          []string{"zelma", "sessions", "detect", "--json"},
+			NextCommand:          []string{"zelma", "instances", "detect", "--json"},
 		})
 		if diagnostic.Summary == nil || diagnostic.Summary.Created != 1 || diagnostic.Summary.Registered != 0 || diagnostic.Summary.Skipped != 1 {
 			t.Fatalf("summary = %+v, want created=1 registered=0 skipped=1", diagnostic.Summary)
 		}
-		if _, err := os.Stat(filepath.Join(repoRoot, ".zelma", "sessions.json")); !os.IsNotExist(err) {
+		if _, err := os.Stat(filepath.Join(repoRoot, ".zelma", "instances.json")); !os.IsNotExist(err) {
 			t.Fatalf("registry stat err = %v, want no registry write on unconfirmed create", err)
 		}
 	})

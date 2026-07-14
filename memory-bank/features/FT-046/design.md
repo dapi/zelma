@@ -2,7 +2,7 @@
 title: "FT-046: Pane PID Codex Session Evidence Design"
 doc_kind: feature
 doc_function: design
-purpose: "Selected design for optional PID-correlated Codex session evidence in sessions detect."
+purpose: "Selected design for optional PID-correlated Codex session evidence in instances detect."
 derived_from:
   - brief.md
   - ../../engineering/codex-runtime-identification.md
@@ -15,7 +15,7 @@ audience: humans_and_agents
 
 ## Decision
 
-`sessions detect` keeps the existing evidence order:
+`instances detect` keeps the existing evidence order:
 
 1. command evidence from the zellij pane command;
 2. indexed `session_meta` lookup by opened path;
@@ -43,10 +43,10 @@ correlated with the pane PID and its process evidence yields a valid UUID. The
 resulting source is `pid_correlated_process`.
 
 Zero, multiple, stale or unsupported PID candidates remain unresolved
-candidates. `sessions detect --explain` reports the fallback verdict and reason.
+candidates. `instances detect --explain` reports the fallback verdict and reason.
 
 ## Privacy
 
 PID, raw argv, process environment and process tree details are not written to
-`.zelma/sessions.json`. Explain output reports only verdict, source and redacted
+`.zelma/instances.json`. Explain output reports only verdict, source and redacted
 reason. The resolver extracts only a safe UUID session ref.

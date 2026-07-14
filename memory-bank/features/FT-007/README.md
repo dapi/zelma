@@ -2,7 +2,7 @@
 title: "FT-007: Atomic Registry Writes And Lock"
 doc_kind: feature
 doc_function: index
-purpose: "Навигация по package фичи для безопасной записи `.zelma/sessions.json`."
+purpose: "Навигация по package фичи для безопасной записи `.zelma/instances.json`."
 derived_from:
   - ../../dna/governance.md
   - brief.md

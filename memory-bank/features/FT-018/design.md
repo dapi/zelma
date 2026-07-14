@@ -23,7 +23,7 @@ audience: humans_and_agents
 
 FT-017 intentionally left unconfirmed create panes as
 `created=1 registered=0 skipped=1`. FT-018 turns those partial outcomes into agent-facing diagnostics
-because a created zellij pane may now exist even when `.zelma/sessions.json` is
+because a created zellij pane may now exist even when `.zelma/instances.json` is
 unchanged.
 
 The design keeps upstream adapter contracts intact: `codex`, `zellij` and
@@ -60,7 +60,7 @@ messages.
 | `create_pane_launch_failed` | zellij run failed before a pane was confirmed. | `true` for zellij command failure, otherwise `false` | Inspect zellij availability/session and retry only when environment is fixed. |
 | `create_pane_unconfirmed` | Returned pane cannot be proven to be the requested Codex pane. | `false` | Run detect and inspect zellij before retrying create. |
 | `create_confirmation_failed` | Pane was created, but list-panes confirmation failed. | `false` | Run detect and inspect zellij before retrying create. |
-| `create_registry_write_failed` | Confirmed pane could not be written to `.zelma/sessions.json`. | `true` only for registry lock contention | Inspect registry/filesystem; run detect before retrying create when a pane may already exist. |
+| `create_registry_write_failed` | Confirmed pane could not be written to `.zelma/instances.json`. | `true` only for registry lock contention | Inspect registry/filesystem; run detect before retrying create when a pane may already exist. |
 
 `create_invalid_request` is reserved for internal caller contract errors.
 
@@ -68,7 +68,7 @@ messages.
 
 | Contract ID | Input / Output | Producer / Consumer | Semantics / Constraints |
 | --- | --- | --- | --- |
-| `CTR-01` | stderr diagnostic string | `zelma sessions create` / human or agent caller | Includes create reason code, retryability and recovery hint on create failures. |
+| `CTR-01` | stderr diagnostic string | `zelma instances create` / human or agent caller | Includes create reason code, retryability and recovery hint on create failures. |
 | `CTR-02` | `create.DiagnosticError` | `internal/create` / CLI and tests | Preserves upstream cause through `errors.As` / `errors.Is` and includes original cause detail in stderr; callers must not parse free text for retryability. |
 | `CTR-03` | partial `Summary` | create diagnostics / agent caller | Non-zero summary means side effects may already exist and destructive cleanup is not automatic. |
 

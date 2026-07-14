@@ -76,7 +76,7 @@ None.
 - `../../flows/feature-flow.md` requires `design.md` when a feature changes an
   integration contract or requires explicit solution reasoning.
 - `../../engineering/architecture.md` states that skills must call public CLI /
-  API rather than hand-writing `.zelma/sessions.json`.
+  API rather than hand-writing `.zelma/instances.json`.
 - `../../engineering/skill-contract.md` owns command routing and recovery
   expectations, but does not itself create the repo-local package artifact.
 
@@ -177,7 +177,7 @@ None.
 | Status | accepted |
 | Date | 2026-07-08 |
 | Review cycle | implementation |
-| Closed question | Should FT-048 document or implement "what a session is doing" in `zelma sessions list`? |
+| Closed question | Should FT-048 document or implement "what a session is doing" in `zelma instances list`? |
 | FPF frame | Boundary classification + evidence graph |
 
 ### Available Facts
@@ -190,7 +190,7 @@ None.
 - `../../../internal/skills/client.go` models the same public JSON fields and
   has no activity/task summary field.
 - Issue 87 scope is the distributable Codex skill package, not a new
-  `sessions list` output contract.
+  `instances list` output contract.
 
 ### Decision
 

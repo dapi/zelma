@@ -25,9 +25,9 @@ not a shell string:
 - opened path: normalized absolute path equal to or inside the current repo
   root.
 
-`zelma sessions create --dry-run` resolves this contract and prints it without
-creating a `zellij` pane or writing `.zelma/sessions.json`. Plain
-`zelma sessions create` performs the same preflight and then stops with a clear
+`zelma instances create --dry-run` resolves this contract and prints it without
+creating a `zellij` pane or writing `.zelma/instances.json`. Plain
+`zelma instances create` performs the same preflight and then stops with a clear
 pending-zellij diagnostic until the FT-016/FT-017 create path lands.
 
 ## Path Policy
@@ -65,4 +65,4 @@ identity parsing and registry promotion remain outside FT-015.
 - `CHK-01`: `internal/codex` unit tests assert the command vector and working
   directory for the resolved opened path.
 - `CHK-02`: CLI tests use a missing fake Codex binary and assert a recoverable
-  diagnostic without creating `.zelma/sessions.json`.
+  diagnostic without creating `.zelma/instances.json`.

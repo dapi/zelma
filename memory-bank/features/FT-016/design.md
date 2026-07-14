@@ -63,7 +63,7 @@ effect.
 
 ## Boundaries
 
-FT-016 does not implement `zelma sessions create`, write `.zelma/sessions.json`,
+FT-016 does not implement `zelma instances create`, write `.zelma/instances.json`,
 confirm that Codex started, attach/focus panes or clean up partially created
 panes.
 

@@ -43,7 +43,7 @@ func (err *DiagnosticError) Error() string {
 	}
 
 	diagnostic := err.Diagnostic
-	message := fmt.Sprintf("create session: %s: %s; retryable=%t", diagnostic.Code, diagnostic.Message, diagnostic.Retryable)
+	message := fmt.Sprintf("create instance: %s: %s; retryable=%t", diagnostic.Code, diagnostic.Message, diagnostic.Retryable)
 	if diagnostic.CauseCode != "" {
 		message += fmt.Sprintf("; cause=%s", diagnostic.CauseCode)
 	}
@@ -111,17 +111,17 @@ func RegistryWriteFailure(summary Summary, path string, err error) error {
 	diagnostic := Diagnostic{
 		Code:      ReasonRegistryWriteFailed,
 		CauseCode: diagnosticCauseCode(err),
-		Message:   "write sessions registry failed",
+		Message:   "write instances registry failed",
 		Summary:   summary,
-		RecoveryHint: "inspect the registry path and filesystem permissions; run \"zelma sessions detect\" " +
+		RecoveryHint: "inspect the registry path and filesystem permissions; run \"zelma instances detect\" " +
 			"to reconcile the created pane before retrying create",
 	}
 	if path != "" {
-		diagnostic.Message = fmt.Sprintf("write sessions registry failed at %s", path)
+		diagnostic.Message = fmt.Sprintf("write instances registry failed at %s", path)
 	}
 	if errors.Is(err, registry.ErrRegistryLocked) {
 		diagnostic.Retryable = true
-		diagnostic.RecoveryHint = "retry after the other registry writer finishes; run \"zelma sessions detect\" " +
+		diagnostic.RecoveryHint = "retry after the other registry writer finishes; run \"zelma instances detect\" " +
 			"first if a Codex pane may already have been created"
 	}
 
@@ -213,7 +213,7 @@ func confirmationFailure(summary Summary, err error) error {
 			Code:         ReasonConfirmationFailed,
 			CauseCode:    diagnosticCauseCode(err),
 			Message:      "confirm created pane failed",
-			RecoveryHint: "run \"zelma sessions detect\" to reconcile any live Codex panes, inspect zellij list-panes for the target session, then retry only after resolving the confirmation failure",
+			RecoveryHint: "run \"zelma instances detect\" to reconcile any live Codex panes, inspect zellij list-panes for the target session, then retry only after resolving the confirmation failure",
 			Summary:      summary,
 		},
 		Err: err,
@@ -226,7 +226,7 @@ func paneUnconfirmedFailure(summary Summary, ref zellij.PaneRef) error {
 			Code:    ReasonPaneUnconfirmed,
 			Message: fmt.Sprintf("created pane %s in zellij session %q could not be confirmed as Codex", ref.PaneID.String(), ref.Session),
 			RecoveryHint: fmt.Sprintf(
-				"run \"zelma sessions detect\" to reconcile live Codex panes, inspect zellij pane %s in session %q, then fix the environment before retrying create",
+				"run \"zelma instances detect\" to reconcile live Codex panes, inspect zellij pane %s in session %q, then fix the environment before retrying create",
 				ref.PaneID.String(),
 				ref.Session,
 			),

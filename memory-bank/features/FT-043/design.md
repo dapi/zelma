@@ -64,7 +64,7 @@ codex -c "developer_instructions='External session UUID: 019f3d81-b070-7a91-9a6f
 
 ## Invariants
 
-- Raw argv is never stored in `.zelma/sessions.json`.
+- Raw argv is never stored in `.zelma/instances.json`.
 - The parser returns `insufficient_evidence` for invalid UUIDs.
 - The parser rejects UUIDs from commands that do not identify Codex.
 - Detection does not read Codex transcript content for argv evidence.
@@ -75,5 +75,5 @@ codex -c "developer_instructions='External session UUID: 019f3d81-b070-7a91-9a6f
   instruction UUID extraction.
 - `CHK-02`: `internal/detection` tests assert `ClassifyPane` and
   `DetectCandidates` propagate the UUID.
-- `CHK-03`: `internal/cli` test asserts `sessions detect` writes an `active`
+- `CHK-03`: `internal/cli` test asserts `instances detect` writes an `active`
   record from `codex resume <uuid>` without session log evidence.

@@ -22,18 +22,18 @@ groups resolved refs by normalized `opened_path`. `FindSessionEvidenceForOpenedP
 now builds that index and delegates to it, preserving the old public behavior
 for single lookups.
 
-CLI enrichment uses the index once per `sessions detect` run. Candidates that
+CLI enrichment uses the index once per `instances detect` run. Candidates that
 already have a `codex_session` from stronger evidence skip session-log lookup.
 
 ## Explain Contract
 
-`zelma sessions detect --explain` appends one line per detected candidate:
+`zelma instances detect --explain` appends one line per detected candidate:
 
 ```text
 candidate zellij_session=<name> zellij_tab=<tab> zellij_pane=<pane> evidence=<verdict> source=<source> codex_session=<uuid> opened_path=<path> reason="<reason>"
 ```
 
-`zelma sessions detect --json --explain` adds:
+`zelma instances detect --json --explain` adds:
 
 ```json
 {

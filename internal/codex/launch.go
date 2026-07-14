@@ -72,7 +72,7 @@ type LaunchContract struct {
 func ResolveOpenedPath(repoRoot, requestedPath string) (string, error) {
 	root, err := normalizeExistingDirectory(repoRoot)
 	if err != nil {
-		return "", invalidInput("", fmt.Sprintf("resolve repo root: %v", err), "run zelma sessions create from inside a valid Git worktree", err)
+		return "", invalidInput("", fmt.Sprintf("resolve repo root: %v", err), "run zelma instances create from inside a valid Git worktree", err)
 	}
 
 	target := root

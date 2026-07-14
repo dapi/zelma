@@ -29,24 +29,24 @@ failures and adds a structured recovery response:
 | CLI reason or scenario | Action | Safe next command |
 | --- | --- | --- |
 | `unsupported repo`, `repo_not_ready`, `repo_not_prepared` | `setup` | `zelma setup` |
-| empty `sessions list --json` result while live panes are likely | `detect` | `zelma sessions detect --json` |
-| `create_pane_unconfirmed`, `create_confirmation_failed` | `detect` | `zelma sessions detect --json` |
-| `create_registry_write_failed` | `detect` | `zelma sessions detect --json` |
+| empty `instances list --json` result while live panes are likely | `detect` | `zelma instances detect --json` |
+| `create_pane_unconfirmed`, `create_confirmation_failed` | `detect` | `zelma instances detect --json` |
+| `create_registry_write_failed` | `detect` | `zelma instances detect --json` |
 | `create_pane_launch_failed`, `zellij_missing_binary`, `zellij_command_failed` | `stop` | none |
 | `create_codex_missing_binary` | `stop` | none |
 | registry schema/validation reason codes | `stop` | none |
 | registry read/adapter compatibility errors | `inspect` | none |
-| stale records reported by detect | `inspect` | `zelma sessions cleanup --json` |
+| stale records reported by detect | `inspect` | `zelma instances cleanup --json` |
 | `registry_locked` | `retry` | none |
 
-`zelma sessions cleanup --json` is a read-only proposal command. Recovery flows
+`zelma instances cleanup --json` is a read-only proposal command. Recovery flows
 must not suggest `cleanup --confirm`; that remains gated by explicit user
 intent.
 
 ## Boundaries
 
 - Recovery suggestions never call `zellij` directly.
-- Recovery suggestions never read or edit `.zelma/sessions.json` directly.
+- Recovery suggestions never read or edit `.zelma/instances.json` directly.
 - Recovery suggestions never perform destructive actions automatically.
 - `detect` is the only recovery command suggested after partial create
   confirmation or registry write failures, because it reconciles possible live
@@ -58,6 +58,6 @@ Unit tests in `internal/skills` cover:
 
 - repo-not-ready diagnostics suggesting `zelma setup`;
 - zellij unavailable diagnostics stopping for environment repair;
-- empty registry plus likely live panes suggesting `sessions detect`;
+- empty registry plus likely live panes suggesting `instances detect`;
 - stale detect output suggesting only cleanup preview;
 - recovery next commands staying inside safe `zelma` CLI surfaces.

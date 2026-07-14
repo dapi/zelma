@@ -51,7 +51,7 @@ open JSONL records, parse UUIDs or promote registry records to `active`.
 - `INV-02` FT-019 does not parse Codex conversation records.
 - `INV-03` Raw process argv, prompts, assistant responses and tool content do
   not appear in the inventory output.
-- `INV-04` `sessions detect` still writes unresolved `candidate` records until
+- `INV-04` `instances detect` still writes unresolved `candidate` records until
   FT-020/FT-021 implement parser and state transition rules.
 
 ## Verification

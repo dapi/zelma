@@ -15,7 +15,7 @@ audience: humans_and_agents
 ## Аннотированный индекс
 
 - [Brief](brief.md)
-  Читать, когда нужно понять contract запуска Codex для `sessions create`.
+  Читать, когда нужно понять contract запуска Codex для `instances create`.
 - [Design](design.md)
   Читать, когда нужно понять selected launch contract, path policy и failure
   boundaries.

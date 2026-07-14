@@ -167,7 +167,7 @@ func TestLaunchAndConfirmReturnsUnconfirmedPaneDiagnostic(t *testing.T) {
 	if diagnostic.Retryable {
 		t.Fatal("Retryable = true, want false for unconfirmed pane")
 	}
-	if !strings.Contains(diagnostic.RecoveryHint, "zelma sessions detect") || !strings.Contains(diagnostic.RecoveryHint, "inspect zellij") {
+	if !strings.Contains(diagnostic.RecoveryHint, "zelma instances detect") || !strings.Contains(diagnostic.RecoveryHint, "inspect zellij") {
 		t.Fatalf("recovery hint = %q, want detect and inspect guidance", diagnostic.RecoveryHint)
 	}
 	if got.Confirmed {
@@ -245,7 +245,7 @@ func TestLaunchAndConfirmClassifiesReadErrorAfterCreate(t *testing.T) {
 	if diagnostic.Retryable {
 		t.Fatal("Retryable = true, want false after pane was created")
 	}
-	if !strings.Contains(diagnostic.RecoveryHint, "zelma sessions detect") {
+	if !strings.Contains(diagnostic.RecoveryHint, "zelma instances detect") {
 		t.Fatalf("recovery hint = %q, want detect guidance", diagnostic.RecoveryHint)
 	}
 	if got.Summary != (Summary{Created: 1}) {
@@ -276,11 +276,11 @@ func TestRegistryWriteFailureClassifiesLockAsRetryable(t *testing.T) {
 	summary := Summary{Created: 1}
 	writeErr := &registry.WriteError{
 		Op:   "lock",
-		Path: "/workspace/zelma/.zelma/sessions.json.lock",
+		Path: "/workspace/zelma/.zelma/instances.json.lock",
 		Err:  registry.ErrRegistryLocked,
 	}
 
-	diagnostic := requireCreateDiagnostic(t, RegistryWriteFailure(summary, "/workspace/zelma/.zelma/sessions.json", writeErr), ReasonRegistryWriteFailed)
+	diagnostic := requireCreateDiagnostic(t, RegistryWriteFailure(summary, "/workspace/zelma/.zelma/instances.json", writeErr), ReasonRegistryWriteFailed)
 	if !diagnostic.Retryable {
 		t.Fatal("Retryable = false, want true for registry lock contention")
 	}

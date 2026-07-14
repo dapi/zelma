@@ -16,8 +16,8 @@ audience: humans_and_agents
 Codex-сессиями в `zellij panes`.
 
 Этот слой описывает то, что должно оставаться истинным независимо от текущей
-продуктовой инициативы или технической реализации: что такое `zelma session`,
-какие свойства она содержит, как `.zelma/sessions.json` становится локальным
+продуктовой инициативы или технической реализации: что такое `zelma instance`,
+какие свойства она содержит, как `.zelma/instances.json` становится локальным
 реестром, какие переходы состояния допустимы и где проходят границы между CLI,
 `zellij`, Codex и skills.
 
@@ -42,8 +42,8 @@ Domain-документы не определяют market positioning, product 
 Пример:
 
 - Product: "Пользователь должен видеть все Codex panes текущего репозитория
-  через `zelma sessions list`".
-- Domain: "`active` `zelma session` должна иметь `zellij session`, `zellij
+  через `zelma instances list`".
+- Domain: "`active` `zelma instance` должна иметь `zellij session`, `zellij
   pane`, `codex session` и normalized opened path".
 
 ## Граница С Engineering

@@ -2,7 +2,7 @@
 title: "FT-028: Stale Detection"
 doc_kind: feature
 doc_function: index
-purpose: "Навигация по package фичи для detection stale sessions."
+purpose: "Навигация по package фичи для detection stale instances."
 derived_from:
   - ../../dna/governance.md
   - brief.md

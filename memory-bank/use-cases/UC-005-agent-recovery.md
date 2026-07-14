@@ -43,7 +43,7 @@ Supervising agent.
 
 - `ALT-01` Ошибка устраняется `zelma setup`: команда обновляет `.gitignore` и
   проверяет repo root без неявного создания registry-файла.
-- `ALT-02` Ошибка устраняется `sessions detect`: registry синхронизируется с live pane.
+- `ALT-02` Ошибка устраняется `instances detect`: registry синхронизируется с live pane.
 - `EX-01` Ошибка требует человека: diagnostic явно помечает manual action.
 
 ## Postconditions

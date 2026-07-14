@@ -24,7 +24,7 @@ Create flow должен быть доказан end-to-end: запуск pane, 
 
 ### Результат
 
-`zelma sessions create --json` покрыт e2e-тестом create-to-list с fake zellij executable и проверкой registry output.
+`zelma instances create --json` покрыт e2e-тестом create-to-list с fake zellij executable и проверкой registry output.
 
 ### Объем Работ
 
@@ -42,9 +42,9 @@ Create flow должен быть доказан end-to-end: запуск pane, 
 ### Критерии Готовности
 
 - `EC-01` CLI возвращает created session JSON.
-- `EC-02` `sessions list --live --json` видит созданную session.
+- `EC-02` `instances list --live --json` видит созданную session.
 - `EC-03` Failure path содержит recovery hint.
 
 ### Обязательное E2E-Покрытие
 
-Feature считается готовой только после e2e-теста, который исполняет `zelma sessions create --json` и затем `zelma sessions list --live --json`.
+Feature считается готовой только после e2e-теста, который исполняет `zelma instances create --json` и затем `zelma instances list --live --json`.

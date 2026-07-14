@@ -2,7 +2,7 @@
 title: "FT-014: Detect Upsert Idempotency"
 doc_kind: feature
 doc_function: index
-purpose: "Навигация по package фичи для идемпотентного `sessions detect` registry upsert."
+purpose: "Навигация по package фичи для идемпотентного `instances detect` registry upsert."
 derived_from:
   - ../../dna/governance.md
   - brief.md

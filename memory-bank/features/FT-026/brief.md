@@ -32,7 +32,7 @@ Skills имеют recovery flows для common failures и сохраняют CL
 
 - `REQ-01` Map CLI reason codes to agent actions.
 - `REQ-02` Предлагать `zelma setup`, если repo не подготовлен.
-- `REQ-03` Предлагать `sessions detect`, если registry пустой, но zellij panes вероятны.
+- `REQ-03` Предлагать `instances detect`, если registry пустой, но zellij panes вероятны.
 
 ### Что Не Входит
 

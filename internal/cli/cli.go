@@ -46,13 +46,14 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 			fmt.Fprintln(stderr, err)
 			return 1
 		}
-		if isSessionsSendDashMessageArgumentError(args, err) {
+		if isSessionResourceSendDashMessageArgumentError(args, err) {
 			err = sendDashPrefixedMessageArgumentError()
+			resource := sessionResourceFromArgs(args)
 			if rawJSONRequested(args) {
-				fmt.Fprintln(stderr, jsonArgumentFailure("zelma sessions send", err))
+				fmt.Fprintln(stderr, jsonArgumentFailure("zelma "+resource+" send", err))
 				return 1
 			}
-			fmt.Fprintln(stderr, legacyCommandDiagnostic("zelma sessions send", err))
+			fmt.Fprintln(stderr, legacyCommandDiagnostic("zelma "+resource+" send", err))
 			return 1
 		}
 		if command, ok := jsonFallbackCommandForArgs(root, args); ok {
@@ -72,7 +73,7 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 func NewRootCommand(stdout, stderr io.Writer) *cobra.Command {
 	root := &cobra.Command{
 		Use:           "zelma",
-		Short:         "Manage zelma sessions.",
+		Short:         "Manage zelma instances.",
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -98,24 +99,7 @@ func NewRootCommand(stdout, stderr io.Writer) *cobra.Command {
 	supervisorCommand.AddCommand(newSupervisorStartIssueCommand(stdout))
 	root.AddCommand(supervisorCommand)
 
-	sessions := &cobra.Command{
-		Use:   "sessions",
-		Short: "Manage zelma sessions.",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return cmd.Help()
-		},
-	}
-	sessions.AddCommand(
-		newSessionsListCommand(stdout),
-		newSessionsCreateCommand(stdout),
-		newSessionsDetectCommand(stdout),
-		newSessionsFocusCommand(stdout),
-		newSessionsSendCommand(stdout),
-		newSessionsBufferCommand(stdout),
-		newSessionsTranscriptCommand(stdout),
-		newSessionsCleanupCommand(stdout),
-	)
-	root.AddCommand(sessions)
+	root.AddCommand(newSessionResourceCommand(stdout, "instances", "Manage zelma instances."))
 
 	return root
 }
@@ -130,24 +114,24 @@ func renderHelp(cmd *cobra.Command, args []string) {
 		fmt.Fprint(cmd.OutOrStdout(), statusHelp)
 	case "zelma monitor":
 		fmt.Fprint(cmd.OutOrStdout(), monitorHelp)
-	case "zelma sessions":
-		fmt.Fprint(cmd.OutOrStdout(), sessionsHelp)
-	case "zelma sessions list":
-		fmt.Fprint(cmd.OutOrStdout(), sessionsListHelp)
-	case "zelma sessions create":
-		fmt.Fprint(cmd.OutOrStdout(), sessionsCreateHelp)
-	case "zelma sessions detect":
-		fmt.Fprint(cmd.OutOrStdout(), sessionsDetectHelp)
-	case "zelma sessions focus":
-		fmt.Fprint(cmd.OutOrStdout(), sessionsFocusHelp)
-	case "zelma sessions send":
-		fmt.Fprint(cmd.OutOrStdout(), sessionsSendHelp)
-	case "zelma sessions buffer":
-		fmt.Fprint(cmd.OutOrStdout(), sessionsBufferHelp)
-	case "zelma sessions transcript":
-		fmt.Fprint(cmd.OutOrStdout(), sessionsTranscriptHelp)
-	case "zelma sessions cleanup":
-		fmt.Fprint(cmd.OutOrStdout(), sessionsCleanupHelp)
+	case "zelma instances":
+		fmt.Fprint(cmd.OutOrStdout(), instancesHelp)
+	case "zelma instances list":
+		fmt.Fprint(cmd.OutOrStdout(), instancesListHelp)
+	case "zelma instances create":
+		fmt.Fprint(cmd.OutOrStdout(), instancesCreateHelp)
+	case "zelma instances detect":
+		fmt.Fprint(cmd.OutOrStdout(), instancesDetectHelp)
+	case "zelma instances focus":
+		fmt.Fprint(cmd.OutOrStdout(), instancesFocusHelp)
+	case "zelma instances send":
+		fmt.Fprint(cmd.OutOrStdout(), instancesSendHelp)
+	case "zelma instances buffer":
+		fmt.Fprint(cmd.OutOrStdout(), instancesBufferHelp)
+	case "zelma instances transcript":
+		fmt.Fprint(cmd.OutOrStdout(), instancesTranscriptHelp)
+	case "zelma instances cleanup":
+		fmt.Fprint(cmd.OutOrStdout(), instancesCleanupHelp)
 	case "zelma supervisor":
 		fmt.Fprint(cmd.OutOrStdout(), supervisorHelp)
 	case "zelma supervisor start-issue":
@@ -163,16 +147,16 @@ const rootHelp = `COMMAND MAP
   zelma help              Show this command map.
   zelma setup             Add .zelma to this repository .gitignore. Status: implemented.
   zelma status            Print dashboard status snapshot. Status: implemented.
-  zelma monitor           Open a live zelma sessions terminal monitor. Status: implemented.
-  zelma sessions help     Show the sessions command map.
-  zelma sessions list     List known zelma sessions. Status: implemented.
-  zelma sessions create   Create and register a confirmed Codex pane. Status: implemented.
-  zelma sessions detect   Detect existing Codex panes. Status: implemented.
-  zelma sessions focus    Focus a known zellij pane by zelma session ID. Status: implemented.
-  zelma sessions send     Send a message to a verified Codex session. Status: implemented.
-  zelma sessions buffer   Read bounded pane screen/scrollback by zelma session ID. Status: implemented.
-  zelma sessions transcript  Read bounded Codex transcript events by zelma session ID. Status: implemented.
-  zelma sessions cleanup  Propose or confirm stale record cleanup. Status: implemented.
+  zelma monitor           Open a live zelma instances terminal monitor. Status: implemented.
+  zelma instances help    Show the instances command map.
+  zelma instances list    List known zelma instances. Status: implemented.
+  zelma instances create  Create and register a confirmed Codex pane. Status: implemented.
+  zelma instances detect  Detect existing Codex panes. Status: implemented.
+  zelma instances focus   Focus a known zellij pane by zelma instance ID. Status: implemented.
+  zelma instances send    Send a message to a verified Codex instance. Status: implemented.
+  zelma instances buffer  Read bounded pane screen/scrollback by zelma instance ID. Status: implemented.
+  zelma instances transcript  Read bounded Codex transcript events by zelma instance ID. Status: implemented.
+  zelma instances cleanup Propose or confirm stale record cleanup. Status: implemented.
   zelma supervisor help   Show the supervisor command map.
   zelma supervisor start-issue  Launch and supervise start-issue. Status: implemented.
 
@@ -180,45 +164,261 @@ OUTPUT CONVENTIONS
   help output: stdout, exit 0, plain text.
   setup changed: stdout, exit 0, "changed: prepared .zelma at <path>".
   setup unchanged: stdout, exit 0, "already configured: <path> contains .zelma".
-  sessions list: stdout, exit 0, active/candidate table by default or schema v1
+  instances list: stdout, exit 0, active/candidate table by default or schema v1
   registry JSON with --json; add --all for stale records in human output;
   auto-detects by default; add --no-detect for registry-only reads; add --live
   to include live/unreachable zellij status.
-  sessions detect: stdout, exit 0, summary with active/candidate/stale counts,
+  instances detect: stdout, exit 0, summary with active/candidate/stale counts,
   stale reason lines when found, or JSON with --json.
-  sessions focus: stdout, exit 0, focused summary or JSON with --json.
-  sessions send: stdout, exit 0, sent summary or JSON with target metadata;
+  instances focus: stdout, exit 0, focused summary or JSON with --json.
+  instances send: stdout, exit 0, sent summary or JSON with target metadata;
   never echoes message body.
-  sessions buffer: stdout, exit 0, bounded zellij pane screen JSON with --json.
-  sessions transcript: stdout, exit 0, bounded Codex transcript event JSON with --json.
-  sessions cleanup: stdout, exit 0, stale cleanup proposal by default; add
+  instances buffer: stdout, exit 0, bounded zellij pane screen JSON with --json.
+  instances transcript: stdout, exit 0, bounded Codex transcript event JSON with --json.
+  instances cleanup: stdout, exit 0, stale cleanup proposal by default; add
   --confirm to remove proposed stale records.
-  sessions create --dry-run: stdout, exit 0, launch contract text or JSON.
-  sessions create: stdout, exit 0, created/registered/skipped summary.
+  instances create --dry-run: stdout, exit 0, launch contract text or JSON.
+  instances create: stdout, exit 0, created/registered/skipped summary.
   status: stdout, exit 0, schema v1 dashboard snapshot JSON.
-  monitor: stdout, exit 0, interactive read-only live sessions TUI.
+  monitor: stdout, exit 0, interactive read-only live instances TUI.
   supervisor start-issue: stdout, exit 0, terminal status summary by default
   or schema v1 supervisor JSON with launch, polling, review and cleanup state.
-  machine-readable session data: use "zelma sessions list --json".
+  machine-readable instance data: use "zelma instances list --json".
 
 RECOVERY HINTS
   unknown command: run "zelma help".
-  session inventory task: run "zelma sessions list --json".
+  instance inventory task: run "zelma instances list --json".
   dashboard task: run "zelma status --json".
   live monitor task: run "zelma monitor".
   setup task: run "zelma setup" from inside a git repository.
   issue supervision task: run "zelma supervisor start-issue <issue> --repo owner/name --base main --json".
 
 HUMAN NOTES
-  zelma manages Codex sessions in zellij panes. sessions list is the primary
+  zelma manages Codex instances in zellij panes. instances list is the primary
   inventory command and auto-detects fresh-enough manual panes before rendering
   the repository-local registry. setup creates .zelma and configures
   repository-local ignore rules. status is the dashboard/backend snapshot
   command and monitor is the live human-facing view over the same status
-  contract. Neither command mutates the sessions registry.
+  contract. Neither command mutates the instances registry.
 
 Usage:
   zelma [command]
+`
+
+const instancesHelp = `COMMAND MAP
+  zelma instances help    Show this instances command map.
+  zelma instances list    List known zelma instances. Status: implemented.
+  zelma instances create  Create and register a confirmed Codex pane. Status: implemented.
+  zelma instances detect  Detect existing Codex panes. Status: implemented.
+  zelma instances focus   Focus a known zellij pane by zelma instance ID. Status: implemented.
+  zelma instances send    Send a message to a verified Codex instance. Status: implemented.
+  zelma instances buffer  Read bounded pane screen/scrollback by zelma instance ID. Status: implemented.
+  zelma instances transcript  Read bounded Codex transcript events by zelma instance ID. Status: implemented.
+  zelma instances cleanup Propose or confirm stale record cleanup. Status: implemented.
+
+OUTPUT CONVENTIONS
+  help output: stdout, exit 0, plain text.
+  list: stdout, exit 0, active/candidate table by default or schema v1 registry JSON
+  with --json; add --all for stale records in human output; auto-detects by
+  default; add --no-detect for registry-only reads; add --live to include
+  live/unreachable zellij status.
+  create --dry-run: stdout, exit 0, resolved Codex command/opened path.
+  create: stdout, exit 0, created/registered/skipped summary.
+  detect: stdout, exit 0, added/unchanged/skipped summary with
+  active/candidate/stale counts, stale reasons when found, or JSON with --json.
+  focus: stdout, exit 0, focused summary or focused instance JSON with --json.
+  send: stdout, exit 0, sent summary or JSON with target metadata; message body
+  is never echoed.
+  buffer: stdout, exit 0, bounded zellij pane screen/scrollback JSON with
+  --json; default --tail 120 lines.
+  transcript: stdout, exit 0, bounded Codex transcript event JSON with --json;
+  default --tail 50 events.
+  cleanup: stdout, exit 0, proposed/removed/kept summary with stale records;
+  without --confirm, does not mutate registry.
+  registry output: preserves id, zellij_session, zellij_pane, codex_session,
+  opened_path and state fields.
+
+RECOVERY HINTS
+  inventory task: inspect "zelma instances list --help".
+  managed create task: inspect "zelma instances create --help".
+  diagnostic/manual detect task: inspect "zelma instances detect --help".
+  focus task: inspect "zelma instances focus --help".
+  send task: inspect "zelma instances send --help".
+  observation task: run "zelma instances buffer <id> --json" or
+  "zelma instances transcript <id> --json".
+
+HUMAN NOTES
+  instances list is the primary inventory command and auto-detects fresh-enough
+  manual panes before rendering .zelma/instances.json. --no-detect keeps a
+  registry-only read path. focus switches zellij UI to a stored pane and does
+  not mutate registry. send revalidates the recorded active Codex pane before
+  delivery and does not mutate registry. cleanup removes stale records only
+  after explicit --confirm.
+
+Usage:
+  zelma instances [command]
+`
+
+const instancesListHelp = `Usage:
+  zelma instances list [--json] [--live] [--all] [--no-detect]
+
+Status:
+  implemented: auto-detects fresh-enough zellij/Codex panes, then reads the
+  repository-local instances registry; --live adds live reachability.
+
+Output:
+  default: tabular human-readable active and candidate instance inventory.
+  --all: include stale, closed and archived records in human output.
+  --json: schema v1 registry JSON object with version and all sessions.
+  --live: adds live_status values: live or unreachable.
+  --no-detect: skip auto-detect and read only .zelma/instances.json before
+  optional --live enrichment.
+
+Notes:
+  Default list may update registry records through the same detection rules as
+  "zelma instances detect". A successful detect is cached by timestamp for the
+  configured TTL, default 5s. Use --no-detect for the registry-only read.
+`
+
+const instancesCreateHelp = `Usage:
+  zelma instances create [path] [--dry-run] [--json]
+
+Status:
+  implemented: creates a zellij pane, confirms launch evidence and registers a
+  candidate record only after confirmation.
+
+Output:
+  --dry-run: launch contract text.
+  --dry-run --json: launch contract JSON.
+  default: created/registered/skipped summary.
+  --json: created/registered/skipped summary plus registered instance JSON.
+
+Contract:
+  default opened path: repository root.
+  explicit path: existing directory equal to or inside the repository root.
+  command: resolved Codex executable with "--cd <opened_path>".
+  working directory: opened_path.
+  zellij session: ZELMA_ZELLIJ_SESSION or zelma-main.
+
+Notes:
+  Registers unresolved Codex identity as candidate, not active. Does not clean
+  up a created pane if registry write fails.
+`
+
+const instancesDetectHelp = `Usage:
+  zelma instances detect [--json] [--explain]
+
+Status:
+  implemented: diagnostic/manual command for reading zellij panes and upserting
+  candidate registry records. Normal inventory should use "instances list".
+
+Output:
+  default: added/unchanged/skipped summary with active/candidate/stale counts.
+  --json: stable summary object with added, unchanged, skipped, active,
+  candidate and stale counts plus stale_candidates reason codes when found.
+  --explain: include per-candidate evidence verdict, source and reason.
+
+Notes:
+  Promotes detected panes to active only when Codex session evidence resolves
+  unambiguously; otherwise writes visible candidate records. Marks active
+  records stale only after successful live zellij inventory proves the zellij
+  session or pane is missing. Does not create panes or delete stale records.
+`
+
+const instancesFocusHelp = `Usage:
+  zelma instances focus <id> [--json]
+
+Status:
+  implemented: focuses a known zellij pane by repo-local zelma instance ID.
+
+Output:
+  default: focused summary with id, state, zellij session, tab and pane.
+  --json: focused instance JSON object.
+
+Notes:
+  Reads .zelma/instances.json and sends zellij focus actions. Does not create,
+  detect, cleanup or mutate registry records. Use "zelma instances list" to find
+  the target ID.
+`
+
+const instancesSendHelp = `Usage:
+  zelma instances send <id> [message] [--json]
+  zelma instances send <id> --stdin [--json]
+
+Status:
+  implemented: sends a message to a live active Codex instance after strict
+  readiness revalidation.
+
+Output:
+  default: sent summary with id, source, byte_count, line_count and submitted.
+  --json: target identity plus message metadata. The message body is never
+  echoed.
+
+Contract:
+  target id: positive repo-local zelma instance id from "zelma instances list".
+  message source: exactly one of positional message or --stdin.
+  readiness: target registry record must be active, reachable in zellij, a
+  terminal pane, and compatible with recorded Codex session/opened path.
+
+Notes:
+  Does not focus panes, detect instances, repair stale records or mutate the
+  registry. On not-ready diagnostics, inspect public zelma recovery hints
+  before retrying.
+`
+
+const instancesBufferHelp = `Usage:
+  zelma instances buffer <id> --json [--tail <lines>]
+
+Status:
+  implemented: reads bounded zellij pane screen/scrollback by repo-local zelma
+  instance ID.
+
+Output:
+  --json: schema v1 observation object with source zellij_buffer, captured_at,
+  truncated, limit and line items.
+  --tail: maximum lines to return; default 120.
+
+Notes:
+  Reads .zelma/instances.json to resolve identity, then reads the current zellij
+  pane screen through the adapter. Does not mutate registry records and does
+  not persist pane content.
+`
+
+const instancesTranscriptHelp = `Usage:
+  zelma instances transcript <id> --json [--tail <events>]
+
+Status:
+  implemented: reads bounded Codex transcript events by repo-local zelma
+  instance ID.
+
+Output:
+  --json: schema v1 observation object with source codex_transcript,
+  captured_at, codex_session, truncated, limit and typed JSONL events.
+  --tail: maximum events to return; default 50.
+
+Notes:
+  Reads .zelma/instances.json to resolve codex_session, then reads the matching
+  Codex transcript through the codex adapter. Does not mutate registry records
+  and does not persist prompts, assistant answers, tool payloads or transcript
+  content in .zelma/instances.json.
+`
+
+const instancesCleanupHelp = `Usage:
+  zelma instances cleanup [--confirm] [--json]
+
+Status:
+  implemented: proposes stale record cleanup and removes stale records only
+  after explicit --confirm.
+
+Output:
+  default: proposed/removed/kept summary followed by stale record lines.
+  --json: summary object with proposed, removed and kept counts plus
+  stale_records when found.
+
+Notes:
+  Without --confirm, reads the registry and prints a proposal without writes.
+  With --confirm, removes only records whose registry state is stale. Active,
+  candidate, closed and archived records are never removed by this command.
 `
 
 const setupHelp = `COMMAND MAP
@@ -239,7 +439,7 @@ RECOVERY HINTS
   gitignore write failure: inspect filesystem permissions and retry.
 
 HUMAN NOTES
-  setup creates .zelma but not sessions.json and does not contact zellij.
+  setup creates .zelma but not instances.json and does not contact zellij.
 
 Usage:
   zelma setup [--json]
@@ -249,14 +449,14 @@ const statusHelp = `Usage:
   zelma status --json
 
 Status:
-  implemented: emits a versioned dashboard status snapshot over zelma sessions.
+  implemented: emits a versioned dashboard status snapshot over zelma instances.
 
 Output:
   --json: schema v1 status snapshot with summary, session status, live status
-  and recovery hints. The command does not mutate .zelma/sessions.json.
+  and recovery hints. The command does not mutate .zelma/instances.json.
 
 Notes:
-  The backend reads the sessions registry and attempts live zellij reconciliation.
+  The backend reads the instances registry and attempts live zellij reconciliation.
   If zellij is unavailable, the command still returns a degraded snapshot with
   recovery hints for dashboard and agent automation.
 `
@@ -265,233 +465,17 @@ const monitorHelp = `Usage:
   zelma monitor
 
 Status:
-  implemented: opens a read-only terminal monitor for live zelma sessions.
+  implemented: opens a read-only terminal monitor for live zelma instances.
 
 Output:
-  default: interactive TUI with live/active sessions first, secondary
+  default: interactive TUI with live/active instances first, secondary
   stale/non-active records, degraded status and recovery hints.
 
 Notes:
   The monitor uses the same status/list semantics as "zelma status --json" and
-  "zelma sessions list --live --json". It does not parse registry internals in
+  "zelma instances list --live --json". It does not parse registry internals in
   the UI layer, does not cleanup stale records, and delegates focus to the
-  existing "zelma sessions focus <id>" behavior.
-`
-
-const sessionsHelp = `COMMAND MAP
-  zelma sessions help     Show this sessions command map.
-  zelma sessions list     List known zelma sessions. Status: implemented.
-  zelma sessions create   Create and register a confirmed Codex pane. Status: implemented.
-  zelma sessions detect   Detect existing Codex panes. Status: implemented.
-  zelma sessions focus    Focus a known zellij pane by zelma session ID. Status: implemented.
-  zelma sessions send     Send a message to a verified Codex session. Status: implemented.
-  zelma sessions buffer   Read bounded pane screen/scrollback by zelma session ID. Status: implemented.
-  zelma sessions transcript  Read bounded Codex transcript events by zelma session ID. Status: implemented.
-  zelma sessions cleanup  Propose or confirm stale record cleanup. Status: implemented.
-
-OUTPUT CONVENTIONS
-  help output: stdout, exit 0, plain text.
-  list: stdout, exit 0, active/candidate table by default or schema v1 registry JSON
-  with --json; add --all for stale records in human output; auto-detects by
-  default; add --no-detect for registry-only reads; add --live to include
-  live/unreachable zellij status.
-  create --dry-run: stdout, exit 0, resolved Codex command/opened path.
-  create: stdout, exit 0, created/registered/skipped summary.
-  detect: stdout, exit 0, added/unchanged/skipped summary with
-  active/candidate/stale counts, stale reasons when found, or JSON with --json.
-  focus: stdout, exit 0, focused summary or focused session JSON with --json.
-  send: stdout, exit 0, sent summary or JSON with target metadata; message body
-  is never echoed.
-  buffer: stdout, exit 0, bounded zellij pane screen/scrollback JSON with
-  --json; default --tail 120 lines.
-  transcript: stdout, exit 0, bounded Codex transcript event JSON with --json;
-  default --tail 50 events.
-  cleanup: stdout, exit 0, proposed/removed/kept summary with stale records;
-  without --confirm, does not mutate registry.
-  sessions registry output: preserves id, zellij_session, zellij_pane,
-  codex_session, opened_path and state fields.
-
-RECOVERY HINTS
-  inventory task: inspect "zelma sessions list --help".
-  managed create task: inspect "zelma sessions create --help".
-  diagnostic/manual detect task: inspect "zelma sessions detect --help".
-  focus task: inspect "zelma sessions focus --help".
-  send task: inspect "zelma sessions send --help".
-  observation task: run "zelma sessions buffer <id> --json" or
-  "zelma sessions transcript <id> --json".
-
-HUMAN NOTES
-  sessions list is the primary inventory command and auto-detects fresh-enough
-  manual panes before rendering .zelma/sessions.json. --no-detect keeps a
-  registry-only read path. focus switches zellij UI to a stored pane and does
-  not mutate registry. send revalidates the recorded active Codex pane before
-  delivery and does not mutate registry. cleanup removes stale records only
-  after explicit --confirm.
-
-Usage:
-  zelma sessions [command]
-`
-
-const sessionsListHelp = `Usage:
-  zelma sessions list [--json] [--live] [--all] [--no-detect]
-
-Status:
-  implemented: auto-detects fresh-enough zellij/Codex panes, then reads the
-  repository-local sessions registry; --live adds live reachability.
-
-Output:
-  default: tabular human-readable active and candidate session inventory.
-  --all: include stale, closed and archived records in human output.
-  --json: schema v1 registry JSON object with version and all sessions.
-  --live: adds live_status values: live or unreachable.
-  --no-detect: skip auto-detect and read only .zelma/sessions.json before
-  optional --live enrichment.
-
-Notes:
-  Default list may update registry records through the same detection rules as
-  "zelma sessions detect". A successful detect is cached by timestamp for the
-  configured TTL, default 5s. Use --no-detect for the old registry-only read.
-`
-
-const sessionsCreateHelp = `Usage:
-  zelma sessions create [path] [--dry-run] [--json]
-
-Status:
-  implemented: creates a zellij pane, confirms launch evidence and registers a
-  candidate record only after confirmation.
-
-Output:
-  --dry-run: launch contract text.
-  --dry-run --json: launch contract JSON.
-  default: created/registered/skipped summary.
-  --json: created/registered/skipped summary plus registered session JSON.
-
-Contract:
-  default opened path: repository root.
-  explicit path: existing directory equal to or inside the repository root.
-  command: resolved Codex executable with "--cd <opened_path>".
-  working directory: opened_path.
-  zellij session: ZELMA_ZELLIJ_SESSION or zelma-main.
-
-Notes:
-  Registers unresolved Codex identity as candidate, not active. Does not clean
-  up a created pane if registry write fails.
-`
-
-const sessionsDetectHelp = `Usage:
-  zelma sessions detect [--json] [--explain]
-
-Status:
-  implemented: diagnostic/manual command for reading zellij panes and upserting
-  candidate registry records. Normal inventory should use "sessions list".
-
-Output:
-  default: added/unchanged/skipped summary with active/candidate/stale counts.
-  --json: stable summary object with added, unchanged, skipped, active,
-  candidate and stale counts plus stale_candidates reason codes when found.
-  --explain: include per-candidate evidence verdict, source and reason.
-
-Notes:
-  Promotes detected panes to active only when Codex session evidence resolves
-  unambiguously; otherwise writes visible candidate records. Marks active
-  records stale only after successful live zellij inventory proves the zellij
-  session or pane is missing. Does not create panes or delete stale records.
-`
-
-const sessionsFocusHelp = `Usage:
-  zelma sessions focus <id> [--json]
-
-Status:
-  implemented: focuses a known zellij pane by repo-local zelma session ID.
-
-Output:
-  default: focused summary with id, state, zellij session, tab and pane.
-  --json: focused session JSON object.
-
-Notes:
-  Reads .zelma/sessions.json and sends zellij focus actions. Does not create,
-  detect, cleanup or mutate registry records. Use "zelma sessions list" to find
-  the target ID.
-`
-
-const sessionsSendHelp = `Usage:
-  zelma sessions send <id> [message] [--json]
-  zelma sessions send <id> --stdin [--json]
-
-Status:
-  implemented: sends a message to a live active Codex session after strict
-  readiness revalidation.
-
-Output:
-  default: sent summary with id, source, byte_count, line_count and submitted.
-  --json: target identity plus message metadata. The message body is never
-  echoed.
-
-Contract:
-  target id: positive repo-local zelma session id from "zelma sessions list".
-  message source: exactly one of positional message or --stdin.
-  readiness: target registry record must be active, reachable in zellij, a
-  terminal pane, and compatible with recorded Codex session/opened path.
-
-Notes:
-  Does not focus panes, detect sessions, repair stale records or mutate the
-  registry. On not-ready diagnostics, inspect public zelma recovery hints
-  before retrying.
-`
-
-const sessionsBufferHelp = `Usage:
-  zelma sessions buffer <id> --json [--tail <lines>]
-
-Status:
-  implemented: reads bounded zellij pane screen/scrollback by repo-local zelma
-  session ID.
-
-Output:
-  --json: schema v1 observation object with source zellij_buffer, captured_at,
-  truncated, limit and line items.
-  --tail: maximum lines to return; default 120.
-
-Notes:
-  Reads .zelma/sessions.json to resolve identity, then reads the current zellij
-  pane screen through the adapter. Does not mutate registry records and does
-  not persist pane content.
-`
-
-const sessionsTranscriptHelp = `Usage:
-  zelma sessions transcript <id> --json [--tail <events>]
-
-Status:
-  implemented: reads bounded Codex transcript events by repo-local zelma
-  session ID.
-
-Output:
-  --json: schema v1 observation object with source codex_transcript,
-  captured_at, codex_session, truncated, limit and typed JSONL events.
-  --tail: maximum events to return; default 50.
-
-Notes:
-  Reads .zelma/sessions.json to resolve codex_session, then reads the matching
-  Codex transcript through the codex adapter. Does not mutate registry records
-  and does not persist prompts, assistant answers, tool payloads or transcript
-  content in .zelma/sessions.json.
-`
-
-const sessionsCleanupHelp = `Usage:
-  zelma sessions cleanup [--confirm] [--json]
-
-Status:
-  implemented: proposes stale record cleanup and removes stale records only
-  after explicit --confirm.
-
-Output:
-  default: proposed/removed/kept summary followed by stale record lines.
-  --json: summary object with proposed, removed and kept counts plus
-  stale_records when found.
-
-Notes:
-  Without --confirm, reads the registry and prints a proposal without writes.
-  With --confirm, removes only records whose registry state is stale. Active,
-  candidate, closed and archived records are never removed by this command.
+  existing "zelma instances focus <id>" behavior.
 `
 
 const supervisorHelp = `COMMAND MAP
@@ -613,7 +597,7 @@ func newStatusCommand(stdout io.Writer) *cobra.Command {
 func newMonitorCommand(stdout io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "monitor",
-		Short: "Open a live zelma sessions monitor.",
+		Short: "Open a live zelma instances monitor.",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			root, err := repo.ResolveRoot("")
@@ -628,6 +612,27 @@ func newMonitorCommand(stdout io.Writer) *cobra.Command {
 			return nil
 		},
 	}
+	return cmd
+}
+
+func newSessionResourceCommand(stdout io.Writer, use, short string) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   use,
+		Short: short,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return cmd.Help()
+		},
+	}
+	cmd.AddCommand(
+		newInstancesListCommand(stdout),
+		newSessionsCreateCommand(stdout),
+		newSessionsDetectCommand(stdout),
+		newSessionsFocusCommand(stdout),
+		newSessionsSendCommand(stdout),
+		newSessionsBufferCommand(stdout),
+		newSessionsTranscriptCommand(stdout),
+		newSessionsCleanupCommand(stdout),
+	)
 	return cmd
 }
 
@@ -729,7 +734,7 @@ func newSupervisorStartIssueCommand(stdout io.Writer) *cobra.Command {
 	return cmd
 }
 
-func newSessionsListCommand(stdout io.Writer) *cobra.Command {
+func newInstancesListCommand(stdout io.Writer) *cobra.Command {
 	var jsonOutput bool
 	var liveOutput bool
 	var allOutput bool
@@ -737,7 +742,7 @@ func newSessionsListCommand(stdout io.Writer) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "list",
-		Short: "List known zelma sessions.",
+		Short: "List known zelma instances.",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			root, err := repo.ResolveRoot("")
@@ -780,7 +785,7 @@ func newSessionsListCommand(stdout io.Writer) *cobra.Command {
 	cmd.Flags().BoolVar(&jsonOutput, "json", false, "Print schema v1 JSON.")
 	cmd.Flags().BoolVar(&liveOutput, "live", false, "Include live zellij pane status without mutating the registry.")
 	cmd.Flags().BoolVar(&allOutput, "all", false, "Include stale, closed and archived sessions in human-readable output.")
-	cmd.Flags().BoolVar(&noDetect, "no-detect", false, "Skip auto-detect and read only the sessions registry.")
+	cmd.Flags().BoolVar(&noDetect, "no-detect", false, "Skip auto-detect and read only the instances registry.")
 	return cmd
 }
 
@@ -790,7 +795,7 @@ func newSessionsCreateCommand(stdout io.Writer) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "create [path]",
-		Short: "Create a zelma session.",
+		Short: "Create a zelma instance.",
 		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			root, err := repo.ResolveRoot("")
@@ -1057,7 +1062,7 @@ func newSessionsDetectCommand(stdout io.Writer) *cobra.Command {
 }
 
 func ensureAutoDetectFresh(ctx context.Context, command, repoRoot string) error {
-	ttl, err := config.SessionsListAutoDetectTTL(repoRoot)
+	ttl, err := config.InstancesListAutoDetectTTL(repoRoot)
 	if err != nil {
 		return fmt.Errorf("%s: %w", command, err)
 	}
@@ -1113,10 +1118,10 @@ func newSessionsFocusCommand(stdout io.Writer) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "focus <id>",
-		Short: "Focus a known zelma session pane.",
+		Short: "Focus a known zelma instance pane.",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			id, err := parseSessionIDArg(args[0])
+			id, err := parseInstanceIDArg(args[0])
 			if err != nil {
 				return commandFailure(cmd.CommandPath(), err, jsonOutput)
 			}
@@ -1128,7 +1133,7 @@ func newSessionsFocusCommand(stdout io.Writer) *cobra.Command {
 			}
 
 			if jsonOutput {
-				return writeFocusSessionJSON(stdout, session)
+				return writeFocusInstanceJSON(stdout, session)
 			}
 			_, err = fmt.Fprintf(
 				stdout,
@@ -1153,10 +1158,10 @@ const (
 	sendReasonMissingMessage            sendReasonCode = "missing_message"
 	sendReasonEmptyMessage              sendReasonCode = "empty_message"
 	sendReasonMessageReadFailed         sendReasonCode = "message_read_failed"
-	sendReasonSessionNotFound           sendReasonCode = "session_not_found"
+	sendReasonInstanceNotFound          sendReasonCode = "instance_not_found"
 	sendReasonPaneNotFound              sendReasonCode = "pane_not_found"
 	sendReasonPaneNotTerminal           sendReasonCode = "pane_not_terminal"
-	sendReasonSessionStateNotActive     sendReasonCode = "session_state_not_active"
+	sendReasonInstanceStateNotActive    sendReasonCode = "instance_state_not_active"
 	sendReasonRuntimeUnreachable        sendReasonCode = "runtime_unreachable"
 	sendReasonCodexRuntimeMissing       sendReasonCode = "codex_runtime_missing"
 	sendReasonCodexIdentityMismatch     sendReasonCode = "codex_identity_mismatch"
@@ -1227,12 +1232,13 @@ func newSessionsSendCommand(stdout io.Writer) *cobra.Command {
 		Short: "Send a message to a verified Codex session.",
 		Args:  cobra.RangeArgs(1, 2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			id, err := parseSessionIDArg(args[0])
+			resource := sessionResourceFromCommandPath(cmd.CommandPath())
+			id, err := parseInstanceIDArg(args[0])
 			if err != nil {
 				return commandFailure(cmd.CommandPath(), err, jsonOutput)
 			}
 
-			message, err := resolveSendMessageInput(args[1:], stdinInput)
+			message, err := resolveSendMessageInput(args[1:], stdinInput, resource)
 			if err != nil {
 				return commandFailure(cmd.CommandPath(), err, jsonOutput)
 			}
@@ -1244,29 +1250,29 @@ func newSessionsSendCommand(stdout io.Writer) *cobra.Command {
 			session, ok := findSessionByID(reg, id)
 			if !ok {
 				return commandFailure(cmd.CommandPath(), sendFailure(
-					sendReasonSessionNotFound,
-					fmt.Sprintf("session id %d was not found in the current repository registry", id),
+					sendReasonInstanceNotFound,
+					fmt.Sprintf("instance id %d was not found in the current repository registry", id),
 					false,
 					true,
-					"run zelma sessions list --json to choose an existing repo-local session id",
-					[]string{"zelma", "sessions", "list", "--json"},
+					fmt.Sprintf("run zelma %s list --json to choose an existing repo-local instance id", resource),
+					sessionResourceCommand(resource, "list", "--json"),
 					nil,
 				), jsonOutput)
 			}
 			if session.State != registry.StateActive {
 				return commandFailure(cmd.CommandPath(), sendFailure(
-					sendReasonSessionStateNotActive,
-					fmt.Sprintf("session id %d is %s; only active sessions can receive messages", id, session.State),
+					sendReasonInstanceStateNotActive,
+					fmt.Sprintf("instance id %d is %s; only active instances can receive messages", id, session.State),
 					false,
 					true,
-					"run zelma sessions list --json to choose an active session or zelma sessions detect --json to reconcile candidates",
-					[]string{"zelma", "sessions", "list", "--json"},
+					fmt.Sprintf("run zelma %s list --json to choose an active instance or zelma %s detect --json to reconcile candidates", resource, resource),
+					sessionResourceCommand(resource, "list", "--json"),
 					nil,
 				), jsonOutput)
 			}
 
 			client := zellij.New(zellij.WithBinary(os.Getenv("ZELMA_ZELLIJ_BIN")))
-			if err := validateSendTargetReady(cmd.Context(), session, os.Getenv("ZELMA_CODEX_BIN"), client); err != nil {
+			if err := validateSendTargetReady(cmd.Context(), session, os.Getenv("ZELMA_CODEX_BIN"), client, resource); err != nil {
 				return commandFailure(cmd.CommandPath(), err, jsonOutput)
 			}
 
@@ -1282,8 +1288,8 @@ func newSessionsSendCommand(stdout io.Writer) *cobra.Command {
 					"message was not submitted because the zellij adapter could not complete delivery to the verified target",
 					true,
 					true,
-					"run zelma sessions list --live --json to inspect the target before retrying send",
-					[]string{"zelma", "sessions", "list", "--live", "--json"},
+					fmt.Sprintf("run zelma %s list --live --json to inspect the target before retrying send", resource),
+					sessionResourceCommand(resource, "list", "--live", "--json"),
 					err,
 				), jsonOutput)
 			}
@@ -1307,19 +1313,28 @@ func newSessionsSendCommand(stdout io.Writer) *cobra.Command {
 	return cmd
 }
 
+func sessionResourceFromCommandPath(_ string) string {
+	return "instances"
+}
+
+func sessionResourceCommand(resource, subcommand string, args ...string) []string {
+	command := []string{"zelma", resource, subcommand}
+	return append(command, args...)
+}
+
 type sendLiveTargetRuntime interface {
 	ListSessions(ctx context.Context) ([]zellij.Session, error)
 	ListPanes(ctx context.Context, session string) ([]zellij.Pane, error)
 }
 
-func resolveSendMessageInput(args []string, stdinInput bool) (sendMessageInput, error) {
+func resolveSendMessageInput(args []string, stdinInput bool, resource string) (sendMessageInput, error) {
 	if stdinInput && len(args) > 0 {
 		return sendMessageInput{}, sendFailure(
 			sendReasonConflictingMessageSources,
 			"provide either a positional message or --stdin, not both",
 			false,
 			true,
-			"retry with exactly one message source: zelma sessions send <id> \"message\" --json or zelma sessions send <id> --stdin --json",
+			fmt.Sprintf("retry with exactly one message source: zelma %s send <id> \"message\" --json or zelma %s send <id> --stdin --json", resource, resource),
 			[]string{},
 			nil,
 		)
@@ -1330,7 +1345,7 @@ func resolveSendMessageInput(args []string, stdinInput bool) (sendMessageInput, 
 			"message text is required",
 			false,
 			true,
-			"retry with exactly one message source: zelma sessions send <id> \"message\" --json or zelma sessions send <id> --stdin --json",
+			fmt.Sprintf("retry with exactly one message source: zelma %s send <id> \"message\" --json or zelma %s send <id> --stdin --json", resource, resource),
 			[]string{},
 			nil,
 		)
@@ -1346,7 +1361,7 @@ func resolveSendMessageInput(args []string, stdinInput bool) (sendMessageInput, 
 				"could not read message text from stdin",
 				true,
 				false,
-				"retry zelma sessions send <id> --stdin --json after stdin is readable",
+				fmt.Sprintf("retry zelma %s send <id> --stdin --json after stdin is readable", resource),
 				[]string{},
 				err,
 			)
@@ -1382,7 +1397,7 @@ func sendLineCount(text string) int {
 	return strings.Count(text, "\n") + 1
 }
 
-func validateSendTargetReady(ctx context.Context, session registry.Session, configuredCodexBinary string, runtime sendLiveTargetRuntime) error {
+func validateSendTargetReady(ctx context.Context, session registry.Session, configuredCodexBinary string, runtime sendLiveTargetRuntime, resource string) error {
 	liveSessions, err := runtime.ListSessions(ctx)
 	if err != nil {
 		return sendFailure(
@@ -1390,19 +1405,19 @@ func validateSendTargetReady(ctx context.Context, session registry.Session, conf
 			"could not list live zellij sessions before sending",
 			true,
 			true,
-			"run zelma sessions list --live --json to inspect runtime reachability before retrying send",
-			[]string{"zelma", "sessions", "list", "--live", "--json"},
+			fmt.Sprintf("run zelma %s list --live --json to inspect runtime reachability before retrying send", resource),
+			sessionResourceCommand(resource, "list", "--live", "--json"),
 			err,
 		)
 	}
 	if !sendLiveSessionExists(liveSessions, session.ZellijSession) {
 		return sendFailure(
-			sendReasonSessionNotFound,
-			fmt.Sprintf("zellij session %q from session id %d was not found", session.ZellijSession, session.ID),
+			sendReasonInstanceNotFound,
+			fmt.Sprintf("zellij session %q from instance id %d was not found", session.ZellijSession, session.ID),
 			false,
 			true,
-			"run zelma sessions list --live --json to inspect the current session registry and live status",
-			[]string{"zelma", "sessions", "list", "--live", "--json"},
+			fmt.Sprintf("run zelma %s list --live --json to inspect the current instance registry and live status", resource),
+			sessionResourceCommand(resource, "list", "--live", "--json"),
 			nil,
 		)
 	}
@@ -1412,16 +1427,16 @@ func validateSendTargetReady(ctx context.Context, session registry.Session, conf
 		code := sendReasonRuntimeUnreachable
 		message := "could not list zellij panes before sending"
 		if zellij.IsSessionNotFound(err) {
-			code = sendReasonSessionNotFound
-			message = fmt.Sprintf("zellij session %q from session id %d was not found", session.ZellijSession, session.ID)
+			code = sendReasonInstanceNotFound
+			message = fmt.Sprintf("zellij session %q from instance id %d was not found", session.ZellijSession, session.ID)
 		}
 		return sendFailure(
 			code,
 			message,
 			true,
 			true,
-			"run zelma sessions list --live --json to inspect the target before retrying send",
-			[]string{"zelma", "sessions", "list", "--live", "--json"},
+			fmt.Sprintf("run zelma %s list --live --json to inspect the target before retrying send", resource),
+			sessionResourceCommand(resource, "list", "--live", "--json"),
 			err,
 		)
 	}
@@ -1430,33 +1445,33 @@ func validateSendTargetReady(ctx context.Context, session registry.Session, conf
 	if !ok {
 		return sendFailure(
 			sendReasonPaneNotFound,
-			fmt.Sprintf("pane %q from session id %d was not found", session.ZellijPane, session.ID),
+			fmt.Sprintf("pane %q from instance id %d was not found", session.ZellijPane, session.ID),
 			false,
 			true,
-			"run zelma sessions list --live --json to inspect stale or moved panes before retrying send",
-			[]string{"zelma", "sessions", "list", "--live", "--json"},
+			fmt.Sprintf("run zelma %s list --live --json to inspect stale or moved panes before retrying send", resource),
+			sessionResourceCommand(resource, "list", "--live", "--json"),
 			nil,
 		)
 	}
 	if pane.Exited {
 		return sendFailure(
 			sendReasonTargetNotReady,
-			fmt.Sprintf("pane %q from session id %d has exited", session.ZellijPane, session.ID),
+			fmt.Sprintf("pane %q from instance id %d has exited", session.ZellijPane, session.ID),
 			false,
 			true,
-			"run zelma sessions detect --json to reconcile exited panes before retrying send",
-			[]string{"zelma", "sessions", "detect", "--json"},
+			fmt.Sprintf("run zelma %s detect --json to reconcile exited panes before retrying send", resource),
+			sessionResourceCommand(resource, "detect", "--json"),
 			nil,
 		)
 	}
 	if pane.ID.Kind != zellij.PaneKindTerminal {
 		return sendFailure(
 			sendReasonPaneNotTerminal,
-			fmt.Sprintf("pane %q from session id %d is not a terminal pane", session.ZellijPane, session.ID),
+			fmt.Sprintf("pane %q from instance id %d is not a terminal pane", session.ZellijPane, session.ID),
 			false,
 			true,
-			"run zelma sessions list --live --json to choose a terminal Codex session before retrying send",
-			[]string{"zelma", "sessions", "list", "--live", "--json"},
+			fmt.Sprintf("run zelma %s list --live --json to choose a terminal Codex instance before retrying send", resource),
+			sessionResourceCommand(resource, "list", "--live", "--json"),
 			nil,
 		)
 	}
@@ -1466,22 +1481,22 @@ func validateSendTargetReady(ctx context.Context, session registry.Session, conf
 			fmt.Sprintf("pane %q opened path no longer matches the registry record", session.ZellijPane),
 			false,
 			true,
-			"run zelma sessions detect --json to reconcile Codex session identity before retrying send",
-			[]string{"zelma", "sessions", "detect", "--json"},
+			fmt.Sprintf("run zelma %s detect --json to reconcile Codex instance identity before retrying send", resource),
+			sessionResourceCommand(resource, "detect", "--json"),
 			nil,
 		)
 	}
 	if code, message := sendPaneCodexReadiness(session, pane, configuredCodexBinary); code != "" {
-		nextCommand := []string{"zelma", "sessions", "detect", "--json"}
+		nextCommand := sessionResourceCommand(resource, "detect", "--json")
 		if code == sendReasonRuntimeAmbiguous {
-			nextCommand = []string{"zelma", "sessions", "list", "--live", "--json"}
+			nextCommand = sessionResourceCommand(resource, "list", "--live", "--json")
 		}
 		return sendFailure(
 			code,
 			message,
 			false,
 			true,
-			"run "+strings.Join(nextCommand, " ")+" to inspect or reconcile Codex session identity before retrying send",
+			"run "+strings.Join(nextCommand, " ")+" to inspect or reconcile Codex instance identity before retrying send",
 			nextCommand,
 			nil,
 		)
@@ -1580,13 +1595,13 @@ func newSessionsBufferCommand(stdout io.Writer) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "buffer <id>",
-		Short: "Read bounded zellij pane screen by zelma session ID.",
+		Short: "Read bounded zellij pane screen by zelma instance ID.",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if !jsonOutput {
 				return commandFailure(cmd.CommandPath(), errors.New("buffer output is currently available only with --json"), jsonOutput)
 			}
-			id, err := parseSessionIDArg(args[0])
+			id, err := parseInstanceIDArg(args[0])
 			if err != nil {
 				return commandFailure(cmd.CommandPath(), err, jsonOutput)
 			}
@@ -1617,13 +1632,13 @@ func newSessionsTranscriptCommand(stdout io.Writer) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "transcript <id>",
-		Short: "Read bounded Codex transcript events by zelma session ID.",
+		Short: "Read bounded Codex transcript events by zelma instance ID.",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if !jsonOutput {
 				return commandFailure(cmd.CommandPath(), errors.New("transcript output is currently available only with --json"), jsonOutput)
 			}
-			id, err := parseSessionIDArg(args[0])
+			id, err := parseInstanceIDArg(args[0])
 			if err != nil {
 				return commandFailure(cmd.CommandPath(), err, jsonOutput)
 			}
@@ -1658,7 +1673,7 @@ func focusSessionByID(ctx context.Context, command string, id int, client zellij
 	}
 	session, ok := findSessionByID(reg, id)
 	if !ok {
-		return registry.Session{}, fmt.Errorf("session id %d not found; run zelma sessions list", id)
+		return registry.Session{}, fmt.Errorf("instance id %d not found; run zelma instances list", id)
 	}
 	if err := focusSession(ctx, session, client); err != nil {
 		return registry.Session{}, err
@@ -1687,7 +1702,7 @@ func newSessionsCleanupCommand(stdout io.Writer) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "cleanup",
-		Short: "Propose or confirm stale zelma session cleanup.",
+		Short: "Propose or confirm stale zelma instance cleanup.",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if !confirm {
@@ -1895,7 +1910,7 @@ func writeAutoDetectCache(repoRoot string, detectedAt time.Time) error {
 func writeSessionsJSON(stdout io.Writer, reg registry.Registry) error {
 	data, err := json.MarshalIndent(reg, "", "  ")
 	if err != nil {
-		return fmt.Errorf("encode sessions registry JSON: %w", err)
+		return fmt.Errorf("encode instances registry JSON: %w", err)
 	}
 	_, err = fmt.Fprintf(stdout, "%s\n", data)
 	return err
@@ -1920,7 +1935,7 @@ func writeSetupJSON(stdout io.Writer, result setup.Result) error {
 func writeLiveSessionsJSON(stdout io.Writer, reg live.Registry) error {
 	data, err := json.MarshalIndent(reg, "", "  ")
 	if err != nil {
-		return fmt.Errorf("encode live sessions JSON: %w", err)
+		return fmt.Errorf("encode live instances JSON: %w", err)
 	}
 	_, err = fmt.Fprintf(stdout, "%s\n", data)
 	return err
@@ -1969,7 +1984,7 @@ func writeSupervisorStartIssueJSON(stdout io.Writer, result supervisor.Result) e
 	return err
 }
 
-func writeFocusSessionJSON(stdout io.Writer, session registry.Session) error {
+func writeFocusInstanceJSON(stdout io.Writer, session registry.Session) error {
 	data, err := json.MarshalIndent(session, "", "  ")
 	if err != nil {
 		return fmt.Errorf("encode focused session JSON: %w", err)
@@ -2069,12 +2084,12 @@ func jsonFallbackCommandForArgs(root *cobra.Command, args []string) (*cobra.Comm
 	return command, true
 }
 
-func isSessionsSendDashMessageArgumentError(args []string, err error) bool {
-	return isCobraValidationError(err) && hasDashPrefixedSessionsSendMessageArg(args)
+func isSessionResourceSendDashMessageArgumentError(args []string, err error) bool {
+	return isCobraValidationError(err) && hasDashPrefixedSessionResourceSendMessageArg(args)
 }
 
-func hasDashPrefixedSessionsSendMessageArg(args []string) bool {
-	if len(args) < 3 || args[0] != "sessions" || args[1] != "send" {
+func hasDashPrefixedSessionResourceSendMessageArg(args []string) bool {
+	if len(args) < 3 || !isSessionResourceArg(args[0]) || args[1] != "send" {
 		return false
 	}
 
@@ -2097,6 +2112,17 @@ func hasDashPrefixedSessionsSendMessageArg(args []string) bool {
 		}
 	}
 	return false
+}
+
+func isSessionResourceArg(arg string) bool {
+	return arg == "instances"
+}
+
+func sessionResourceFromArgs(args []string) string {
+	if len(args) > 0 && isSessionResourceArg(args[0]) {
+		return args[0]
+	}
+	return "instances"
 }
 
 func isSessionsSendBoolFlagToken(arg string) bool {
@@ -2244,7 +2270,7 @@ func recoveryDiagnosticForError(command string, err error) recoveryDiagnosticJSO
 
 	if errors.Is(err, registry.ErrRegistryLocked) {
 		diagnostic.Code = "registry_locked"
-		diagnostic.Message = "sessions registry is locked by another writer"
+		diagnostic.Message = "instances registry is locked by another writer"
 		diagnostic.Retryable = true
 		diagnostic.ManualActionRequired = false
 		diagnostic.RecoveryHint = "retry after the other registry writer finishes; do not edit the registry directly"
@@ -2305,7 +2331,7 @@ func recoveryDiagnosticForError(command string, err error) recoveryDiagnosticJSO
 		diagnostic.Message = codexDiagnostic.Message
 		diagnostic.RecoveryHint = codexDiagnostic.RecoveryHint
 		if codexDiagnostic.Code == codex.ErrorCodeTranscriptMissing {
-			diagnostic.NextCommand = []string{"zelma", "sessions", "detect", "--json"}
+			diagnostic.NextCommand = []string{"zelma", "instances", "detect", "--json"}
 		} else {
 			diagnostic.NextCommand = nextCommandForCode(diagnostic.Code)
 		}
@@ -2349,7 +2375,7 @@ func isRegistryFilePath(path string) bool {
 func nextCommandForCode(code string) []string {
 	switch code {
 	case string(create.ReasonPaneUnconfirmed), string(create.ReasonConfirmationFailed), string(create.ReasonRegistryWriteFailed):
-		return []string{"zelma", "sessions", "detect", "--json"}
+		return []string{"zelma", "instances", "detect", "--json"}
 	case "repo_not_ready", "repo_not_prepared", "unsupported_repo":
 		return []string{"zelma", "setup"}
 	default:
@@ -2365,7 +2391,7 @@ type createResultJSON struct {
 	Created    int              `json:"created"`
 	Registered int              `json:"registered"`
 	Skipped    int              `json:"skipped"`
-	Session    registry.Session `json:"session"`
+	Instance   registry.Session `json:"instance"`
 }
 
 func writeCreateResultJSON(stdout io.Writer, summary create.Summary, session registry.Session) error {
@@ -2373,7 +2399,7 @@ func writeCreateResultJSON(stdout io.Writer, summary create.Summary, session reg
 		Created:    summary.Created,
 		Registered: summary.Registered,
 		Skipped:    summary.Skipped,
-		Session:    session,
+		Instance:   session,
 	}
 	data, err := json.MarshalIndent(output, "", "  ")
 	if err != nil {
@@ -2493,10 +2519,10 @@ func configuredZellijSession() string {
 	return create.DefaultZellijSession
 }
 
-func parseSessionIDArg(value string) (int, error) {
+func parseInstanceIDArg(value string) (int, error) {
 	id, err := strconv.Atoi(value)
 	if err != nil || id <= 0 {
-		return 0, fmt.Errorf("invalid session id %q; pass a positive integer from zelma sessions list", value)
+		return 0, fmt.Errorf("invalid instance id %q; pass a positive integer from zelma instances list", value)
 	}
 	return id, nil
 }

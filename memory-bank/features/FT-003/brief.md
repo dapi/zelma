@@ -2,7 +2,7 @@
 title: "FT-003: Agent-First Шаблоны Help"
 doc_kind: feature
 doc_function: canonical
-purpose: "Канонический brief для agent-first help templates в `zelma` и `zelma sessions`."
+purpose: "Канонический brief для agent-first help templates в `zelma` и `zelma instances`."
 derived_from:
   - ../../product/context.md
   - ../../product/vision.md
@@ -35,7 +35,7 @@ Default CLI help обычно оптимизирован для человека
 ### Объем Работ
 
 - `REQ-01` Настроить top-level help для `zelma`.
-- `REQ-02` Настроить `zelma sessions help`.
+- `REQ-02` Настроить `zelma instances help`.
 - `REQ-03` Включить agent-first command map, stable output conventions и recovery hint pattern.
 
 ### Что Не Входит
@@ -60,7 +60,7 @@ Default CLI help обычно оптимизирован для человека
 ### Критерии Готовности
 
 - `EC-01` `zelma help` и bare `zelma` output являются agent-first.
-- `EC-02` `zelma sessions help` показывает subcommand map и ожидаемые output modes.
+- `EC-02` `zelma instances help` показывает subcommand map и ожидаемые output modes.
 
 ### Матрица Трассировки
 

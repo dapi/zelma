@@ -26,7 +26,7 @@ must_not_define:
 
 ## Результат
 
-`zelma sessions detect` читает zellij sessions/panes, классифицирует кандидатов
+`zelma instances detect` читает zellij sessions/panes, классифицирует кандидатов
 Codex panes и идемпотентно обновляет registry.
 
 ## Набросок Объема
