@@ -2,11 +2,11 @@
 title: "EP-008: Autonomous Issue Shipping Supervisor"
 doc_kind: epic
 doc_function: index
-purpose: "Навигация по draft package epic для автономного orchestration вокруг start-issue: default zellij pane, optional tab, review/fix loops, PR, CI, merge и notification."
+purpose: "Навигация по epic: implemented local supervisor lifecycle и remaining real GitHub PR/CI/merge gates."
 derived_from:
   - ../../dna/governance.md
   - brief.md
-status: draft
+status: active
 audience: humans_and_agents
 ---
 
@@ -14,26 +14,27 @@ audience: humans_and_agents
 
 ## О разделе
 
-Draft package для supervisor-агента, который запускает разработку указанной
-GitHub issue через `start-issue` в новой zellij pane по умолчанию, либо в tab
-только по явному выбору пользователя, и доводит delivery
-до отревьюшенного, mergeable PR с зеленым CI, исправленными review/CI issues,
-запушенными коммитами и merge.
+Implemented baseline запускает `start-issue` в zellij, наблюдает pane markers,
+ведет локальный review/fix/re-review cycle и закрывает pane после **merge
+simulation**. Он не читает реальное состояние GitHub PR/CI и не выполняет
+GitHub merge. Эта remaining capability принадлежит open issue
+[#111](https://github.com/dapi/zelma/issues/111) и требует отдельной merge
+policy.
 
 ## Аннотированный индекс
 
 - [Brief](brief.md)
-  Читать, когда нужно понять scope autonomous issue shipping, prompt override
-  model и candidate features.
+  Читать, когда нужно понять implemented local scope и boundary future GitHub
+  gates.
 
 - [PROMPT-005: Start Issue Shipping Supervisor](../../prompts/PROMPT-005-start-issue-shipping-supervisor.md)
   Читать, когда нужно запустить generic supervisor-сессию без hardcoded repo.
 
-## Кандидатные Packages Фич
+## Delivery Evidence And Next Work
 
-- [`FT-032`](../../features/FT-032/README.md): Supervisor command and zellij launch
-- `FT-033`: Editable prompt template and `.zelma` override
-- `FT-034`: Pane observation and completion detection
-- `FT-035`: Review/fix loop orchestration
-- `FT-036`: PR, mergeability and CI gate
-- `FT-037`: Merge, cleanup and desktop notification
+- [`FT-032`](../../features/FT-032/README.md): implemented supervisor command,
+  launch surface resolution and zellij launch.
+- [`FT-036`](../../features/FT-036/README.md): implemented local supervisor
+  orchestration e2e, including merge simulation.
+- [#111](https://github.com/dapi/zelma/issues/111): future real GitHub PR/CI
+  gates and explicit merge policy.

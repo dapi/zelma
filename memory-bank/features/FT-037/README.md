@@ -6,7 +6,7 @@ purpose: "Навигация по package фичи для e2e-покрытия U
 derived_from:
   - ../../use-cases/UC-005-agent-recovery.md
   - brief.md
-status: draft
+status: active
 audience: humans_and_agents
 ---
 

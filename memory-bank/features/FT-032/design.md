@@ -7,7 +7,7 @@ derived_from:
   - brief.md
   - ../../ops/config.md
   - ../../engineering/zellij-integration.md
-status: draft
+status: active
 audience: humans_and_agents
 must_not_define:
   - ft_032_scope

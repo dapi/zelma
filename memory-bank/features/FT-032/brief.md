@@ -7,8 +7,8 @@ derived_from:
   - ../../epics/EP-008/brief.md
   - ../../ops/config.md
   - ../../prompts/PROMPT-005-start-issue-shipping-supervisor.md
-status: draft
-delivery_status: planned
+status: active
+delivery_status: implemented
 audience: humans_and_agents
 must_not_define:
   - implementation_sequence

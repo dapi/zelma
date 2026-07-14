@@ -6,7 +6,7 @@ purpose: "Навигация по package фичи для e2e-покрытия U
 derived_from:
   - ../../use-cases/UC-007-agent-handoff.md
   - brief.md
-status: draft
+status: active
 audience: humans_and_agents
 ---
 

@@ -22,7 +22,7 @@ derived_from:
   - ../FT-026/brief.md
   - ../FT-047/brief.md
 status: active
-delivery_status: planned
+delivery_status: implemented
 audience: humans_and_agents
 must_not_define:
   - implementation_sequence

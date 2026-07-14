@@ -5,8 +5,8 @@ doc_function: canonical
 purpose: "Канонический brief для e2e-покрытия recovery diagnostics."
 derived_from:
   - ../../use-cases/UC-005-agent-recovery.md
-status: draft
-delivery_status: planned
+status: active
+delivery_status: implemented
 milestone: milestone-1
 audience: humans_and_agents
 must_not_define:

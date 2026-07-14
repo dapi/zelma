@@ -13,8 +13,8 @@ audience: humans_and_agents
 
 # Execution Order
 
-Этот документ фиксирует порядок запуска feature issues в производство. Он
-описывает delivery sequencing и параллелизм, но не заменяет brief конкретной
+Этот документ фиксирует current delivery sequencing; completed waves остаются
+ниже как baseline, а не как tasks to launch. Он не заменяет brief конкретной
 feature.
 
 ## Правила Запуска
@@ -26,7 +26,13 @@ feature.
   merged contract, а не локальные предположения.
 - Review, CI и merge gates обязательны для каждой feature issue.
 
-## Волна 0: CLI And Registry Foundation
+## Completed Baseline: v0.1–v0.4
+
+Волны 0–6 ниже завершены: соответствующие issues closed, work merged и
+результаты вошли в v0.1–v0.4. Они сохраняются как dependency history, а не как
+план запуска.
+
+### Волна 0: CLI And Registry Foundation
 
 Перед zellij/read/detect работами должны быть готовы базовые EP-001/EP-002
 контракты:
@@ -130,17 +136,13 @@ pane candidates и идемпотентно обновлять registry.
 Результат волны: Codex skills становятся thin wrappers над `zelma` CLI и
 используют тот же stable output contract.
 
-## Краткий Практический Порядок
+## Current Next Delivery
 
-0. Завершить foundation baseline: `FT-001`...`FT-009`, `FT-031`.
-1. Параллельно: `#22`, `#23`, `#24`.
-2. Параллельно: `#25`, `#26`.
-3. Параллельно: `#27`, `#28`.
-4. Последовательно: `#29`, затем `#30`.
-5. Сначала: `#31`.
-6. Параллельно: `#32`, `#34`.
-7. Затем: `#33`.
-8. Параллельно: `#39`, `#40`, `#42`.
-9. Затем: `#41`.
-10. Параллельно: `#36`, `#37`.
-11. Затем параллельно: `#35`, `#38`.
+| Issue | Dependency | Next decision |
+| --- | --- | --- |
+| [#108](https://github.com/dapi/zelma/issues/108) | Current identity evidence | Approve manual-resolution UX and evidence threshold. |
+| [#109](https://github.com/dapi/zelma/issues/109) | Repo-local registry | Choose strict worktree ownership model. |
+| [#110](https://github.com/dapi/zelma/issues/110) | Existing zellij/Codex integrations | Define supported-version policy and CI canaries. |
+| [#111](https://github.com/dapi/zelma/issues/111) | Implemented local supervisor lifecycle | Decide GitHub integration and merge policy before implementation. |
+| [#112](https://github.com/dapi/zelma/issues/112) | Current lifecycle/handoff flows | Define event source and follow semantics. |
+| [#113](https://github.com/dapi/zelma/issues/113) | Current zellij integration | Decide current-session discovery and fallback behaviour. |

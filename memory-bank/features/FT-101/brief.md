@@ -18,7 +18,7 @@ derived_from:
   - ../FT-047/brief.md
   - ../FT-048/brief.md
 status: active
-delivery_status: planned
+delivery_status: implemented
 audience: humans_and_agents
 must_not_define:
   - implementation_sequence

@@ -134,3 +134,5 @@ audience: humans_and_agents
 - [FT-101: Safe Message Sending To Codex Sessions](FT-101/README.md) —
   guarded `zelma sessions send <id>` flow for delivering follow-up messages to
   live-revalidated Codex sessions through the public CLI and skill contract.
+- [FT-107: Synchronize Roadmap And Delivery Statuses](FT-107/README.md) —
+  reconciliation of product/epic/feature delivery statuses after v0.4.
